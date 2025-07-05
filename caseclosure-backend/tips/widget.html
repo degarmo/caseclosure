@@ -1,0 +1,15 @@
+<div id="cc-tip-widget"></div>
+<script>
+(function(){
+  const victim = window.location.host.split('.')[0]; // assumes subdomain
+  fetch('https://caseclosure.org/widget.js')
+    .then(r=>r.text())
+    .then(js=>eval(js))
+    .then(()=> window.CCWidget.init({
+      container: '#cc-tip-widget',
+      apiBase: 'https://caseclosure.org/api/tips',
+      victim,
+      recaptchaSiteKey: '6LfTKXkrAAAAAF5n5iDC_rohJwlx-U30isYH1tDj'
+    }));
+})();
+</script>
