@@ -143,16 +143,6 @@ export default function Dashboard() {
                   <small className="text-slate-400">Will appear as subdomain.caseclosure.org</small>
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm mb-1">Custom Domain (optional)</label>
-                  <input
-                    name="custom_domain"
-                    value={form.custom_domain}
-                    onChange={handleChange}
-                    className="w-full border px-3 py-2 rounded"
-                  />
-                  <small className="text-slate-400">e.g. 4josh.org</small>
-                </div>
-                <div className="mb-4">
                   <label className="block text-sm mb-1">Description</label>
                   <textarea
                     name="description"

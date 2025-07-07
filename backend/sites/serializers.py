@@ -8,7 +8,7 @@ class MemorialSiteSerializer(serializers.ModelSerializer):
             'id', 'user', 'name', 'victim_name', 'photo', 'date_of_birth', 'date_of_death',
             'incident_date', 'incident_location', 'case_number', 'investigating_department',
             'detective_contact', 'description', 'media_links', 'reward_offered', 'is_public',
-            'subdomain', 'custom_domain', 'created_at'
+            'subdomain', 'created_at'
         ]
         read_only_fields = ['id', 'user', 'created_at', 'photo']
 
