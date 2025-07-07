@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
@@ -16,7 +16,7 @@ export default function Login() {
     e.preventDefault();
     setError("");
     try {
-      const response = await axios.post("http://127.0.0.1:8000/api/auth/login/", form, {
+      const response = await api.post("auth/login/", form, {
         headers: { "Content-Type": "application/json" },
       });
       // Store tokens (for later use in AuthContext)

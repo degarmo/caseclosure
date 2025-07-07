@@ -1,6 +1,6 @@
 // frontend/src/pages/Signup.jsx
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 
 export default function Signup() {
@@ -18,7 +18,7 @@ export default function Signup() {
     e.preventDefault();
     setError(""); setSuccess("");
     try {
-      await axios.post("http://127.0.0.1:8000/api/auth/register/", form, {
+      await api.post("auth/register/", form, {
         headers: { "Content-Type": "application/json" },
       });
       setSuccess("Registration successful! Redirecting to login…");
