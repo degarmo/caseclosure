@@ -8,8 +8,6 @@ export default function Dashboard() {
   const [form, setForm] = useState({
     name: "",
     victim_name: "",
-    subdomain: "",
-    custom_domain: "",
     description: "",
   });
   const [error, setError] = useState("");
@@ -43,8 +41,6 @@ export default function Dashboard() {
       setForm({
         name: "",
         victim_name: "",
-        subdomain: "",
-        custom_domain: "",
         description: "",
       });
       setModalOpen(false);
@@ -93,7 +89,17 @@ export default function Dashboard() {
                   {sites.map((site) => (
                     <li key={site.id} className="mb-2">
                       <span className="font-semibold">{site.name}</span>{" "}
-                      <span className="text-xs text-slate-400">{site.subdomain}.caseclosure.org</span>
+                      {site.subdomain && (
+                        <span className="text-xs text-slate-400">
+                          {site.subdomain}.caseclosure.org
+                        </span>
+                      )}
+                      <a
+                        href={`/memorial/${site.id}`}
+                        className="ml-2 text-blue-500 underline hover:text-blue-700 text-xs"
+                      >
+                        View/Edit
+                      </a>
                     </li>
                   ))}
                 </ul>
@@ -130,17 +136,6 @@ export default function Dashboard() {
                     required
                     className="w-full border px-3 py-2 rounded"
                   />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm mb-1">Subdomain</label>
-                  <input
-                    name="subdomain"
-                    value={form.subdomain}
-                    onChange={handleChange}
-                    required
-                    className="w-full border px-3 py-2 rounded"
-                  />
-                  <small className="text-slate-400">Will appear as subdomain.caseclosure.org</small>
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm mb-1">Description</label>
