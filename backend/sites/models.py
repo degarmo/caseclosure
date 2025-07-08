@@ -18,9 +18,23 @@ class MemorialSite(models.Model):
     description = models.TextField(blank=True, help_text="Memorial bio or story")
     media_links = models.TextField(blank=True, help_text="Comma-separated URLs or media links")
     reward_offered = models.CharField(max_length=100, blank=True, help_text="Reward details (optional)")
-    is_public = models.BooleanField(default=True)
-    subdomain = models.CharField(max_length=50, unique=True)
+
+    # -- BEGIN PUBLISHING FIELDS --
+    is_public = models.BooleanField(default=False)  # Default is False until "published"
+    subdomain = models.CharField(max_length=50, unique=True, blank=True, null=True)
     custom_domain = models.CharField(max_length=255, unique=True, blank=True, null=True)
+    DOMAIN_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('live', 'Live'),
+        ('error', 'Error'),
+    ]
+    domain_status = models.CharField(
+        max_length=16,
+        choices=DOMAIN_STATUS_CHOICES,
+        default='pending'
+    )
+    # -- END PUBLISHING FIELDS --
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
