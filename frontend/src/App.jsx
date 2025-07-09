@@ -1,28 +1,55 @@
 // src/App.jsx
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import MemorialPage from "./pages/MemorialPage";
 import MemorialPublicPage from "./pages/MemorialPublicPage";
-import getSubdomain from "./utils/getSubdomain"; // Correct path!
+import MemorialSites from "./pages/MemorialSites";
+import UserSettings from "./pages/UserSettings";
+import MemorialSettings from "./pages/MemorialSettings"; // <-- ADD THIS IMPORT
+import getSubdomain from "./utils/getSubdomain";
+import Sidebar from "./components/Sidebar";
+import Topbar from "./components/Topbar";
 import "./App.css";
 import "./assets/styles/tailwind.css";
 import "./assets/styles/index.css";
-import MemorialSites from "./pages/MemorialSites";
 
-// Sidebar navigation items
-const sidebarLinks = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/memorial-sites", label: "Memorial Sites" },
-  // Add more links as needed
-];
+// --- Dummy Auth Helper ---
+// Replace with your real auth/context or pass in as prop/hook
+function useAuth() {
+  let user = null;
+  try {
+    user = JSON.parse(localStorage.getItem("user") || "null");
+  } catch {}
+  // Optionally, fallback to token logic:
+  // const token = localStorage.getItem("token");
+  // return { user, isAuthenticated: !!user || !!token };
+  return { user, isAuthenticated: !!user };
+}
 
-function App() {
+// RequireAuth: Protects all private routes
+function RequireAuth({ children }) {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    // Redirect to login, and after login can redirect back
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return children;
+}
+
+function AppContent() {
+  const { user, isAuthenticated } = useAuth();
+  const location = useLocation();
   const subdomain = getSubdomain();
 
-  // If on subdomain root, show public memorial page
+  // Routes for which sidebar/topbar should NOT show
+  const authRoutes = ["/login", "/signup"];
+
+  // Handle public memorial page by subdomain
   if (
     subdomain &&
     subdomain !== "www" &&
@@ -31,39 +58,89 @@ function App() {
     return <MemorialPublicPage subdomain={subdomain} />;
   }
 
-  // Otherwise, show normal app with sidebar
+  // Auth pages: only render auth forms (no sidebar/topbar)
+  if (authRoutes.includes(location.pathname)) {
+    return (
+      <Routes>
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
+      </Routes>
+    );
+  }
+
+  // Main layout for authenticated users
+  if (isAuthenticated) {
+    const handleLogout = () => {
+      localStorage.removeItem("user");
+      // Optionally: localStorage.removeItem("token");
+      window.location.href = "/login";
+    };
+
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar user={user} />
+        <div className="flex-1 flex flex-col">
+          <Topbar user={user} onLogout={handleLogout} />
+          <main className="flex-1">
+            <Routes>
+              <Route
+                path="/dashboard"
+                element={
+                  <RequireAuth>
+                    <Dashboard />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/memorial/:id"
+                element={
+                  <RequireAuth>
+                    <MemorialPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/memorial-sites"
+                element={
+                  <RequireAuth>
+                    <MemorialSites />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/settings/user"
+                element={
+                  <RequireAuth>
+                    <UserSettings />
+                  </RequireAuth>
+                }
+              />
+              {/* ---- NEW! Memorial Settings Route ---- */}
+              <Route
+                path="/settings/memorial"
+                element={
+                  <RequireAuth>
+                    <MemorialSettings />
+                  </RequireAuth>
+                }
+              />
+              {/* Add more protected routes here */}
+              <Route path="*" element={<Navigate to="/dashboard" />} />
+            </Routes>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated and not on auth routes, force login
+  return <Navigate to="/login" replace />;
+}
+
+function App() {
   return (
     <Router>
-      <div className="flex min-h-screen bg-gray-50">
-        {/* Sidebar */}
-        <aside className="w-56 bg-white shadow-lg p-4 flex flex-col">
-          <div className="mb-8 font-bold text-lg tracking-wide">CaseClosure.org</div>
-          {sidebarLinks.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className="block px-4 py-2 mb-1 rounded hover:bg-blue-100 text-gray-700"
-              activeclassname="bg-blue-200 font-bold"
-            >
-              {link.label}
-            </Link>
-          ))}
-          <div className="flex-1" />
-          <div className="text-xs text-gray-400 mt-8">Building justice, one story at a time.</div>
-        </aside>
-
-        {/* Main content area */}
-        <main className="flex-1">
-          <Routes>
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/memorial/:id" element={<MemorialPage />} />
-            <Route path="/memorial-sites" element={<MemorialSites />} />
-            {/* Add other routes here */}
-          </Routes>
-        </main>
-      </div>
+      <AppContent />
     </Router>
   );
 }

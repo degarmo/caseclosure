@@ -19,10 +19,25 @@ export default function Login() {
       const response = await api.post("auth/login/", form, {
         headers: { "Content-Type": "application/json" },
       });
-      // Store tokens (for later use in AuthContext)
+      // Store tokens
       localStorage.setItem("access", response.data.access);
       localStorage.setItem("refresh", response.data.refresh);
-      // Redirect to dashboard or protected route
+
+      // Store user info for your app layout/sidebar logic
+      // If your backend returns user info:
+      if (response.data.user) {
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+      } else {
+        // If not, get it with a second API call:
+        const me = await api.get("auth/user/", {
+          headers: {
+            Authorization: `Bearer ${response.data.access}`,
+          },
+        });
+        localStorage.setItem("user", JSON.stringify(me.data));
+      }
+
+      // Redirect after login
       navigate("/dashboard");
     } catch (err) {
       setError(
@@ -35,7 +50,7 @@ export default function Login() {
   return (
     <div className="container mx-auto px-4 h-full flex flex-col justify-center items-center min-h-screen bg-white">
       <div className="w-full max-w-md px-4">
-        <div className="shadow-lg rounded-lg bg-white border-0">
+        <div className="shadow-xl rounded-lg bg-sky-100 border border-sky-300">
           <div className="rounded-t px-6 py-6">
             <div className="text-center mb-3">
               <h6 className="text-slate-500 text-lg font-bold">Sign In</h6>
