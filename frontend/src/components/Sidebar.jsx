@@ -13,7 +13,7 @@ const menu = [
   },
   // ---- CaseBuilder Section ----
   {
-    section: "Create Case (CaseBuilder)",
+    section: "Create Case",
     icon: <FiPlusCircle />,
     to: "/case-builder",
   },

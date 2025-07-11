@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -15,6 +15,7 @@ export default function FileUploader({
   const [error, setError] = useState("");
   const [preview, setPreview] = useState(value?.preview || "");
   const [file, setFile] = useState(value?.file || null);
+  const inputRef = useRef();
 
   const maxSize = maxSizeMB * 1024 * 1024;
 
@@ -77,6 +78,7 @@ export default function FileUploader({
         data-dragging={dragActive || undefined}
       >
         <input
+          ref={inputRef}
           type="file"
           accept={accept}
           className="sr-only"
@@ -109,12 +111,15 @@ export default function FileUploader({
             <p className="text-muted-foreground text-xs mb-2">
               PNG, JPG or GIF (max. {maxSizeMB}MB)
             </p>
-            <label htmlFor="file-uploader-input">
-              <Button variant="outline" className="cursor-pointer">
-                <UploadIcon className="-ms-1 size-4 opacity-60 mr-2" />
-                {label}
-              </Button>
-            </label>
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              type="button"
+              onClick={() => inputRef.current && inputRef.current.click()}
+            >
+              <UploadIcon className="-ms-1 size-4 opacity-60 mr-2" />
+              {label}
+            </Button>
           </div>
         )}
       </div>
