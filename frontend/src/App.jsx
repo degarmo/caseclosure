@@ -1,4 +1,3 @@
-// src/App.jsx
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Signup from "./pages/Signup";
@@ -8,24 +7,21 @@ import MemorialPage from "./pages/MemorialPage";
 import MemorialPublicPage from "./pages/MemorialPublicPage";
 import MemorialSites from "./pages/MemorialSites";
 import UserSettings from "./pages/UserSettings";
-import MemorialSettings from "./pages/MemorialSettings"; // <-- ADD THIS IMPORT
+import MemorialSettings from "./pages/MemorialSettings";
 import getSubdomain from "./utils/getSubdomain";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import "./App.css";
 import "./assets/styles/tailwind.css";
 import "./assets/styles/index.css";
+import CaseBuilder from './pages/CaseBuilder/CaseBuilder';
 
 // --- Dummy Auth Helper ---
-// Replace with your real auth/context or pass in as prop/hook
 function useAuth() {
   let user = null;
   try {
     user = JSON.parse(localStorage.getItem("user") || "null");
   } catch {}
-  // Optionally, fallback to token logic:
-  // const token = localStorage.getItem("token");
-  // return { user, isAuthenticated: !!user || !!token };
   return { user, isAuthenticated: !!user };
 }
 
@@ -33,9 +29,7 @@ function useAuth() {
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
-
   if (!isAuthenticated) {
-    // Redirect to login, and after login can redirect back
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return children;
@@ -50,11 +44,7 @@ function AppContent() {
   const authRoutes = ["/login", "/signup"];
 
   // Handle public memorial page by subdomain
-  if (
-    subdomain &&
-    subdomain !== "www" &&
-    window.location.pathname === "/"
-  ) {
+  if (subdomain && subdomain !== "www" && window.location.pathname === "/") {
     return <MemorialPublicPage subdomain={subdomain} />;
   }
 
@@ -72,7 +62,6 @@ function AppContent() {
   if (isAuthenticated) {
     const handleLogout = () => {
       localStorage.removeItem("user");
-      // Optionally: localStorage.removeItem("token");
       window.location.href = "/login";
     };
 
@@ -115,7 +104,6 @@ function AppContent() {
                   </RequireAuth>
                 }
               />
-              {/* ---- NEW! Memorial Settings Route ---- */}
               <Route
                 path="/settings/memorial"
                 element={
@@ -124,7 +112,15 @@ function AppContent() {
                   </RequireAuth>
                 }
               />
-              {/* Add more protected routes here */}
+              <Route
+                path="/case-builder/*"
+                element={
+                  <RequireAuth>
+                    <CaseBuilder />
+                  </RequireAuth>
+                }
+              />
+              {/* 404 catch-all */}
               <Route path="*" element={<Navigate to="/dashboard" />} />
             </Routes>
           </main>

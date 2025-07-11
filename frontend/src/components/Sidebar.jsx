@@ -1,14 +1,21 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  FiHome, FiUser, FiSettings, FiMap, FiMessageCircle, FiFileText, FiChevronDown
+  FiHome, FiUser, FiSettings, FiMap, FiMessageCircle, FiFileText, FiChevronDown, FiPlusCircle
 } from "react-icons/fi";
 
+// Menu definition with CaseBuilder section
 const menu = [
   {
     section: "Dashboard",
     icon: <FiHome />,
     to: "/dashboard",
+  },
+  // ---- CaseBuilder Section ----
+  {
+    section: "Create Case (CaseBuilder)",
+    icon: <FiPlusCircle />,
+    to: "/case-builder",
   },
   {
     section: "Memorial Sites",
@@ -21,9 +28,7 @@ const menu = [
     children: [
       { label: "User Settings", to: "/settings/user" },
       { label: "Memorial Settings", to: "/settings/memorial" },
-      // You can add more as needed, e.g.:
-      // { label: "Account Info", to: "/settings/account" },
-      // { label: "Billing/Upgrade", to: "/settings/billing" },
+      // ... more as needed
     ]
   },
   {
@@ -79,7 +84,7 @@ export default function Sidebar({ user }) {
                 to={item.to}
                 className={`flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 text-gray-700 ${
                   isActive(item.to) ? "bg-blue-100 font-bold" : ""
-                }`}
+                } ${item.section.includes("CaseBuilder") || item.section.includes("Create Case") ? "bg-blue-600 text-white font-bold shadow hover:bg-blue-700" : ""}`}
               >
                 {item.icon}
                 {item.section}
