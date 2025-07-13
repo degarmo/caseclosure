@@ -1,6 +1,20 @@
 // tailwind.config.js
 const plugin = require("tailwindcss/plugin");
 const colors = require("tailwindcss/colors");
+import { materialTailwindPreset } from "@material-tailwind/react";
+
+export default {
+  presets: [materialTailwindPreset],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+    // add more paths as needed
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
 
 module.exports = {
     darkMode: ["class"],
