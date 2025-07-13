@@ -36,7 +36,7 @@ export default function Step1_Basics({ data = {}, next }) {
 
   return (
     <form
-      className="max-w-xl mx-auto p-8 bg-white rounded-lg shadow"
+      className="w-full p-8 bg-white rounded-lg shadow"
       onSubmit={handleNext}
       autoComplete="off"
     >
@@ -116,10 +116,10 @@ export default function Step1_Basics({ data = {}, next }) {
           type="submit"
           className="bg-blue-600 text-white font-bold px-8 py-2 rounded hover:bg-blue-700"
           disabled={
-            !form.first_name ||
-            !form.last_name ||
-            !form.title ||
-            !form.description
+            !form.first_name?.trim() ||
+            !form.last_name?.trim() ||
+            !form.title?.trim() ||
+            !form.description?.trim()
           }
         >
           Next

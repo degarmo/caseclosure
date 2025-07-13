@@ -1,14 +1,13 @@
 import { useState } from "react";
 import Step1_Basics from "./CaseStep1_Basics";
-import Step2_Template from "./CaseStep2_Template";
-import Step3_Widget from "./CaseStep3_Widget";
-import Step4_Review from "./CaseStep4_Review"; 
+import Step2_CrimeDetails from "./CaseStep2_CrimeData";
+import Step3_TemplateLogo from "./CaseStep3_TemplateLogo";
+
 
 const steps = [
   Step1_Basics,
-  Step2_Template,
-  Step3_Widget,
-  Step4_Review, // <-- Add here
+  Step2_CrimeDetails,
+  Step3_TemplateLogo,
 ];
 
 export default function CaseBuilder() {

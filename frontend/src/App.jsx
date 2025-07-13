@@ -58,7 +58,7 @@ function AppContent() {
     );
   }
 
-  // Main layout for authenticated users
+  // Main layout for authenticated users (sidebar/topbar always present)
   if (isAuthenticated) {
     const handleLogout = () => {
       localStorage.removeItem("user");
@@ -70,7 +70,7 @@ function AppContent() {
         <Sidebar user={user} />
         <div className="flex-1 flex flex-col">
           <Topbar user={user} onLogout={handleLogout} />
-          <main className="flex-1">
+          <main className="flex-1 p-8">
             <Routes>
               <Route
                 path="/dashboard"
