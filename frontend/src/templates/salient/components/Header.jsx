@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { Link } from "react-router-dom";
 import {
   Popover,
   PopoverButton,
@@ -9,10 +9,10 @@ import {
 } from '@headlessui/react'
 import clsx from 'clsx'
 
-import { Button } from '@/components/Button'
-import { Container } from '@/components/Container'
-import { Logo } from '@/components/Logo'
-import { NavLink } from '@/components/NavLink'
+import { Button } from './Button'
+import { Container } from './Container'
+import { NavLink } from './NavLink'
+import { Logo } from './Logo' // <-- Missing import added
 
 function MobileNavLink({ href, children }) {
   return (
@@ -76,7 +76,7 @@ function MobileNavigation() {
   )
 }
 
-export function Header() {
+export default function Header() {
   return (
     <header className="py-10">
       <Container>

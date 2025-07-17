@@ -1,10 +1,11 @@
-import Link from 'next/link'
+import { Link } from "react-router-dom";
 
-import { Container } from '@/components/Container'
-import { Logo } from '@/components/Logo'
-import { NavLink } from '@/components/NavLink'
+import { Container } from './Container'
+import { NavLink } from './NavLink'
+import { Logo } from './Logo'
 
-export function Footer() {
+
+export default function Footer() {
   return (
     <footer className="bg-slate-50">
       <Container>

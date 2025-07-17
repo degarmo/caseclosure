@@ -12,7 +12,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto w-full">
+    <div className="w-full h-full px-4 py-8">
       {/* Stats/Feature Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         <div className="bg-white rounded-xl p-8 shadow text-center w-full">

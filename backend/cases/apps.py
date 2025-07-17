@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class SitesConfig(AppConfig):
+class CasesConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'sites'
+    name = 'cases'

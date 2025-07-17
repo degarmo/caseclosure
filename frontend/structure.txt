@@ -44,55 +44,40 @@
 │   │   │   ├── team-4-470x470.png
 │   │   │   └── vue.jpg
 │   │   ├── react.svg
-│   │   ├── styles
-│   │   │   ├── index.css
-│   │   │   ├── tailwind.css
-│   │   │   └── templates
-│   │   │       └── salient
-│   │   │           ├── background-auth.jpg
-│   │   │           ├── background-call-to-action.jpg
-│   │   │           ├── background-faqs.jpg
-│   │   │           ├── background-features.jpg
-│   │   │           └── salient.css
-│   │   └── templates
+│   │   └── styles
+│   │       ├── index.css
+│   │       ├── tailwind.css
+│   │       └── templates
+│   │           └── salient
+│   │               ├── background-auth.jpg
+│   │               ├── background-call-to-action.jpg
+│   │               ├── background-faqs.jpg
+│   │               ├── background-features.jpg
+│   │               └── salient.css
+│   ├── builder
+│   │   ├── BuilderSidebar.jsx
+│   │   ├── PageCanvas.jsx
+│   │   ├── PageList.jsx
+│   │   └── WidgetList.jsx
 │   ├── components
 │   │   ├── avatar.jsx
-│   │   ├── BuilderSidebar.jsx
 │   │   ├── comp-545.tsx
 │   │   ├── fieldset.jsx
 │   │   ├── FileUploader.jsx
 │   │   ├── input.jsx
-│   │   ├── PageBuilder.jsx
 │   │   ├── PublishMemorialModal.jsx
 │   │   ├── RequireAuth.jsx
 │   │   ├── Sidebar.jsx
-│   │   ├── templates
-│   │   │   └── salient
-│   │   │       ├── components
-│   │   │       │   ├── Button.jsx
-│   │   │       │   ├── CallToAction.jsx
-│   │   │       │   ├── Container.jsx
-│   │   │       │   ├── Faqs.jsx
-│   │   │       │   ├── Fields.jsx
-│   │   │       │   ├── Footer.jsx
-│   │   │       │   ├── Header.jsx
-│   │   │       │   ├── Hero.jsx
-│   │   │       │   ├── Logo.jsx
-│   │   │       │   ├── NavLink.jsx
-│   │   │       │   ├── Pricing.jsx
-│   │   │       │   ├── PrimaryFeatures.jsx
-│   │   │       │   ├── SecondaryFeatures.jsx
-│   │   │       │   ├── SlimLayout.jsx
-│   │   │       │   └── Testimonials.jsx
-│   │   │       └── SalientTemplate.jsx
+│   │   ├── TemplatePreviewModal.jsx
 │   │   ├── textarea.jsx
 │   │   ├── Topbar.jsx
-│   │   ├── ui
-│   │   │   └── button.tsx
-│   │   └── widgets
-│   │       ├── LightHeroWidget.jsx
-│   │       ├── PagePalette.jsx
-│   │       └── WidgetPalette.jsx
+│   │   └── ui
+│   │       ├── button.jsx
+│   │       ├── button.tsx
+│   │       ├── label.jsx
+│   │       └── switch.jsx
+│   ├── constants
+│   │   └── templates.js
 │   ├── hooks
 │   │   └── use-file-upload.ts
 │   ├── index.css
@@ -105,24 +90,40 @@
 │   │   ├── CaseBuilder
 │   │   │   ├── CaseBuilder.jsx
 │   │   │   ├── CaseStep1_Basics.jsx
-│   │   │   ├── CaseStep2_CrimeDetails.jsx
-│   │   │   ├── CaseStep3_TemplateLogo.jsx
-│   │   │   └── CaseStep4_Review.jsx
+│   │   │   ├── CaseStep2_CrimeData.jsx
+│   │   │   └── CaseStep3_TemplateLogo.jsx
 │   │   ├── Dashboard.jsx
 │   │   ├── Login.jsx
 │   │   ├── MemorialPage.jsx
 │   │   ├── MemorialPublicPage.jsx
 │   │   ├── MemorialSettings.jsx
-│   │   ├── MemorialSites.jsx
+│   │   ├── PageBuilder.jsx
 │   │   ├── Signup.jsx
+│   │   ├── TemplatePreview.jsx
 │   │   └── UserSettings.jsx
 │   ├── styles
-│   └── utils
-│       ├── getSubdomain.js
-│       └── WidgetRegistry.js
+│   ├── templates
+│   │   └── salient
+│   │       ├── components
+│   │       │   ├── Button.jsx
+│   │       │   ├── Container.jsx
+│   │       │   ├── Footer.jsx
+│   │       │   ├── Header.jsx
+│   │       │   ├── Logo.jsx
+│   │       │   └── NavLink.jsx
+│   │       └── SalientTemplate.jsx
+│   ├── utils
+│   │   ├── getSubdomain.js
+│   │   └── WidgetRegistry.js
+│   └── widgets
+│       ├── index.jsx
+│       ├── LightHeroWidget.jsx
+│       ├── MapWidget.jsx
+│       ├── PagePalette.jsx
+│       └── WidgetPalette.jsx
 ├── structure.txt
 ├── tailwind.config.js
 ├── tsconfig.json
 └── vite.config.js
 
-23 directories, 103 files
+24 directories, 103 files

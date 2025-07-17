@@ -1,7 +1,7 @@
-from django.shortcuts import render, get_object_or_404
-from sites.models import MemorialSite
+from django.shortcuts import render
+from cases.models import Case  # Updated import
 
-class SubdomainMemorialMiddleware:
+class SubdomainCaseMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -11,8 +11,8 @@ class SubdomainMemorialMiddleware:
         if host.endswith('.caseclosure.org') and not host.startswith('www.'):
             subdomain = host.rsplit('.caseclosure.org', 1)[0]
             if subdomain and request.path == "/":
-                memorial = MemorialSite.objects.filter(subdomain=subdomain, is_public=True).first()
-                if memorial:
-                    # Render a template for the memorial site
-                    return render(request, "memorials/memorial_view.html", {"memorial": memorial})
+                case = Case.objects.filter(subdomain=subdomain, is_public=True).first()
+                if case:
+                    # Render a template for the case's public page
+                    return render(request, "memorials/memorial_view.html", {"case": case})
         return self.get_response(request)

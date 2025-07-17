@@ -1,33 +1,30 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  FiHome, FiUser, FiSettings, FiMap, FiMessageCircle, FiFileText, FiChevronDown, FiPlusCircle
+  FiHome, FiUser, FiSettings, FiMap, FiMessageCircle, FiFileText, FiChevronDown, FiFolder, FiPlusCircle, FiList
 } from "react-icons/fi";
 
-// Menu definition with CaseBuilder section
+// Updated menu definition
 const menu = [
   {
     section: "Dashboard",
     icon: <FiHome />,
     to: "/dashboard",
   },
-  // ---- CaseBuilder Section ----
+  // ---- Cases Section ----
   {
-    section: "Create Case",
-    icon: <FiPlusCircle />,
-    to: "/case-builder",
-  },
-  {
-    section: "Memorial Sites",
-    icon: <FiFileText />,
-    to: "/memorial-sites",
+    section: "Cases",
+    icon: <FiFolder />,
+    children: [
+      { label: "Create Case", icon: <FiPlusCircle />, to: "/case-builder" },
+      { label: "Case List", icon: <FiList />, to: "/cases/list" }
+    ]
   },
   {
     section: "Account",
     icon: <FiUser />,
     children: [
       { label: "User Settings", to: "/settings/user" },
-      { label: "Memorial Settings", to: "/settings/memorial" },
       // ... more as needed
     ]
   },
@@ -84,7 +81,7 @@ export default function Sidebar({ user }) {
                 to={item.to}
                 className={`flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 text-gray-700 ${
                   isActive(item.to) ? "bg-blue-100 font-bold" : ""
-                } ${item.section.includes("CaseBuilder") || item.section.includes("Create Case") ? "bg-blue-600 text-white font-bold shadow hover:bg-blue-700" : ""}`}
+                }`}
               >
                 {item.icon}
                 {item.section}
@@ -106,14 +103,15 @@ export default function Sidebar({ user }) {
                 </button>
                 {item.children && open[idx] && (
                   <div className="pl-10">
-                    {item.children.map((child) => (
+                    {item.children.map((child, childIdx) => (
                       <Link
                         key={child.to}
                         to={child.to}
-                        className={`block py-1 px-2 rounded hover:bg-blue-50 text-sm ${
+                        className={`flex items-center gap-2 py-1 px-2 rounded hover:bg-blue-50 text-sm ${
                           isActive(child.to) ? "bg-blue-100 font-bold" : ""
                         }`}
                       >
+                        {child.icon}
                         {child.label}
                       </Link>
                     ))}

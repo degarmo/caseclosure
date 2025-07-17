@@ -6,9 +6,11 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      // Remove this if you want only relative imports!
       '@': path.resolve(__dirname, 'src'),
     },
+  },
+  optimizeDeps: {
+    include: ["react-map-gl"],
   },
   server: {
     host: true,

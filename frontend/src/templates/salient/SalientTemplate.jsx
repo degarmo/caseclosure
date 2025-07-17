@@ -1,6 +1,8 @@
 // src/components/templates/salient/SalientTemplate.jsx
-import Header from './components/Header'
-import Footer from './components/Footer'
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import { Logo } from './components/Logo'
+
 
 export default function SalientTemplate({ children }) {
   return (
