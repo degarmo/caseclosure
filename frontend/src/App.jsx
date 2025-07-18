@@ -13,7 +13,7 @@ import "./assets/styles/tailwind.css";
 import "./assets/styles/index.css";
 import CaseBuilder from './pages/CaseBuilder/CaseBuilder';
 import PageBuilder from "./pages/PageBuilder";
-// import CasesList from "./pages/Cases/CasesList"; // (Admins only, when ready)
+import CasesList from "./components/CaseList";
 
 function useAuth() {
   let user = null;
@@ -41,7 +41,6 @@ function AppContent() {
   const authRoutes = ["/login", "/signup"];
 
   // "Immersive" builder/editor pages (no sidebar/topbar)
-  // (You can add more immersive routes if you want)
   const isImmersive =
     location.pathname === "/page-builder" ||
     location.pathname.startsWith("/case-builder");
@@ -80,6 +79,9 @@ function AppContent() {
       window.location.href = "/login";
     };
 
+    // Determine admin status using Django conventions
+    const isAdmin = user?.is_staff || user?.is_superuser;
+
     return (
       <div className="flex min-h-screen bg-gray-50">
         <Sidebar user={user} />
@@ -95,17 +97,17 @@ function AppContent() {
                   </RequireAuth>
                 }
               />
-              {/* Admin-only: Uncomment when you have CasesList page
-              {user?.is_admin && (
+              {/* Restrict Case List route to admin users only */}
+              {isAdmin && (
                 <Route
-                  path="/cases"
+                  path="/cases/list"
                   element={
                     <RequireAuth>
                       <CasesList />
                     </RequireAuth>
                   }
                 />
-              )} */}
+              )}
               <Route
                 path="/settings/user"
                 element={

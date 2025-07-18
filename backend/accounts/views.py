@@ -3,12 +3,19 @@ from django.contrib.auth import get_user_model
 from rest_framework.serializers import ModelSerializer
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from .models import UserProfile
-from .serializers import UserProfileSerializer
+from .serializers import UserProfileSerializer, UserSerializer
 
 User = get_user_model()
 
-# --- Registration Serializer ---
+class CurrentUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+    
 class RegisterSerializer(ModelSerializer):
     class Meta:
         model = User
@@ -23,27 +30,18 @@ class RegisterSerializer(ModelSerializer):
         )
         return user
 
-# --- Registration View ---
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
 
-# --- User Detail View (Protected) ---
 class UserDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        return Response({
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-        })
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
 
-# --- User Profile GET/PUT (Protected) ---
 class MyProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

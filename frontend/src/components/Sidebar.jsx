@@ -1,31 +1,29 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  FiHome, FiUser, FiSettings, FiMap, FiMessageCircle, FiFileText, FiChevronDown, FiFolder, FiPlusCircle, FiList
+  FiHome, FiUser, FiSettings, FiMap, FiMessageCircle, FiFileText, FiChevronDown, FiFolder, FiPlusCircle, FiList, FiShield
 } from "react-icons/fi";
 
-// Updated menu definition
+// Standard sections for all users
 const menu = [
   {
     section: "Dashboard",
     icon: <FiHome />,
     to: "/dashboard",
   },
-  // ---- Cases Section ----
   {
     section: "Cases",
     icon: <FiFolder />,
     children: [
-      { label: "Create Case", icon: <FiPlusCircle />, to: "/case-builder" },
-      { label: "Case List", icon: <FiList />, to: "/cases/list" }
+      { label: "Create Case", icon: <FiPlusCircle />, to: "/case-builder" }
+      // "Case List" is admin-only (see below)
     ]
   },
   {
     section: "Account",
     icon: <FiUser />,
     children: [
-      { label: "User Settings", to: "/settings/user" },
-      // ... more as needed
+      { label: "User Settings", to: "/settings/user" }
     ]
   },
   {
@@ -33,7 +31,7 @@ const menu = [
     icon: <FiMessageCircle />,
     children: [
       { label: "Inbox", to: "/messages/inbox" },
-      { label: "Tip Settings", to: "/messages/settings" },
+      { label: "Tip Settings", to: "/messages/settings" }
     ]
   },
   {
@@ -41,7 +39,7 @@ const menu = [
     icon: <FiFileText />,
     children: [
       { label: "Current Reports", to: "/reports/current" },
-      { label: "Create Report", to: "/reports/create" },
+      { label: "Create Report", to: "/reports/create" }
     ]
   },
   {
@@ -54,14 +52,31 @@ const menu = [
     icon: <FiMap />,
     children: [
       { label: "Map View", to: "/maps" },
-      { label: "Map Settings", to: "/maps/settings" },
+      { label: "Map Settings", to: "/maps/settings" }
     ]
   },
 ];
 
+// Admin-only section(s)
+const adminMenu = [
+  {
+    section: "Admin",
+    icon: <FiShield />,
+    children: [
+      { label: "Case List", icon: <FiList />, to: "/cases/list" }
+      // Add more admin-only items here in the future!
+    ]
+  }
+];
+
 export default function Sidebar({ user }) {
+  console.log("Sidebar user:", user);
   const location = useLocation();
   const [open, setOpen] = useState({});
+
+  // Determine admin status based on Django user fields
+  const isAdmin = user?.is_staff || user?.is_superuser;
+  const fullMenu = isAdmin ? [...menu, ...adminMenu] : menu;
 
   const isActive = (to) =>
     location.pathname === to ||
@@ -70,11 +85,15 @@ export default function Sidebar({ user }) {
   return (
     <aside className="w-60 min-h-screen bg-white border-r shadow-lg flex flex-col">
       <div className="p-6 flex items-center gap-2 font-bold text-lg">
-        <span className="bg-blue-600 text-white rounded-full px-3 py-2">{user?.first_name?.[0]?.toUpperCase() || "?"}</span>
-        <span>Welcome, {user?.first_name ? user.first_name.charAt(0).toUpperCase() + user.first_name.slice(1) : "User"}</span>
+        <span className="bg-blue-600 text-white rounded-full px-3 py-2">
+          {user?.first_name?.[0]?.toUpperCase() || "?"}
+        </span>
+        <span>
+          Welcome, {user?.first_name ? user.first_name.charAt(0).toUpperCase() + user.first_name.slice(1) : "User"}
+        </span>
       </div>
       <nav className="flex-1 overflow-y-auto px-2">
-        {menu.map((item, idx) => (
+        {fullMenu.map((item, idx) => (
           <div key={idx} className="mb-1">
             {item.to ? (
               <Link
