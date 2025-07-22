@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import TemplatePreviewModal from "@/components/TemplatePreviewModal";
-import SalientTemplate from "@/templates/salient/SalientTemplate"; // Add more as needed
+import SalientTemplate from "@/templates/salient/SalientTemplate";
+import api from "@/utils/axios"; // <-- Axios instance with auth
 
 const TEMPLATES = [
   {
@@ -12,8 +13,30 @@ const TEMPLATES = [
   // Add more templates as needed!
 ];
 
-export default function CaseStep3_TemplateSelect({ onTemplateSelect }) {
+export default function CaseStep3_TemplateSelect({ caseId, onTemplateSelect, next }) {
   const [modal, setModal] = useState({ open: false, template: null });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSelect = async (templateId) => {
+    setLoading(true);
+    setError("");
+    try {
+      // PATCH template selection to backend
+      const res = await api.patch(`/cases/${caseId}/`, { template: templateId });
+      setLoading(false);
+      if (onTemplateSelect) onTemplateSelect(templateId);
+      if (next) next(res.data); // Proceed to next step if needed
+      setModal({ open: false, template: null });
+    } catch (err) {
+      setLoading(false);
+      setError(
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Could not save template selection."
+      );
+    }
+  };
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50">
@@ -40,11 +63,15 @@ export default function CaseStep3_TemplateSelect({ onTemplateSelect }) {
         <TemplatePreviewModal
           template={modal.template}
           onClose={() => setModal({ open: false, template: null })}
-          onSelect={() => {
-            onTemplateSelect(modal.template.id);
-            setModal({ open: false, template: null });
-          }}
+          onSelect={() => handleSelect(modal.template.id)}
+          loading={loading}
         />
+      )}
+
+      {error && (
+        <div className="fixed bottom-8 left-0 right-0 mx-auto text-center text-red-600 font-semibold">
+          {error}
+        </div>
       )}
     </div>
   );

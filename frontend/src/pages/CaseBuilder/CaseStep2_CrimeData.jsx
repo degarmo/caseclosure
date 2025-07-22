@@ -2,12 +2,15 @@ import { useState, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import api from "@/utils/axios";
 
 const CRIME_TYPES = ["Homicide", "Assault", "Missing", "Other"];
 
 export default function CaseStep2_CrimeData({ data = {}, next, back }) {
   const firstName = data.first_name || "your loved one";
-  const portrait = data.portrait || data.photo || "";
+  // Always prefer data.photo, then data.portrait, then ""
+  const portrait = data.photo || data.portrait || "";
+  const photoUrl = portrait && typeof portrait === "string" ? portrait : "";
   const resultedInDeathId = useId();
   const rewardOfferedId = useId();
 
@@ -24,13 +27,19 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
     detective_name: data.detective_name || "",
     detective_phone: data.detective_phone || "",
     detective_email: data.detective_email || "",
-    media_links: data.media_links || [],
+    media_links: Array.isArray(data.media_links)
+      ? data.media_links
+      : typeof data.media_links === "string"
+      ? data.media_links.split(",").filter(Boolean)
+      : [],
     media_link_input: "",
-    reward_offered: data.reward_offered ?? false,
+    reward_offered: data.reward_offered === "true" || data.reward_offered === true,
     reward_amount: data.reward_amount || "",
   });
 
-  // Handlers
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
@@ -46,7 +55,6 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
     }));
   };
 
-  // Media link add/remove
   const handleAddLink = (e) => {
     e.preventDefault();
     const link = form.media_link_input.trim();
@@ -67,17 +75,46 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
   };
 
   const handleMapSelect = () => {
-    // TODO: Open a modal to pick from Google Maps, update form.incident_location and form.incident_latlng
     alert("Map selection coming soon!");
   };
 
-  const handleNext = (e) => {
+  const handleNext = async (e) => {
     e.preventDefault();
-    const output = { ...form };
-    if (!form.resulted_in_death) output.date_of_death = "";
-    if (!form.reward_offered) output.reward_amount = "";
-    delete output.media_link_input; // Clean temp field
-    next(output);
+    setLoading(true);
+    setError("");
+
+    const output = {
+      ...form,
+      resulted_in_death: !!form.resulted_in_death,
+      reward_offered: form.reward_offered ? "true" : "false",
+      media_links: Array.isArray(form.media_links)
+        ? form.media_links.filter(Boolean).join(",")
+        : "",
+    };
+
+    if (!output.resulted_in_death) delete output.date_of_death;
+    if (output.reward_offered !== "true") delete output.reward_amount;
+    if (!output.reward_amount) delete output.reward_amount;
+    if (data.user) output.user = data.user;
+
+    try {
+      const res = await api.patch(`/cases/${data.id}/`, output);
+      setLoading(false);
+      next({ ...form, ...res.data });
+    } catch (err) {
+      setLoading(false);
+      setError(
+        err?.response?.data?.detail ||
+          JSON.stringify(err?.response?.data) ||
+          err?.message ||
+          "Could not update case."
+      );
+      console.error(
+        "[CaseStep2_CrimeData] ERROR during PATCH:",
+        err,
+        err.response?.data
+      );
+    }
   };
 
   return (
@@ -86,13 +123,31 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
       onSubmit={handleNext}
       autoComplete="off"
     >
+      {error && (
+        <div className="mb-4 text-red-600 text-center font-medium">{error}</div>
+      )}
+
       {/* 1. More about Loved One */}
       <section>
         <h2 className="text-lg font-bold mb-4">1. More about {firstName}</h2>
         <div className="flex items-start mb-4 gap-6">
-          {portrait && (
-            <img src={portrait} alt="Portrait" className="h-28 w-28 rounded-lg object-cover border" />
-          )}
+          <div>
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt="Portrait"
+                className="h-28 w-28 rounded-lg object-cover border"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "";
+                }}
+              />
+            ) : (
+              <div className="h-28 w-28 flex items-center justify-center bg-gray-100 rounded-lg border text-gray-400">
+                No Image
+              </div>
+            )}
+          </div>
           <div className="flex-1 space-y-4">
             <div>
               <label className="block font-bold mb-1">Date of Birth</label>
@@ -112,7 +167,9 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
                 <Switch
                   id={resultedInDeathId}
                   checked={form.resulted_in_death}
-                  onCheckedChange={(checked) => handleSwitch("resulted_in_death", checked)}
+                  onCheckedChange={(checked) =>
+                    handleSwitch("resulted_in_death", checked)
+                  }
                 />
                 <span>{form.resulted_in_death ? "Yes" : "No"}</span>
               </div>
@@ -148,7 +205,9 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
             >
               <option value="">Select...</option>
               {CRIME_TYPES.map((ct) => (
-                <option key={ct} value={ct}>{ct}</option>
+                <option key={ct} value={ct}>
+                  {ct}
+                </option>
               ))}
             </select>
           </div>
@@ -176,22 +235,15 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
               placeholder="Address, intersection, or landmark"
               required
             />
-            <Button
-              type="button"
-              className="ml-2"
-              onClick={handleMapSelect}
-            >
+            <Button type="button" className="ml-2" onClick={handleMapSelect}>
               Pinpoint on Map
             </Button>
           </div>
-          {/* Map preview placeholder */}
-          <div className="my-2 w-full bg-gray-100 border h-40 flex items-center justify-center rounded text-gray-500">
-            {/* Replace with map component */}
-            [Map will appear here after selecting a location]
-          </div>
         </div>
         <div>
-          <label className="block font-bold mb-1">Brief Incident Description</label>
+          <label className="block font-bold mb-1">
+            Brief Incident Description
+          </label>
           <textarea
             name="incident_description"
             value={form.incident_description}
@@ -203,22 +255,20 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
         </div>
       </section>
 
-      {/* 3. Contacts & Reporting */}
+      {/* 3. Contacts */}
       <section>
         <h2 className="text-lg font-bold mb-4">3. Contacts & Reporting</h2>
-        <div className="bg-yellow-100 border-l-4 border-yellow-400 p-3 mb-3 text-sm text-yellow-900 rounded">
-          <strong>Emergency?</strong> If this is an emergency or crime in progress, call <b>911</b> immediately.
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block font-bold mb-1">Investigating Department</label>
+            <label className="block font-bold mb-1">
+              Investigating Department
+            </label>
             <input
               type="text"
               name="investigating_department"
               value={form.investigating_department}
               onChange={handleChange}
               className="w-full border px-3 py-2 rounded"
-              placeholder="e.g., City PD"
             />
           </div>
           <div>
@@ -229,7 +279,6 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
               value={form.detective_name}
               onChange={handleChange}
               className="w-full border px-3 py-2 rounded"
-              placeholder="Detective's full name"
             />
           </div>
           <div>
@@ -240,7 +289,6 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
               value={form.detective_phone}
               onChange={handleChange}
               className="w-full border px-3 py-2 rounded"
-              placeholder="(555) 555-5555"
             />
           </div>
           <div>
@@ -251,14 +299,8 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
               value={form.detective_email}
               onChange={handleChange}
               className="w-full border px-3 py-2 rounded"
-              placeholder="email@example.com"
             />
           </div>
-        </div>
-        <div className="mt-2">
-          <a href="/tip" className="text-blue-700 underline">
-            Submit a Tip
-          </a>
         </div>
       </section>
 
@@ -276,18 +318,29 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
               className="flex-1 border px-3 py-2 rounded"
               placeholder="Paste a news or video link"
             />
-            <Button type="button" onClick={handleAddLink}>Add</Button>
+            <Button type="button" onClick={handleAddLink}>
+              Add
+            </Button>
           </div>
           <ul className="mt-2 space-y-1">
             {form.media_links.map((link, idx) => (
-              <li key={link} className="flex items-center gap-2">
-                <a href={link} target="_blank" rel="noopener" className="text-blue-700 underline break-all">{link}</a>
+              <li key={idx} className="flex items-center gap-2">
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-700 underline break-all"
+                >
+                  {link}
+                </a>
                 <Button
                   type="button"
                   size="sm"
                   onClick={() => handleRemoveLink(idx)}
                   className="ml-2 px-2 py-0.5 text-xs bg-red-200 hover:bg-red-300 text-red-800 rounded"
-                >Remove</Button>
+                >
+                  Remove
+                </Button>
               </li>
             ))}
           </ul>
@@ -300,7 +353,9 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
             <Switch
               id={rewardOfferedId}
               checked={form.reward_offered}
-              onCheckedChange={(checked) => handleSwitch("reward_offered", checked)}
+              onCheckedChange={(checked) =>
+                handleSwitch("reward_offered", checked)
+              }
             />
             <span>{form.reward_offered ? "Yes" : "No"}</span>
           </div>
@@ -309,29 +364,35 @@ export default function CaseStep2_CrimeData({ data = {}, next, back }) {
               <label className="block font-bold mb-1">Reward Amount ($)</label>
               <input
                 type="number"
-                min="0"
-                step="any"
                 name="reward_amount"
                 value={form.reward_amount}
                 onChange={handleChange}
                 className="w-full border px-3 py-2 rounded"
-                placeholder="e.g., 5000"
               />
-              <div className="text-xs text-gray-600 mt-1">
-                Reward disbursement is at the sole discretion of the family or authorized individual, and is not managed by CaseClosure.org.
-              </div>
             </div>
           )}
         </div>
       </section>
 
-      {/* 5. Navigation */}
       <div className="flex justify-between mt-8">
-        <Button variant="outline" type="button" onClick={back}>
+        <Button
+          variant="outline"
+          type="button"
+          onClick={back}
+          disabled={loading}
+        >
           Back
         </Button>
-        <Button type="submit">
-          Next
+        <Button
+          type="submit"
+          disabled={
+            loading ||
+            !form.crime_type ||
+            !form.incident_date ||
+            !form.incident_location
+          }
+        >
+          {loading ? "Saving..." : "Next"}
         </Button>
       </div>
     </form>

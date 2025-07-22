@@ -1,7 +1,7 @@
-from rest_framework import routers
+from rest_framework.routers import DefaultRouter
 from .views import CaseViewSet
 
-router = routers.DefaultRouter()
-router.register(r'cases', CaseViewSet)
+router = DefaultRouter()
+router.register(r'cases', CaseViewSet, basename='case')
 
 urlpatterns = router.urls

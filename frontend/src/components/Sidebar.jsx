@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   FiHome, FiUser, FiSettings, FiMap, FiMessageCircle, FiFileText, FiChevronDown, FiFolder, FiPlusCircle, FiList, FiShield
 } from "react-icons/fi";
+import api from "@/utils/axios";
 
-// Standard sections for all users
 const menu = [
   {
     section: "Dashboard",
@@ -14,10 +14,7 @@ const menu = [
   {
     section: "Cases",
     icon: <FiFolder />,
-    children: [
-      { label: "Create Case", icon: <FiPlusCircle />, to: "/case-builder" }
-      // "Case List" is admin-only (see below)
-    ]
+    // children handled below!
   },
   {
     section: "Account",
@@ -57,24 +54,36 @@ const menu = [
   },
 ];
 
-// Admin-only section(s)
 const adminMenu = [
   {
     section: "Admin",
     icon: <FiShield />,
     children: [
       { label: "Case List", icon: <FiList />, to: "/cases/list" }
-      // Add more admin-only items here in the future!
     ]
   }
 ];
 
 export default function Sidebar({ user }) {
-  console.log("Sidebar user:", user);
   const location = useLocation();
   const [open, setOpen] = useState({});
+  const [userCases, setUserCases] = useState([]);
 
-  // Determine admin status based on Django user fields
+  // Fetch user cases on mount (filtering handled by backend for regular users)
+  useEffect(() => {
+    api.get("/cases/")
+      .then(res => {
+        const data = res.data.results || res.data;
+        // For admins, show all. For users, filter by user.id
+        // (Backend already does this, but safe to filter)
+        const filtered = Array.isArray(data)
+          ? data.filter(c => String(c.user) === String(user.id))
+          : [];
+        setUserCases(filtered);
+      })
+      .catch(() => setUserCases([]));
+  }, [user.id]);
+
   const isAdmin = user?.is_staff || user?.is_superuser;
   const fullMenu = isAdmin ? [...menu, ...adminMenu] : menu;
 
@@ -95,7 +104,47 @@ export default function Sidebar({ user }) {
       <nav className="flex-1 overflow-y-auto px-2">
         {fullMenu.map((item, idx) => (
           <div key={idx} className="mb-1">
-            {item.to ? (
+            {item.section === "Cases" ? (
+              <>
+                <button
+                  onClick={() => setOpen((o) => ({ ...o, [idx]: !o[idx] }))}
+                  className="flex w-full items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 text-gray-700 focus:outline-none"
+                  type="button"
+                >
+                  {item.icon}
+                  {item.section}
+                  <FiChevronDown
+                    className={`ml-auto transition-transform ${open[idx] ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {open[idx] && (
+                  <div className="pl-10">
+                    {/* Always show "Create Case" */}
+                    <Link
+                      to="/case-builder"
+                      className={`flex items-center gap-2 py-1 px-2 rounded hover:bg-blue-50 text-sm ${
+                        isActive("/case-builder") ? "bg-blue-100 font-bold" : ""
+                      }`}
+                    >
+                      <FiPlusCircle />
+                      Create Case
+                    </Link>
+                    {/* Show user's created cases */}
+                    {userCases.map((c) => (
+                      <Link
+                        key={c.id}
+                        to={`/cases/${c.id}`}
+                        className={`flex items-center gap-2 py-1 px-2 rounded hover:bg-blue-50 text-sm ${
+                          isActive(`/cases/${c.id}`) ? "bg-blue-100 font-bold" : ""
+                        }`}
+                      >
+                        {c.victim_name || c.name || c.first_name + " " + c.last_name || "Untitled"}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : item.to ? (
               <Link
                 to={item.to}
                 className={`flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 text-gray-700 ${

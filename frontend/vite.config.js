@@ -16,5 +16,8 @@ export default defineConfig({
     host: true,
     port: 5173,
     allowedHosts: ['caseclosure.org', 'dron4.caseclosure.org'],
+    proxy: {
+      "/api": "http://localhost:8000", // <-- point to your Django backend
+    }
   },
 })

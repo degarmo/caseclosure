@@ -14,6 +14,7 @@ import "./assets/styles/index.css";
 import CaseBuilder from './pages/CaseBuilder/CaseBuilder';
 import PageBuilder from "./pages/PageBuilder";
 import CasesList from "./components/CaseList";
+import CaseDetail from "./pages/CaseDetail"; // NEW: Import your Case Detail page
 
 function useAuth() {
   let user = null;
@@ -66,7 +67,7 @@ function AppContent() {
       <RequireAuth>
         <Routes>
           <Route path="/page-builder" element={<PageBuilder />} />
-          <Route path="/case-builder/*" element={<CaseBuilder />} />
+          <Route path="/case-builder" element={<CaseBuilder />} />
         </Routes>
       </RequireAuth>
     );
@@ -108,6 +109,15 @@ function AppContent() {
                   }
                 />
               )}
+              {/* --- New Case Detail Route --- */}
+              <Route
+                path="/cases/:id"
+                element={
+                  <RequireAuth>
+                    <CaseDetail />
+                  </RequireAuth>
+                }
+              />
               <Route
                 path="/settings/user"
                 element={

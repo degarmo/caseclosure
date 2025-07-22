@@ -17,7 +17,8 @@ class Case(models.Model):
     detective_contact = models.CharField(max_length=255, blank=True, help_text="Detective's contact info")
     description = models.TextField(blank=True, help_text="Case bio or story")
     media_links = models.TextField(blank=True, help_text="Comma-separated URLs or media links")
-    
+    first_name = models.CharField(max_length=255, blank=True, null=True)
+    last_name = models.CharField(max_length=255, blank=True, null=True)
     # -- Reward Fields --
     reward_amount = models.DecimalField(
         max_digits=10, decimal_places=2, blank=True, null=True,

@@ -1,0 +1,172 @@
+.
+├── backend
+│   ├── accounts
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── migrations
+│   │   │   ├── __init__.py
+│   │   │   └── 0001_initial.py
+│   │   ├── models.py
+│   │   ├── serializers.py
+│   │   ├── signals.py
+│   │   ├── tests.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── cases
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── migrations
+│   │   │   ├── __init__.py
+│   │   │   └── 0001_initial.py
+│   │   ├── models.py
+│   │   ├── serializers.py
+│   │   ├── tests.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   ├── asgi.py
+│   │   ├── middleware.py
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   ├── manage.py
+│   └── structure.txt
+├── frontend
+│   ├── components.json
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── public
+│   │   ├── logo.png
+│   │   └── vite.svg
+│   ├── README.md
+│   ├── src
+│   │   ├── api
+│   │   │   ├── axios.js
+│   │   │   └── memorialSites.js
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   ├── assets
+│   │   │   ├── constants
+│   │   │   │   └── themes.js
+│   │   │   ├── img
+│   │   │   │   ├── angular.jpg
+│   │   │   │   ├── bootstrap.jpg
+│   │   │   │   ├── component-btn-pink.png
+│   │   │   │   ├── component-btn.png
+│   │   │   │   ├── component-info-2.png
+│   │   │   │   ├── component-info-card.png
+│   │   │   │   ├── component-menu.png
+│   │   │   │   ├── component-profile-card.png
+│   │   │   │   ├── documentation.png
+│   │   │   │   ├── github.svg
+│   │   │   │   ├── google.svg
+│   │   │   │   ├── ill_header.png
+│   │   │   │   ├── landing.jpg
+│   │   │   │   ├── login.jpg
+│   │   │   │   ├── pattern_react.png
+│   │   │   │   ├── profile.jpg
+│   │   │   │   ├── react.jpg
+│   │   │   │   ├── register_bg_2.png
+│   │   │   │   ├── sketch.jpg
+│   │   │   │   ├── team-1-800x800.jpg
+│   │   │   │   ├── team-2-800x800.jpg
+│   │   │   │   ├── team-3-800x800.jpg
+│   │   │   │   ├── team-4-470x470.png
+│   │   │   │   └── vue.jpg
+│   │   │   ├── react.svg
+│   │   │   └── styles
+│   │   │       ├── index.css
+│   │   │       ├── tailwind.css
+│   │   │       └── templates
+│   │   │           └── salient
+│   │   │               ├── background-auth.jpg
+│   │   │               ├── background-call-to-action.jpg
+│   │   │               ├── background-faqs.jpg
+│   │   │               ├── background-features.jpg
+│   │   │               └── salient.css
+│   │   ├── builder
+│   │   │   ├── BuilderSidebar.jsx
+│   │   │   ├── PageCanvas.jsx
+│   │   │   ├── PageList.jsx
+│   │   │   └── WidgetList.jsx
+│   │   ├── components
+│   │   │   ├── avatar.jsx
+│   │   │   ├── CaseFormTabs.jsx
+│   │   │   ├── CaseList.jsx
+│   │   │   ├── comp-545.tsx
+│   │   │   ├── fieldset.jsx
+│   │   │   ├── FileUploader.jsx
+│   │   │   ├── input.jsx
+│   │   │   ├── LogoUploader.jsx
+│   │   │   ├── ProgressBar.jsx
+│   │   │   ├── PublishMemorialModal.jsx
+│   │   │   ├── RequireAuth.jsx
+│   │   │   ├── Sidebar.jsx
+│   │   │   ├── TemplatePreviewModal.jsx
+│   │   │   ├── TemplateThumbnail.jsx
+│   │   │   ├── textarea.jsx
+│   │   │   ├── Topbar.jsx
+│   │   │   └── ui
+│   │   │       ├── button.jsx
+│   │   │       ├── button.tsx
+│   │   │       ├── label.jsx
+│   │   │       └── switch.jsx
+│   │   ├── constants
+│   │   │   └── templates.js
+│   │   ├── hooks
+│   │   │   └── use-file-upload.ts
+│   │   ├── index.css
+│   │   ├── lib
+│   │   │   └── utils.js
+│   │   ├── main.jsx
+│   │   ├── MainAppRoutes.jsx
+│   │   ├── pages
+│   │   │   ├── BuilderLanding.jsx
+│   │   │   ├── CaseBuilder
+│   │   │   │   ├── CaseBuilder.jsx
+│   │   │   │   ├── CaseStep1_Basics.jsx
+│   │   │   │   ├── CaseStep2_CrimeData.jsx
+│   │   │   │   └── CaseStep3_TemplateLogo.jsx
+│   │   │   ├── CaseDetail.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── Login.jsx
+│   │   │   ├── MemorialPublicPage.jsx
+│   │   │   ├── PageBuilder.jsx
+│   │   │   ├── Signup.jsx
+│   │   │   ├── TemplatePreview.jsx
+│   │   │   └── UserSettings.jsx
+│   │   ├── styles
+│   │   ├── templates
+│   │   │   └── salient
+│   │   │       ├── components
+│   │   │       │   ├── Button.jsx
+│   │   │       │   ├── Container.jsx
+│   │   │       │   ├── Footer.jsx
+│   │   │       │   ├── Header.jsx
+│   │   │       │   ├── Logo.jsx
+│   │   │       │   └── NavLink.jsx
+│   │   │       └── SalientTemplate.jsx
+│   │   ├── utils
+│   │   │   ├── axios.js
+│   │   │   ├── getSubdomain.js
+│   │   │   └── WidgetRegistry.js
+│   │   └── widgets
+│   │       ├── index.jsx
+│   │       ├── LightHeroWidget.jsx
+│   │       ├── MapWidget.jsx
+│   │       ├── PagePalette.jsx
+│   │       └── WidgetPalette.jsx
+│   ├── structure.txt
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   └── vite.config.js
+├── README.md
+└── structure.txt
+
+31 directories, 139 files
