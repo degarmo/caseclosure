@@ -7,6 +7,8 @@ class CaseViewSet(viewsets.ModelViewSet):
     queryset = Case.objects.all().order_by('-created_at')
     serializer_class = CaseSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = 'id'
+
 
     def get_queryset(self):
         if self.request.user.is_staff:

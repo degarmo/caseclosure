@@ -1,9 +1,11 @@
+import React from "react";
 import { Link, useLocation } from "react-router-dom";
 
 export function NavLink({ to, href, children, className = "", ...rest }) {
   const location = useLocation();
   let isActive = false;
 
+  // If "to" is present, check if current path matches for active styling
   if (to) {
     isActive = location.pathname === to;
   }
@@ -12,7 +14,9 @@ export function NavLink({ to, href, children, className = "", ...rest }) {
     return (
       <Link
         to={to}
-        className={`text-slate-700 hover:text-blue-600 font-medium transition ${isActive ? "font-bold underline" : ""} ${className}`}
+        className={`text-slate-700 hover:text-blue-600 font-medium transition ${
+          isActive ? "font-bold underline" : ""
+        } ${className}`}
         {...rest}
       >
         {children}

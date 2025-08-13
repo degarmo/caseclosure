@@ -1,25 +1,24 @@
-'use client'
-
+import React from "react";
 import { Link } from "react-router-dom";
 import {
   Popover,
   PopoverButton,
   PopoverBackdrop,
   PopoverPanel,
-} from '@headlessui/react'
-import clsx from 'clsx'
+} from '@headlessui/react';
+import clsx from 'clsx';
 
-import { Button } from './Button'
-import { Container } from './Container'
-import { NavLink } from './NavLink'
-import { Logo } from './Logo' // <-- Missing import added
+import { Button } from './Button';
+import { Container } from './Container';
+import LogoRenderer from "@/components/LogoRenderer";
+import DynamicNavbar from "@/components/DynamicNavbar"; // Should render only nav links, not auth
 
-function MobileNavLink({ href, children }) {
+function MobileNavLink({ to, children }) {
   return (
-    <PopoverButton as={Link} href={href} className="block w-full p-2">
+    <PopoverButton as={Link} to={to} className="block w-full p-2">
       {children}
     </PopoverButton>
-  )
+  );
 }
 
 function MobileNavIcon({ open }) {
@@ -46,10 +45,11 @@ function MobileNavIcon({ open }) {
         )}
       />
     </svg>
-  )
+  );
 }
 
-function MobileNavigation() {
+// Only dynamic pages in nav, static auth at right
+function MobileNavigation({ pages }) {
   return (
     <Popover>
       <PopoverButton
@@ -66,46 +66,46 @@ function MobileNavigation() {
         transition
         className="absolute inset-x-0 top-full mt-4 flex origin-top flex-col rounded-2xl bg-white p-4 text-lg tracking-tight text-slate-900 shadow-xl ring-1 ring-slate-900/5 data-closed:scale-95 data-closed:opacity-0 data-enter:duration-150 data-enter:ease-out data-leave:duration-100 data-leave:ease-in"
       >
-        <MobileNavLink href="#features">Features</MobileNavLink>
-        <MobileNavLink href="#testimonials">Testimonials</MobileNavLink>
-        <MobileNavLink href="#pricing">Pricing</MobileNavLink>
+        {pages && pages.map(page => (
+          <MobileNavLink key={page.slug} to={`/${page.slug}`}>
+            {page.title}
+          </MobileNavLink>
+        ))}
         <hr className="m-2 border-slate-300/40" />
-        <MobileNavLink href="/login">Sign in</MobileNavLink>
+        <MobileNavLink to="/login">Sign in</MobileNavLink>
       </PopoverPanel>
     </Popover>
-  )
+  );
 }
 
-export default function Header() {
+export default function Header({ logo, pages = [] }) {
   return (
     <header className="py-10">
       <Container>
         <nav className="relative z-50 flex justify-between">
           <div className="flex items-center md:gap-x-12">
-            <Link href="#" aria-label="Home">
-              <Logo className="h-10 w-auto" />
+            <Link to="/" aria-label="Home">
+              <LogoRenderer logo={logo} />
             </Link>
+            {/* Dynamic page navigation, desktop only */}
             <div className="hidden md:flex md:gap-x-6">
-              <NavLink href="#features">Features</NavLink>
-              <NavLink href="#testimonials">Testimonials</NavLink>
-              <NavLink href="#pricing">Pricing</NavLink>
+              <DynamicNavbar pages={pages} />
             </div>
           </div>
           <div className="flex items-center gap-x-5 md:gap-x-8">
+            {/* Desktop: static links */}
             <div className="hidden md:block">
-              <NavLink href="/login">Sign in</NavLink>
+              <Link to="/login" className="text-slate-700 hover:text-blue-600 font-medium transition">
+                Sign in
+              </Link>
             </div>
-            <Button href="/register" color="blue">
-              <span>
-                Get started <span className="hidden lg:inline">today</span>
-              </span>
-            </Button>
+            {/* Mobile: hamburger */}
             <div className="-mr-1 md:hidden">
-              <MobileNavigation />
+              <MobileNavigation pages={pages} />
             </div>
           </div>
         </nav>
       </Container>
     </header>
-  )
+  );
 }

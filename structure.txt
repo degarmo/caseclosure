@@ -13,13 +13,20 @@
 │   │   ├── tests.py
 │   │   ├── urls.py
 │   │   └── views.py
+│   ├── case_photos
+│   │   └── ChatGPT_Image_Jul_19_2025_09_53_48_PM.png
 │   ├── cases
 │   │   ├── __init__.py
 │   │   ├── admin.py
 │   │   ├── apps.py
 │   │   ├── migrations
 │   │   │   ├── __init__.py
-│   │   │   └── 0001_initial.py
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_case_first_name_case_last_name.py
+│   │   │   ├── 0003_case_crime_type_case_detective_email_and_more.py
+│   │   │   ├── 0004_case_layout_case_template.py
+│   │   │   ├── 0005_case_logo_case_logo_gallery_id.py
+│   │   │   └── 0006_alter_case_logo.py
 │   │   ├── models.py
 │   │   ├── serializers.py
 │   │   ├── tests.py
@@ -32,8 +39,40 @@
 │   │   ├── settings.py
 │   │   ├── urls.py
 │   │   └── wsgi.py
+│   ├── dump.rdb
 │   ├── manage.py
-│   └── structure.txt
+│   ├── media
+│   │   ├── case_photos
+│   │   │   ├── ChatGPT_Image_Jul_19_2025_09_53_48_PM_8pjj0TY.png
+│   │   │   └── ChatGPT_Image_Jul_19_2025_09_53_48_PM.png
+│   │   └── untitled folder
+│   │       └── 4dde2d81-7de8-4113-aed2-c0bd3ba3d8df.png
+│   ├── structure.txt
+│   └── tracker
+│       ├── __init__.py
+│       ├── admin.py
+│       ├── apps.py
+│       ├── consumers.py
+│       ├── middleware.py
+│       ├── migrations
+│       │   ├── __init__.py
+│       │   └── 0001_initial.py
+│       ├── ml_analyzer.py
+│       ├── models.py
+│       ├── routing.py
+│       ├── serializers.py
+│       ├── suspicious_detector.py
+│       ├── tasks.py
+│       ├── tests.py
+│       ├── utils
+│       │   ├── __init__.py
+│       │   ├── celery_app.py
+│       │   ├── dashboard_analytics.py
+│       │   └── deep_learning_model.py
+│       ├── views
+│       │   ├── dashboard_views.py
+│       │   └── urls.py
+│       └── views.py
 ├── frontend
 │   ├── components.json
 │   ├── eslint.config.js
@@ -42,8 +81,8 @@
 │   ├── package.json
 │   ├── postcss.config.js
 │   ├── public
-│   │   ├── logo.png
-│   │   └── vite.svg
+│   │   ├── CaseClosure.png
+│   │   └── logo.png
 │   ├── README.md
 │   ├── src
 │   │   ├── api
@@ -55,30 +94,6 @@
 │   │   │   ├── constants
 │   │   │   │   └── themes.js
 │   │   │   ├── img
-│   │   │   │   ├── angular.jpg
-│   │   │   │   ├── bootstrap.jpg
-│   │   │   │   ├── component-btn-pink.png
-│   │   │   │   ├── component-btn.png
-│   │   │   │   ├── component-info-2.png
-│   │   │   │   ├── component-info-card.png
-│   │   │   │   ├── component-menu.png
-│   │   │   │   ├── component-profile-card.png
-│   │   │   │   ├── documentation.png
-│   │   │   │   ├── github.svg
-│   │   │   │   ├── google.svg
-│   │   │   │   ├── ill_header.png
-│   │   │   │   ├── landing.jpg
-│   │   │   │   ├── login.jpg
-│   │   │   │   ├── pattern_react.png
-│   │   │   │   ├── profile.jpg
-│   │   │   │   ├── react.jpg
-│   │   │   │   ├── register_bg_2.png
-│   │   │   │   ├── sketch.jpg
-│   │   │   │   ├── team-1-800x800.jpg
-│   │   │   │   ├── team-2-800x800.jpg
-│   │   │   │   ├── team-3-800x800.jpg
-│   │   │   │   ├── team-4-470x470.png
-│   │   │   │   └── vue.jpg
 │   │   │   ├── react.svg
 │   │   │   └── styles
 │   │   │       ├── index.css
@@ -90,28 +105,24 @@
 │   │   │               ├── background-faqs.jpg
 │   │   │               ├── background-features.jpg
 │   │   │               └── salient.css
-│   │   ├── builder
-│   │   │   ├── BuilderSidebar.jsx
-│   │   │   ├── PageCanvas.jsx
-│   │   │   ├── PageList.jsx
-│   │   │   └── WidgetList.jsx
 │   │   ├── components
 │   │   │   ├── avatar.jsx
-│   │   │   ├── CaseFormTabs.jsx
 │   │   │   ├── CaseList.jsx
-│   │   │   ├── comp-545.tsx
+│   │   │   ├── DynamicNavbar.jsx
 │   │   │   ├── fieldset.jsx
 │   │   │   ├── FileUploader.jsx
 │   │   │   ├── input.jsx
-│   │   │   ├── LogoUploader.jsx
-│   │   │   ├── ProgressBar.jsx
+│   │   │   ├── LogoRenderer.jsx
+│   │   │   ├── LogoSelector.jsx
 │   │   │   ├── PublishMemorialModal.jsx
 │   │   │   ├── RequireAuth.jsx
 │   │   │   ├── Sidebar.jsx
 │   │   │   ├── TemplatePreviewModal.jsx
-│   │   │   ├── TemplateThumbnail.jsx
 │   │   │   ├── textarea.jsx
 │   │   │   ├── Topbar.jsx
+│   │   │   ├── tracking
+│   │   │   │   ├── index.jsx
+│   │   │   │   └── TrackingProvider.jsx
 │   │   │   └── ui
 │   │   │       ├── button.jsx
 │   │   │       ├── button.tsx
@@ -120,28 +131,39 @@
 │   │   ├── constants
 │   │   │   └── templates.js
 │   │   ├── hooks
-│   │   │   └── use-file-upload.ts
+│   │   │   ├── use-file-upload.ts
+│   │   │   ├── useDashboard.js
+│   │   │   └── useTracker.js
 │   │   ├── index.css
 │   │   ├── lib
 │   │   │   └── utils.js
 │   │   ├── main.jsx
 │   │   ├── MainAppRoutes.jsx
 │   │   ├── pages
-│   │   │   ├── BuilderLanding.jsx
 │   │   │   ├── CaseBuilder
+│   │   │   │   ├── BuilderSidebar.jsx
 │   │   │   │   ├── CaseBuilder.jsx
+│   │   │   │   ├── CaseCreationModal.jsx
+│   │   │   │   ├── CaseDetailsModal.jsx
 │   │   │   │   ├── CaseStep1_Basics.jsx
 │   │   │   │   ├── CaseStep2_CrimeData.jsx
-│   │   │   │   └── CaseStep3_TemplateLogo.jsx
-│   │   │   ├── CaseDetail.jsx
+│   │   │   │   ├── CaseStep3_TemplateLogo.jsx
+│   │   │   │   ├── PageCanvas.jsx
+│   │   │   │   └── PageList.jsx
 │   │   │   ├── Dashboard.jsx
 │   │   │   ├── Login.jsx
 │   │   │   ├── MemorialPublicPage.jsx
 │   │   │   ├── PageBuilder.jsx
+│   │   │   ├── public
+│   │   │   │   └── Home.jsx
 │   │   │   ├── Signup.jsx
 │   │   │   ├── TemplatePreview.jsx
 │   │   │   └── UserSettings.jsx
-│   │   ├── styles
+│   │   ├── services
+│   │   │   ├── dashboard
+│   │   │   │   └── dashboardService.js
+│   │   │   └── tracker
+│   │   │       └── tracker.js
 │   │   ├── templates
 │   │   │   └── salient
 │   │   │       ├── components
@@ -155,18 +177,17 @@
 │   │   ├── utils
 │   │   │   ├── axios.js
 │   │   │   ├── getSubdomain.js
+│   │   │   ├── tracker.js
 │   │   │   └── WidgetRegistry.js
 │   │   └── widgets
+│   │       ├── CaseThread.jsx
 │   │       ├── index.jsx
 │   │       ├── LightHeroWidget.jsx
-│   │       ├── MapWidget.jsx
-│   │       ├── PagePalette.jsx
-│   │       └── WidgetPalette.jsx
-│   ├── structure.txt
+│   │       └── MapWidget.jsx
 │   ├── tailwind.config.js
 │   ├── tsconfig.json
 │   └── vite.config.js
 ├── README.md
 └── structure.txt
 
-31 directories, 139 files
+42 directories, 149 files

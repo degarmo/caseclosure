@@ -3,10 +3,9 @@ import MapWidget from "./MapWidget";
 // ...more widgets
 
 export const WIDGETS = {
-  "widget-hero": {
-    label: "Hero Widget",
-    component: LightHeroWidget, // If you mean to use LightHeroWidget
-    defaultProps: { title: "A Life Remembered", subtitle: "In loving memory..." }
+    "Hero Widget Light": {
+    label: "Hero Widget Light",
+    component: LightHeroWidget,
   },
   "widget-map": {
     label: "Incident Map",

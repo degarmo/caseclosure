@@ -1,72 +1,86 @@
-import { useState } from "react";
-import Step1_Basics from "./CaseStep1_Basics";
-import CaseStep2_CrimeData from "./CaseStep2_CrimeData";
-import Step3_TemplateLogo from "./CaseStep3_TemplateLogo";
-
-// List ALL form fields you want to preserve
-const CRITICAL_FIELDS = [
-  // Step 1 fields
-  "first_name", "last_name", "title", "description", "relation", "photo", "photoPreview",
-  // Step 2 fields
-  "date_of_birth", "resulted_in_death", "date_of_death", "crime_type",
-  "incident_date", "incident_location", "incident_latlng", "incident_description",
-  "investigating_department", "detective_name", "detective_phone", "detective_email",
-  "media_links", "reward_offered", "reward_amount",
-  // Step 3 fields (add as needed)
-  "template"
-];
-
-// Utility to always keep last non-blank for each critical field
-const authoritativeMerge = (prev, next) => {
-  const merged = { ...prev };
-  for (const key of CRITICAL_FIELDS) {
-    // If the new data has the field (even as ""), use it; else use the old one
-    if (Object.prototype.hasOwnProperty.call(next, key)) {
-      merged[key] = next[key];
-    }
-    // If the key isn't present in either, fill with "" (or null)
-    if (merged[key] === undefined) merged[key] = "";
-  }
-  return merged;
-};
-
-const steps = [
-  Step1_Basics,
-  CaseStep2_CrimeData,
-  Step3_TemplateLogo,
-];
+// CaseBuilder.jsx - Simplified version that goes directly to PageBuilder
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import PageBuilder from "../PageBuilder";
+import api from "@/utils/axios";
 
 export default function CaseBuilder() {
-  const [step, setStep] = useState(0);
-  const [formData, setFormData] = useState({});
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-  const handleNext = (data) => {
-    setFormData(prev => {
-      // Always merge with full authority: never drop any field
-      const updated = authoritativeMerge(prev, data);
-      console.log("[CaseBuilder] Authoritative merged formData:", updated);
-      return updated;
-    });
-    setStep(prevStep => Math.min(steps.length - 1, prevStep + 1));
-  };
+  const [caseData, setCaseData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const handleBack = () => setStep(s => Math.max(0, s - 1));
+  useEffect(() => {
+    const fetchCase = async () => {
+      try {
+        if (!id) {
+          // If no ID, redirect to dashboard - case creation should be done via modal
+          console.log("[CaseBuilder] No ID provided, redirecting to dashboard");
+          navigate("/dashboard");
+          return;
+        }
 
-  const StepComponent = steps[step];
+        const res = await api.get(`/cases/${id}/`);
+        const caseInfo = res.data;
 
-  return (
-    <div>
-      <div className="mb-4">
-        <span className="font-bold">
-          Step {step + 1} of {steps.length}
-        </span>
+        console.log("[CaseBuilder] Loaded case from DB:", caseInfo);
+
+        setCaseData(caseInfo);
+        setError("");
+      } catch (err) {
+        console.error("Error fetching case:", err);
+        setError("Could not load case. Redirecting to dashboard...");
+        setTimeout(() => navigate("/dashboard"), 2000);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCase();
+  }, [id, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading case...</p>
+        </div>
       </div>
-      <StepComponent
-        data={formData}
-        next={handleNext}
-        back={handleBack}
-        isLast={step === steps.length - 1}
-      />
-    </div>
-  );
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <svg className="h-12 w-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L4.316 15.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <p className="text-red-600 font-semibold">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!caseData || !caseData.id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">No case data available.</p>
+          <Link to="/dashboard" className="text-blue-600 hover:underline">
+            ← Return to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Go directly to PageBuilder - no more multi-step forms!
+  // The PageBuilder will handle all the case editing
+  return <PageBuilder data={caseData} />;
 }

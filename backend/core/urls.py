@@ -10,8 +10,12 @@ urlpatterns = [
     path('', lambda request: HttpResponse("CaseClosure API Server Running.")),
     path('api/', include('accounts.urls')),
     path('api/', include('cases.urls')),
+    path('api/', include('tracker.urls')),
     path('api/accounts/', include('accounts.urls')),
 ]
+
+static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

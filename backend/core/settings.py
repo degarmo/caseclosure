@@ -43,7 +43,16 @@ INSTALLED_APPS = [
     'corsheaders',
     'accounts',
     'cases',
+    'tracker',
+    'django_celery_beat',
+    'django_celery_results',
+    'channels',
 ]
+
+ASGI_APPLICATION = 'caseclosure.asgi.application'
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -55,6 +64,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'tracker.middleware.TrackingMiddleware',
+    'tracker.middleware.RateLimitMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'tracker.middleware.TrackingMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -92,7 +105,25 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+    }
+}
 
+# Tracking settings
+TRACKING_EXCLUDED_PATHS = [
+    '/admin/',
+    '/static/',
+    '/media/',
+]
+
+TRACKING_RATE_LIMITS = {
+    'default': (100, 60),     # 100 requests per minute
+    'api': (1000, 60),        # 1000 API requests per minute
+    'auth': (5, 300),         # 5 auth attempts per 5 minutes
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -137,6 +168,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # React dev server
+    "http://localhost:5173",
+
+]
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -158,3 +195,21 @@ SIMPLE_JWT = {
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Detection System Configuration
+DETECTOR_PARALLEL = True
+DETECTOR_MAX_WORKERS = 10
+
+# Optional: Detection thresholds (if you want to override defaults)
+DETECTION_CONFIG = {
+    'thresholds': {
+        'tor_usage_tolerance': 0,
+        'vpn_usage_ratio': 0.4,
+        # Add any threshold overrides here
+    },
+    'risk_weights': {
+        'tor_usage': 10.0,
+        'evidence_tampering': 10.0,
+        # Add any weight overrides here
+    }
+}
