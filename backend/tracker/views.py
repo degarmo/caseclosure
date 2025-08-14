@@ -14,7 +14,7 @@ import uuid
 from user_agents import parse
 import csv
 from io import StringIO
-
+from .alerts import check_for_criminal_behavior
 # Import Case model from cases app
 from cases.models import Case
 
@@ -149,6 +149,18 @@ def track_event(request):
         event.is_suspicious = suspicious_score > 0.7
         event.save()
         
+                # Update event with suspicious score
+        event.suspicious_score = suspicious_score
+        event.is_suspicious = suspicious_score > 0.7
+        event.save()
+
+        # CHECK FOR CRIMINAL BEHAVIOR AND SEND ALERTS
+        if suspicious_score > 0.3:  # Any suspicious activity
+            alerts_sent = check_for_criminal_behavior(event)
+            if alerts_sent:
+                print(f"⚠️ ALERTS SENT: {alerts_sent}")
+
+                
         # Update session metrics
         if session:
             update_session_metrics(session, event)

@@ -48,30 +48,62 @@
 │   │   └── untitled folder
 │   │       └── 4dde2d81-7de8-4113-aed2-c0bd3ba3d8df.png
 │   ├── structure.txt
+│   ├── test_settings.py
 │   └── tracker
 │       ├── __init__.py
 │       ├── admin.py
 │       ├── apps.py
 │       ├── consumers.py
+│       ├── dashboard_analytics.py
+│       ├── dashboard_views.py
+│       ├── DB.txt
+│       ├── detection
+│       │   ├── __init__.py
+│       │   ├── base
+│       │   │   ├── __init__.py
+│       │   │   ├── base_detector.py
+│       │   │   ├── detector_facade.py
+│       │   │   └── detector_factory.py
+│       │   ├── core_detector.py
+│       │   ├── detectors
+│       │   │   ├── __init__.py
+│       │   │   ├── behavioral_patterns.py
+│       │   │   ├── biometric_profiler.py
+│       │   │   ├── content_forensics.py
+│       │   │   ├── criminal_indicators.py
+│       │   │   ├── evasion_detector.py
+│       │   │   ├── honeytrap_manager.py
+│       │   │   ├── network_analyzer.py
+│       │   │   ├── psychological_detector.py
+│       │   │   ├── session_analyzer.py
+│       │   │   └── temporal_analyzer.py
+│       │   ├── environmental_analyzer.py
+│       │   ├── management
+│       │   │   ├── __init__.py
+│       │   │   └── alert_manager.py
+│       │   └── utils
+│       │       ├── __init__.py
+│       │       ├── constants.py
+│       │       └── detector_utils.py
+│       ├── detection_simple.py
 │       ├── middleware.py
 │       ├── migrations
 │       │   ├── __init__.py
-│       │   └── 0001_initial.py
+│       │   ├── 0001_initial.py
+│       │   ├── 0002_alert_notification_sent_alert_notification_sent_at_and_more.py
+│       │   └── 0003_make_case_foreign_keys_nullable.py
 │       ├── ml_analyzer.py
 │       ├── models.py
 │       ├── routing.py
 │       ├── serializers.py
-│       ├── suspicious_detector.py
 │       ├── tasks.py
 │       ├── tests.py
+│       ├── urls.py
 │       ├── utils
 │       │   ├── __init__.py
 │       │   ├── celery_app.py
 │       │   ├── dashboard_analytics.py
 │       │   └── deep_learning_model.py
-│       ├── views
-│       │   ├── dashboard_views.py
-│       │   └── urls.py
 │       └── views.py
 ├── frontend
 │   ├── components.json
@@ -190,4 +222,4 @@
 ├── README.md
 └── structure.txt
 
-42 directories, 149 files
+46 directories, 177 files

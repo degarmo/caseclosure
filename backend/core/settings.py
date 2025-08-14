@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     'rest_framework',
     'corsheaders',
     'accounts',
@@ -47,6 +48,11 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'channels',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'rest_framework_simplejwt.token_blacklist',
 ]
 
 ASGI_APPLICATION = 'caseclosure.asgi.application'
@@ -68,6 +74,7 @@ MIDDLEWARE = [
     'tracker.middleware.RateLimitMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'tracker.middleware.TrackingMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -161,6 +168,12 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'tracker/static'),
+]
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
@@ -173,6 +186,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 
 ]
+CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -211,5 +225,38 @@ DETECTION_CONFIG = {
         'tor_usage': 10.0,
         'evidence_tampering': 10.0,
         # Add any weight overrides here
+    }
+}
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Prints to console for testing
+ADMIN_EMAIL = 'degarmo@gmail.com'
+
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # or 'mandatory'
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+LOGIN_REDIRECT_URL = '/dashboard'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': '529305719233-4s2afkgpt2t0rljnf17k15dqiibgiqe7.apps.googleusercontent.com',  # Get from Google Console
+            'secret': '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',  # Get from Google Console
+            'key': ''
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        },
+        'OAUTH_PKCE_ENABLED': True,
     }
 }

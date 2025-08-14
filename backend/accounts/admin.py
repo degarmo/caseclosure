@@ -1,4 +1,133 @@
 from django.contrib import admin
-from .models import UserProfile
+from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
+from .models import AccountRequest, UserProfile
 
-admin.site.register(UserProfile)
+@admin.register(AccountRequest)
+class AccountRequestAdmin(admin.ModelAdmin):
+    list_display = [
+        'full_name', 
+        'email', 
+        'phone', 
+        'status', 
+        'submitted_at',
+        'quick_actions'
+    ]
+    list_filter = ['status', 'submitted_at']
+    search_fields = ['email', 'first_name', 'last_name', 'phone']
+    readonly_fields = ['submitted_at', 'verification_code']
+    
+    fieldsets = (
+        ('Request Information', {
+            'fields': ('first_name', 'last_name', 'email', 'phone', 'role', 'organization', 'location')
+        }),
+        ('Verification', {
+            'fields': ('description', 'supporting_links')
+        }),
+        ('Status', {
+            'fields': ('status', 'rejection_reason', 'submitted_at', 'reviewed_at', 'reviewed_by')
+        }),
+        ('Verification Code', {
+            'fields': ('verification_code', 'verification_sent_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+    full_name.short_description = 'Name'
+    
+    def quick_actions(self, obj):
+        if obj.status == 'pending':
+            return 'Awaiting Review'
+        elif obj.status == 'approved':
+            return '✅ Approved'
+        elif obj.status == 'rejected':
+            return '❌ Rejected'
+        return obj.status
+    quick_actions.short_description = 'Quick Status'
+    
+    actions = ['approve_and_notify', 'reject_with_reason']
+    
+    def approve_and_notify(self, request, queryset):
+        """Approve selected requests and send notification"""
+        approved_count = 0
+        
+        for account_request in queryset.filter(status='pending'):
+            # Update status
+            account_request.status = 'approved'
+            account_request.reviewed_by = request.user
+            account_request.reviewed_at = timezone.now()
+            account_request.save()
+            
+            # Send approval email
+            send_mail(
+                subject='CaseClosure Account Approved - Action Required',
+                message=f"""
+Hello {account_request.first_name},
+
+Your CaseClosure account request has been approved!
+
+Next Steps:
+1. Visit: {settings.SITE_URL}/verify-account/
+2. Enter your email: {account_request.email}
+3. We'll text a verification code to: {account_request.phone}
+4. Create your password and complete setup
+
+This link expires in 48 hours.
+
+If you have questions, reply to this email.
+
+Thank you for trusting CaseClosure with your case.
+
+The CaseClosure Team
+                """,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[account_request.email],
+                fail_silently=False,
+            )
+            
+            approved_count += 1
+        
+        self.message_user(
+            request, 
+            f"✅ {approved_count} account(s) approved and notified"
+        )
+    
+    approve_and_notify.short_description = "✅ Approve and send notification email"
+    
+    def reject_with_reason(self, request, queryset):
+        """Reject with a reason"""
+        # You could make this open a form for rejection reason
+        rejected_count = queryset.filter(status='pending').update(
+            status='rejected',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now(),
+            rejection_reason='Does not meet verification requirements'
+        )
+        
+        self.message_user(
+            request,
+            f"❌ {rejected_count} account(s) rejected"
+        )
+    
+    reject_with_reason.short_description = "❌ Reject selected requests"
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = [
+        'user_email',
+        'display_name', 
+        'account_type',
+        'phone_verified',
+        'current_cases',
+        'created_at'
+    ]
+    list_filter = ['account_type', 'phone_verified', 'identity_verified']
+    search_fields = ['user__email', 'phone', 'user__first_name', 'user__last_name']
+    
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = 'Email'
