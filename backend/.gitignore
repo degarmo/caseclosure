@@ -1,0 +1,20 @@
+# .gitignore
+*.pyc
+__pycache__/
+.env
+.env.local
+.env.production
+db.sqlite3
+media/
+staticfiles/
+*.log
+.DS_Store
+venv/
+.venv/
+node_modules/
+.coverage
+htmlcov/
+.pytest_cache/
+*.egg-info/
+dist/
+build/

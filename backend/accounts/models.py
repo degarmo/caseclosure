@@ -1,11 +1,283 @@
+# accounts/models.py
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 import random
 import string
 
-User = get_user_model()
+# ============ CUSTOM MANAGER ============
+class CustomUserManager(BaseUserManager):
+    """Custom manager for CustomUser"""
+    
+    def create_user(self, email, password=None, **extra_fields):
+        """Create and save a regular User with the given email and password."""
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+    
+    def create_superuser(self, email, password=None, **extra_fields):
+        """Create and save a SuperUser with the given email and password."""
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+        
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        
+        return self.create_user(email, password, **extra_fields)
 
+
+# ============ CUSTOM USER MODEL ============
+class CustomUser(AbstractUser):
+    """Custom user model for CaseClosure platform"""
+    
+    # Authentication
+    email = models.EmailField(unique=True)
+    username = models.CharField(
+        max_length=150,
+        unique=True,
+        null=True,
+        blank=True
+    )
+    
+    # Basic Info (these are already in AbstractUser but we can override)
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
+    
+    # Contact & Verification
+    phone = models.CharField(max_length=20, blank=True)
+    phone_verified = models.BooleanField(default=False)
+    phone_verified_at = models.DateTimeField(null=True, blank=True)
+    phone_verification_code = models.CharField(max_length=6, blank=True)
+    phone_verification_sent_at = models.DateTimeField(null=True, blank=True)
+    
+    # Account Type
+    account_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('unverified', 'Unverified User'),
+            ('verified', 'Verified Family Member'),
+            ('helper', 'Community Helper'),
+            ('detective', 'Law Enforcement'),
+            ('advocate', 'Victim Advocate'),
+            ('admin', 'Administrator'),
+        ],
+        default='unverified'
+    )
+    
+    # Location
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=50, blank=True)
+    country = models.CharField(max_length=2, default='US')
+    zip_code = models.CharField(max_length=10, blank=True)
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_login_ip = models.GenericIPAddressField(null=True, blank=True)
+    
+    # Use the custom manager
+    objects = CustomUserManager()
+    
+    # IMPORTANT: Only define these once
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []  # Don't require username for createsuperuser
+    
+    class Meta:
+        db_table = 'users'
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
+    
+    def save(self, *args, **kwargs):
+        # Auto-generate username from email if not provided
+        if not self.username:
+            base_username = self.email.split('@')[0]
+            username = base_username
+            counter = 1
+            while CustomUser.objects.filter(username=username).exclude(pk=self.pk).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            self.username = username
+        super().save(*args, **kwargs)
+    
+    def generate_phone_verification_code(self):
+        """Generate 6-digit SMS verification code"""
+        self.phone_verification_code = ''.join(random.choices(string.digits, k=6))
+        self.phone_verification_sent_at = timezone.now()
+        self.save(update_fields=['phone_verification_code', 'phone_verification_sent_at'])
+        return self.phone_verification_code
+    
+    def __str__(self):
+        return self.email
+
+
+# ============ SITE SETTINGS MODEL (NEW) ============
+class SiteSettings(models.Model):
+    """Global site settings - singleton model"""
+    REGISTRATION_MODES = [
+        ('invite_only', 'Invite Only (Beta)'),
+        ('open', 'Open Registration'),
+        ('closed', 'Registration Closed'),
+    ]
+    
+    registration_mode = models.CharField(
+        max_length=20,
+        choices=REGISTRATION_MODES,
+        default='invite_only',
+        help_text="Control how users can register"
+    )
+    beta_message = models.TextField(
+        default="CaseClosure is currently in invite-only beta. Please request an invite to join.",
+        blank=True,
+        help_text="Message shown when registration is restricted"
+    )
+    max_users = models.IntegerField(
+        default=0,
+        help_text="Maximum users allowed (0 = unlimited)"
+    )
+    current_user_count = models.IntegerField(default=0)
+    
+    # Email settings
+    send_welcome_email = models.BooleanField(default=True)
+    auto_approve_requests = models.BooleanField(
+        default=False,
+        help_text="Automatically approve account requests"
+    )
+    
+    # Feature flags
+    enable_google_auth = models.BooleanField(
+        default=False,
+        help_text="Allow Google OAuth registration/login"
+    )
+    enable_case_creation = models.BooleanField(default=True)
+    enable_public_pages = models.BooleanField(default=True)
+    
+    # Maintenance
+    maintenance_mode = models.BooleanField(default=False)
+    maintenance_message = models.TextField(blank=True)
+    
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        CustomUser,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+    
+    class Meta:
+        verbose_name = "Site Settings"
+        verbose_name_plural = "Site Settings"
+        db_table = 'site_settings'
+    
+    def save(self, *args, **kwargs):
+        # Ensure only one instance exists
+        self.pk = 1
+        super().save(*args, **kwargs)
+    
+    @classmethod
+    def get_settings(cls):
+        """Get or create the singleton settings instance"""
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+    
+    def __str__(self):
+        return f"Site Settings ({self.registration_mode})"
+
+
+# ============ INVITE CODE MODEL (NEW) ============
+class InviteCode(models.Model):
+    """Invite codes for beta registration"""
+    code = models.CharField(
+        max_length=8, 
+        unique=True,
+        help_text="8-character invite code"
+    )
+    email = models.EmailField(
+        blank=True, 
+        help_text="Optional: restrict to specific email"
+    )
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_invites'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Usage tracking
+    used_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='used_invite'
+    )
+    used_at = models.DateTimeField(null=True, blank=True)
+    
+    # Control fields
+    is_active = models.BooleanField(default=True)
+    max_uses = models.IntegerField(
+        default=1,
+        help_text="Maximum number of times this code can be used"
+    )
+    current_uses = models.IntegerField(default=0)
+    expires_at = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Optional expiration date"
+    )
+    
+    # Metadata
+    notes = models.TextField(
+        blank=True,
+        help_text="Internal notes about this invite"
+    )
+    
+    class Meta:
+        db_table = 'invite_codes'
+        ordering = ['-created_at']
+        verbose_name = 'Invite Code'
+        verbose_name_plural = 'Invite Codes'
+        
+    def __str__(self):
+        status = "Active" if self.is_valid() else "Used/Expired"
+        return f"{self.code} - {status}"
+    
+    @classmethod
+    def generate_code(cls):
+        """Generate a unique 8-character code"""
+        while True:
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            if not cls.objects.filter(code=code).exists():
+                return code
+    
+    def is_valid(self):
+        """Check if invite code is valid"""
+        if not self.is_active:
+            return False
+        if self.current_uses >= self.max_uses:
+            return False
+        if self.expires_at and timezone.now() > self.expires_at:
+            return False
+        return True
+    
+    def use(self, user):
+        """Mark this invite as used by a user"""
+        self.current_uses += 1
+        if self.current_uses == 1:
+            self.used_by = user
+            self.used_at = timezone.now()
+        self.save()
+
+
+# ============ ACCOUNT REQUEST MODEL ============
 class AccountRequest(models.Model):
     """Initial request for account - pending approval"""
     STATUS_CHOICES = [
@@ -21,6 +293,15 @@ class AccountRequest(models.Model):
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20)
     
+    # Additional fields
+    relation = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Relationship to case"
+    )
+    organization = models.CharField(max_length=255, blank=True)
+    location = models.CharField(max_length=255, blank=True)
+    
     # Verification
     description = models.TextField(help_text="Why do you need an account? Relationship to victim?")
     supporting_links = models.TextField(blank=True, help_text="News articles, obituaries, etc.")
@@ -29,8 +310,23 @@ class AccountRequest(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     submitted_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
-    reviewed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='reviewed_requests')
+    reviewed_by = models.ForeignKey(
+        CustomUser,
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL, 
+        related_name='reviewed_requests'
+    )
     rejection_reason = models.TextField(blank=True)
+    
+    # Link to invite code if approved
+    invite_code = models.ForeignKey(
+        InviteCode,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='account_request'
+    )
     
     # Verification code for SMS
     verification_code = models.CharField(max_length=6, blank=True)
@@ -38,7 +334,10 @@ class AccountRequest(models.Model):
     verification_attempts = models.IntegerField(default=0)
     
     class Meta:
+        db_table = 'account_requests'
         ordering = ['-submitted_at']
+        verbose_name = 'Account Request'
+        verbose_name_plural = 'Account Requests'
     
     def generate_verification_code(self):
         """Generate 6-digit verification code"""
@@ -54,10 +353,68 @@ class AccountRequest(models.Model):
         from datetime import timedelta
         return timezone.now() - self.verification_sent_at < timedelta(minutes=10)
     
+    def approve_and_create_invite(self, approved_by):
+        """Approve request and create invite code"""
+        self.status = 'approved'
+        self.reviewed_by = approved_by
+        self.reviewed_at = timezone.now()
+        
+        # Create invite code for this email
+        invite = InviteCode.objects.create(
+            code=InviteCode.generate_code(),
+            email=self.email,  # Restrict to requester's email
+            created_by=approved_by,
+            max_uses=1,
+            notes=f"Created for account request from {self.first_name} {self.last_name}"
+        )
+        
+        self.invite_code = invite
+        self.save()
+        
+        # TODO: Send email with invite code
+        # send_invite_email(self.email, invite.code)
+        
+        return invite
+
+# REPLACE THE TODO comment with actual email sending:
+    def approve_and_create_invite(self, approved_by):
+        """Approve request and create invite code"""
+        self.status = 'approved'
+        self.reviewed_by = approved_by
+        self.reviewed_at = timezone.now()
+        
+        # Create invite code for this email
+        invite = InviteCode.objects.create(
+            code=InviteCode.generate_code(),
+            email=self.email,  # Restrict to requester's email
+            created_by=approved_by,
+            max_uses=1,
+            notes=f"Created for account request from {self.first_name} {self.last_name}"
+        )
+        
+        self.invite_code = invite
+        self.save()
+        
+        # NOTE: Email is sent from the view to avoid circular imports
+        
+        return invite
+    
+    def reject(self, rejected_by, reason=""):
+        """Reject the account request"""
+        self.status = 'rejected'
+        self.reviewed_by = rejected_by
+        self.reviewed_at = timezone.now()
+        self.rejection_reason = reason
+        self.save()
+        
+        # TODO: Send rejection email
+        # send_rejection_email(self.email, reason)
+    
     def __str__(self):
         return f"{self.first_name} {self.last_name} - {self.status}"
 
 
+# ============ USER PROFILE MODEL ============
 class UserProfile(models.Model):
     """Enhanced user profile with verification and permissions"""
     
@@ -70,14 +427,22 @@ class UserProfile(models.Model):
         ('admin', 'Administrator'),           # Full access
     ]
     
-    # YOUR EXISTING FIELDS
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    # Link to CustomUser
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE, 
+        related_name="profile"
+    )
+    
+    # Contact & Basic Info
     phone = models.CharField(max_length=20, blank=True)
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
     organization = models.CharField(max_length=255, blank=True)
     role = models.CharField(max_length=100, blank=True, help_text="Relationship to case (e.g. Family, Detective, Advocate)")
     bio = models.TextField(blank=True, help_text="Your story, connection, or reason for joining")
     location = models.CharField(max_length=255, blank=True)
+    
+    # Preferences
     preferred_contact = models.CharField(
         max_length=20,
         blank=True,
@@ -93,9 +458,9 @@ class UserProfile(models.Model):
     timezone = models.CharField(max_length=50, blank=True)
     language = models.CharField(max_length=30, blank=True)
     other_language = models.CharField(max_length=50, blank=True, help_text="Specify if language is 'Other'")
-    verified = models.BooleanField(default=False)
     
-    # NEW FIELDS FOR ACCESS CONTROL
+    # Verification Status
+    verified = models.BooleanField(default=False)
     account_type = models.CharField(
         max_length=20, 
         choices=ACCOUNT_TYPES, 
@@ -116,7 +481,7 @@ class UserProfile(models.Model):
     identity_verified = models.BooleanField(default=False)
     identity_verified_at = models.DateTimeField(null=True, blank=True)
     identity_verified_by = models.ForeignKey(
-        User, 
+        CustomUser,
         null=True, 
         blank=True, 
         on_delete=models.SET_NULL, 
@@ -148,7 +513,7 @@ class UserProfile(models.Model):
     flag_reason = models.TextField(blank=True)
     flagged_at = models.DateTimeField(null=True, blank=True)
     flagged_by = models.ForeignKey(
-        User,
+        CustomUser,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -156,72 +521,37 @@ class UserProfile(models.Model):
     )
     
     class Meta:
+        db_table = 'user_profiles'
         ordering = ['-created_at']
         verbose_name = 'User Profile'
         verbose_name_plural = 'User Profiles'
     
     def __str__(self):
-        return f"Profile for {self.user.username} ({self.account_type})"
+        return f"Profile for {self.user.email} ({self.account_type})"
     
     def can_access_case(self, case):
         """Check if user can access a specific case"""
-        # Admins can access everything
         if self.account_type == 'admin' or self.user.is_staff:
             return True
-        
-        # Basic users can only access their own cases
         if self.account_type == 'basic':
             return case.user == self.user
-        
-        # Detectives can access cases they're assigned to
         if self.account_type == 'detective':
-            # You could add a ManyToMany field for assigned cases
             return case.detective_email == self.user.email
-        
-        # Verified family can access their case
         if self.account_type == 'verified':
             return case.user == self.user
-        
         return False
     
-    def can_create_new_case(self):
-        """Check if user can create another case"""
-        if not self.can_create_cases:
-            return False
-        
-        if self.current_cases >= self.max_cases:
-            return False
-        
-        # Must be phone verified
-        if not self.phone_verified:
-            return False
-        
-        return True
+    def has_reached_case_limit(self):
+        """Check if user has reached their case creation limit"""
+        return self.current_cases >= self.max_cases
     
     def increment_case_count(self):
-        """Called when user creates a new case"""
+        """Increment the current case count"""
         self.current_cases += 1
-        self.save()
+        self.save(update_fields=['current_cases'])
     
     def decrement_case_count(self):
-        """Called when user's case is deleted"""
+        """Decrement the current case count"""
         if self.current_cases > 0:
             self.current_cases -= 1
-            self.save()
-    
-    @property
-    def display_name(self):
-        """Get display name for user"""
-        if self.user.first_name and self.user.last_name:
-            return f"{self.user.first_name} {self.user.last_name}"
-        return self.user.username
-    
-    @property
-    def is_high_access(self):
-        """Check if user has elevated access"""
-        return self.account_type in ['detective', 'advocate', 'admin']
-    
-    @property
-    def needs_verification(self):
-        """Check if user needs additional verification"""
-        return not self.phone_verified or not self.identity_verified
+            self.save(update_fields=['current_cases'])

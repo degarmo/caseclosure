@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ContactInquiry } from "@/api/entities";
+import api from "@/utils/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

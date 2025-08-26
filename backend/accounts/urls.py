@@ -1,3 +1,4 @@
+# accounts/urls.py
 from django.urls import path
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -13,6 +14,12 @@ from .views import (
     GoogleOAuthCallbackView,  # Google OAuth callback handler
     LogoutView,  # Logout endpoint
     PasswordResetRequestView,  # Password reset
+    
+    # Add these new imports
+    RegistrationStatusView,  # Registration status check
+    SiteSettingsView,  # Admin site settings
+    AccountRequestView,  # Account requests
+    AccountRequestAdminView,  # Admin account request management
 )
 
 # Import optional view if allauth is installed
@@ -38,6 +45,12 @@ urlpatterns = [
     # Google OAuth endpoints
     path('google/login/', GoogleOAuthLoginView.as_view(), name='google_login'),
     path('google/callback/', GoogleOAuthCallbackView.as_view(), name='google_callback'),
+    
+    # NEW ENDPOINTS for invite system
+    path('registration-status/', RegistrationStatusView.as_view(), name='registration_status'),
+    path('admin/settings/', SiteSettingsView.as_view(), name='admin_settings'),
+    path('account-request/', AccountRequestView.as_view(), name='account_request'),
+    path('admin/account-requests/', AccountRequestAdminView.as_view(), name='admin_account_requests'),
 ]
 
 # Add API-based Google login if available (optional)

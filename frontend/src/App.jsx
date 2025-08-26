@@ -1,5 +1,5 @@
 /**
- * App.jsx with Public Website, Dashboard, and Tracking Integration
+ * App.jsx - Fixed version with proper template routing
  * Location: frontend/src/App.jsx
  */
 
@@ -21,23 +21,23 @@ import RequestAccount from "./pages/RequestAccount";
 
 // Auth Pages
 import Signup from "./pages/Signup";
-import SignIn from "./pages/SignIn";  // Use SignIn instead of Login
-import Login from "./pages/Login";    // Keep for backward compatibility
+import SignIn from "./pages/SignIn";
 
 // Dashboard & Protected Pages
 import Dashboard from "./pages/Dashboard";
-import CaseBuilder from './pages/CaseBuilder/CaseBuilder';
-import PageBuilder from "./pages/PageBuilder";
 import CasesList from "./components/CaseList";
-import UserSettings from "./pages/UserSettings";
-import MemorialPublicPage from "./pages/MemorialPublicPage";
+
+// Case Creator Components
+import CaseCreator from "./components/CaseCreator";
+import ProfileSettings from "./pages/ProfileSettings";
+
+// Template System Components - USE THE WRAPPER THAT LOADS REAL TEMPLATES
+import TemplatePreviewWrapper from './components/CaseCreator/views/TemplatePreviewWrapper';
+import TemplateRenderer from "./templates/TemplateRenderer";
+import TemplateEditor from "./components/TemplateEditor";
 
 // Utils
 import getSubdomain from "./utils/getSubdomain";
-
-// Import tracking components
-import { TrackingProvider } from './components/tracking/TrackingProvider';
-import { useTracker } from './hooks/useTracker';
 
 function useAuth() {
   let user = null;
@@ -50,20 +50,9 @@ function useAuth() {
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
-  const { trackEvent } = useTracker();
-  
-  useEffect(() => {
-    if (!isAuthenticated) {
-      // Track authentication redirect
-      trackEvent('auth_redirect', {
-        from: location.pathname,
-        reason: 'not_authenticated'
-      });
-    }
-  }, [isAuthenticated, location.pathname, trackEvent]);
   
   if (!isAuthenticated) {
-    return <Navigate to="/signin" state={{ from: location }} replace />;  // Changed to /signin
+    return <Navigate to="/signin" state={{ from: location }} replace />;
   }
   return children;
 }
@@ -72,357 +61,245 @@ function AppContent() {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
   const subdomain = getSubdomain();
-  const { trackEvent, trackPageView } = useTracker();
+  
+  // State for modals
+  const [showCaseCreator, setShowCaseCreator] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [currentCase, setCurrentCase] = useState(null);
 
-  // Track user session
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      trackEvent('session_start', {
-        userId: user.id,
-        userRole: user.is_staff ? 'admin' : 'user',
-        subdomain: subdomain
-      });
+  // Determine if this is a memorial site
+  const hostname = window.location.hostname;
+  const isMemorialSite = React.useMemo(() => {
+    if (location.pathname.startsWith('/preview/')) {
+      return false;
     }
-  }, [isAuthenticated, user, subdomain, trackEvent]);
-
-  // Track page views
-  useEffect(() => {
-    trackPageView({
-      path: location.pathname,
-      authenticated: isAuthenticated,
-      subdomain: subdomain
-    });
-  }, [location.pathname, isAuthenticated, subdomain, trackPageView]);
-
-  // Check if current route is public page
-  const publicRoutes = [
-    '/', '/home', '/about', '/pricing', '/services', 
-    '/spotlight', '/contact', '/discover', '/request-account'
-  ];
-  const isPublicRoute = publicRoutes.includes(location.pathname.toLowerCase());
-
-  // Auth-only pages (no layout)
-  const authRoutes = ["/login", "/signin", "/signup"];  // Added /signin
-  const isAuthRoute = authRoutes.includes(location.pathname);
-
-  // Immersive builder/editor pages (no layout)
-  const isImmersive =
-    location.pathname === "/page-builder" ||
-    location.pathname.startsWith("/case-builder") ||
-    /^\/builder\/\d+/.test(location.pathname);
-
-  // Track immersive mode usage
-  useEffect(() => {
-    if (isImmersive) {
-      trackEvent('immersive_mode_entered', {
-        path: location.pathname,
-        type: location.pathname.includes('case-builder') ? 'case_builder' : 'page_builder'
-      });
+    
+    if (hostname.includes('.caseclosure.org') || hostname.includes('.caseclosure.com')) {
+      const sub = hostname.split('.')[0];
+      return sub && sub !== 'www' && sub !== 'app' && sub !== 'caseclosure';
     }
-  }, [isImmersive, location.pathname, trackEvent]);
-
-  // Track memorial page view
-  useEffect(() => {
-    if (subdomain && subdomain !== "www" && window.location.pathname === "/") {
-      trackEvent('memorial_page_view', {
-        subdomain: subdomain,
-        referrer: document.referrer
-      });
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return location.pathname.startsWith('/memorial/');
     }
-  }, [subdomain, trackEvent]);
-
-  // Handle public memorial page by subdomain
-  if (subdomain && subdomain !== "www" && window.location.pathname === "/") {
-    return <MemorialPublicPage subdomain={subdomain} />;
-  }
+    
+    return !hostname.includes('caseclosure');
+  }, [hostname, location.pathname]);
 
   // Logout handler
   const handleLogout = () => {
-    // Track logout
-    trackEvent('user_logout', {
-      userId: user?.id,
-      sessionDuration: Date.now() - (user?.loginTime || Date.now())
-    });
-    
     localStorage.removeItem("user");
     localStorage.removeItem("authToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
-    window.location.href = "/signin";  // Changed to /signin
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    window.location.href = "/signin";
   };
 
+  // Modal handlers
   const handleOpenCaseModal = () => {
-    trackEvent('case_modal_opened', {
-      trigger: 'user_action'
-    });
-    // You can add modal logic here if needed
+    setShowCaseCreator(true);
+  };
+
+  const handleCloseCaseModal = () => {
+    setShowCaseCreator(false);
+  };
+
+  const handleCaseComplete = (caseData) => {
+    console.log('Case created:', caseData);
+    setCurrentCase(caseData);
+    setShowCaseCreator(false);
+    
+    if (caseData.id) {
+      window.location.href = `/cases/${caseData.id}/edit`;
+    }
+  };
+
+  const handleOpenProfileSettings = () => {
+    setShowProfileSettings(true);
+  };
+
+  const handleCloseProfileSettings = () => {
+    setShowProfileSettings(false);
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const updatedUser = JSON.parse(userData);
+        window.location.reload();
+      } catch (e) {
+        console.error('Failed to update user data:', e);
+      }
+    }
   };
 
   // Determine admin status
   const isAdmin = user?.is_staff || user?.is_superuser;
 
+  // If this is a memorial site, render the template
+  if (isMemorialSite) {
+    return <TemplateRenderer />;
+  }
+
+  // Regular CaseClosure app routes
   return (
-    <Routes>
-      {/* ============ PUBLIC WEBSITE ROUTES ============ */}
-      <Route path="/" element={<Layout><Home /></Layout>} />
-      <Route path="/home" element={<Layout><Home /></Layout>} />
-      <Route path="/about" element={<Layout><About /></Layout>} />
-      <Route path="/pricing" element={<Layout><Pricing /></Layout>} />
-      <Route path="/services" element={<Layout><Pricing /></Layout>} />
-      <Route path="/spotlight" element={<Layout><Spotlight /></Layout>} />
-      <Route path="/contact" element={<Layout><Contact /></Layout>} />
-      <Route path="/discover" element={<Layout><Discover /></Layout>} />
-      <Route path="/request-account" element={<Layout><RequestAccount /></Layout>} />
+    <>
+      <Routes>
+        {/* CRITICAL FIX: Use TemplatePreviewWrapper for preview routes */}
+        <Route path="/preview/:caseId/:page" element={<TemplatePreviewWrapper />} />
+        <Route path="/preview/:caseId" element={<TemplatePreviewWrapper />} />
 
-      {/* ============ AUTH ROUTES (No Layout) ============ */}
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/signin" element={<SignIn />} />
-      <Route path="/login" element={<SignIn />} />  {/* Redirect /login to SignIn */}
+        {/* Public Website Routes */}
+        <Route path="/" element={<Layout><Home /></Layout>} />
+        <Route path="/home" element={<Layout><Home /></Layout>} />
+        <Route path="/about" element={<Layout><About /></Layout>} />
+        <Route path="/pricing" element={<Layout><Pricing /></Layout>} />
+        <Route path="/services" element={<Layout><Pricing /></Layout>} />
+        <Route path="/spotlight" element={<Layout><Spotlight /></Layout>} />
+        <Route path="/contact" element={<Layout><Contact /></Layout>} />
+        <Route path="/discover" element={<Layout><Discover /></Layout>} />
+        <Route path="/request-account" element={<Layout><RequestAccount /></Layout>} />
 
-      {/* ============ IMMERSIVE BUILDER ROUTES (No Layout) ============ */}
-      <Route 
-        path="/page-builder" 
-        element={
-          <RequireAuth>
-            <PageBuilder />
-          </RequireAuth>
-        } 
-      />
-      <Route 
-        path="/case-builder/:id" 
-        element={
-          <RequireAuth>
-            <CaseBuilder />
-          </RequireAuth>
-        } 
-      />
-      <Route 
-        path="/builder/:id" 
-        element={
-          <RequireAuth>
-            <PageBuilder />
-          </RequireAuth>
-        } 
-      />
+        {/* Auth Routes */}
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/login" element={<SignIn />} />
 
-      {/* ============ DASHBOARD ROUTES (Protected) ============ */}
-      <Route
-        path="/dashboard"
-        element={
-          <RequireAuth>
-            <Dashboard 
-              user={user} 
-              onLogout={handleLogout}
-              onOpenCaseModal={handleOpenCaseModal}
+        {/* Protected Dashboard Routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <Dashboard 
+                user={user} 
+                onLogout={handleLogout}
+                onOpenCaseModal={handleOpenCaseModal}
+                onOpenProfileSettings={handleOpenProfileSettings}
+              />
+            </RequireAuth>
+          }
+        />
+        
+        {/* Case Management */}
+        <Route
+          path="/cases/:caseId/edit"
+          element={
+            <RequireAuth>
+              <TemplateEditor />
+            </RequireAuth>
+          }
+        />
+        
+        {/* Memorial Preview */}
+        <Route
+          path="/memorial/:caseId/*"
+          element={<TemplateRenderer />}
+        />
+        
+        {/* Settings */}
+        <Route
+          path="/settings/user"
+          element={
+            <RequireAuth>
+              <Dashboard 
+                user={user} 
+                onLogout={handleLogout}
+                onOpenCaseModal={handleOpenCaseModal}
+                onOpenProfileSettings={handleOpenProfileSettings}
+                activeSection="settings"
+                showProfileSettings={true}
+              />
+            </RequireAuth>
+          }
+        />
+        
+        {/* Admin Routes */}
+        {isAdmin && (
+          <>
+            <Route
+              path="/cases/list"
+              element={
+                <RequireAuth>
+                  <Dashboard 
+                    user={user} 
+                    onLogout={handleLogout}
+                    onOpenCaseModal={handleOpenCaseModal}
+                    onOpenProfileSettings={handleOpenProfileSettings}
+                    activeSection="cases"
+                  >
+                    <CasesList />
+                  </Dashboard>
+                </RequireAuth>
+              }
             />
-          </RequireAuth>
-        }
-      />
-      
-      {/* User Settings */}
-      <Route
-        path="/settings/user"
-        element={
-          <RequireAuth>
-            <Dashboard 
-              user={user} 
-              onLogout={handleLogout}
-              onOpenCaseModal={handleOpenCaseModal}
-              activeSection="settings"
-            >
-              <UserSettings />
-            </Dashboard>
-          </RequireAuth>
-        }
-      />
-      
-      {/* Analytics Route */}
-      <Route
-        path="/analytics"
-        element={
-          <RequireAuth>
-            <Dashboard 
-              user={user} 
-              onLogout={handleLogout}
-              onOpenCaseModal={handleOpenCaseModal}
-              activeSection="analytics"
+            <Route
+              path="/admin"
+              element={
+                <RequireAuth>
+                  <Dashboard 
+                    user={user} 
+                    onLogout={handleLogout}
+                    onOpenCaseModal={handleOpenCaseModal}
+                    onOpenProfileSettings={handleOpenProfileSettings}
+                    activeSection="admin"
+                  />
+                </RequireAuth>
+              }
             />
-          </RequireAuth>
-        }
-      />
-      
-      {/* Messages Route */}
-      <Route
-        path="/messages"
-        element={
-          <RequireAuth>
-            <Dashboard 
-              user={user} 
-              onLogout={handleLogout}
-              onOpenCaseModal={handleOpenCaseModal}
-              activeSection="messages"
-            />
-          </RequireAuth>
-        }
-      />
-      
-      {/* Reports Route */}
-      <Route
-        path="/reports"
-        element={
-          <RequireAuth>
-            <Dashboard 
-              user={user} 
-              onLogout={handleLogout}
-              onOpenCaseModal={handleOpenCaseModal}
-              activeSection="reports"
-            />
-          </RequireAuth>
-        }
-      />
-      
-      {/* Maps Route */}
-      <Route
-        path="/maps"
-        element={
-          <RequireAuth>
-            <Dashboard 
-              user={user} 
-              onLogout={handleLogout}
-              onOpenCaseModal={handleOpenCaseModal}
-              activeSection="maps"
-            />
-          </RequireAuth>
-        }
-      />
-      
-      {/* ============ ADMIN ONLY ROUTES ============ */}
-      {isAdmin && (
-        <>
-          <Route
-            path="/cases/list"
-            element={
-              <RequireAuth>
-                <Dashboard 
-                  user={user} 
-                  onLogout={handleLogout}
-                  onOpenCaseModal={handleOpenCaseModal}
-                  activeSection="cases"
-                >
-                  <CasesList />
-                </Dashboard>
-              </RequireAuth>
-            }
+          </>
+        )}
+        
+        {/* Default Redirects */}
+        <Route 
+          path="*" 
+          element={
+            isAuthenticated ? 
+              <Navigate to="/dashboard" replace /> : 
+              <Navigate to="/" replace />
+          } 
+        />
+      </Routes>
+
+      {/* Modals */}
+      {showCaseCreator && (
+        <div className="fixed inset-0 z-[60]">
+          <CaseCreator
+            onClose={handleCloseCaseModal}
+            onComplete={handleCaseComplete}
           />
-          <Route
-            path="/admin"
-            element={
-              <RequireAuth>
-                <Dashboard 
-                  user={user} 
-                  onLogout={handleLogout}
-                  onOpenCaseModal={handleOpenCaseModal}
-                  activeSection="admin"
-                />
-              </RequireAuth>
-            }
-          />
-        </>
+        </div>
       )}
-      
-      {/* ============ DEFAULT REDIRECTS ============ */}
-      {/* If authenticated, unknown routes go to dashboard */}
-      {/* If not authenticated, unknown routes go to home */}
-      <Route 
-        path="*" 
-        element={
-          isAuthenticated ? 
-            <Navigate to="/dashboard" replace /> : 
-            <Navigate to="/" replace />
-        } 
-      />
-    </Routes>
+
+      {showProfileSettings && (
+        <div className="fixed inset-0 z-[60] bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={handleCloseProfileSettings}
+              className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg z-10"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <ProfileSettings
+              user={user}
+              currentCase={currentCase}
+              onClose={handleCloseProfileSettings}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
-/**
- * ErrorBoundary for tracking JavaScript errors
- */
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    // Log error to tracking system
-    if (window.tracker) {
-      window.tracker.trackEvent({
-        eventType: 'javascript_error',
-        error: error.toString(),
-        componentStack: errorInfo.componentStack,
-        errorBoundary: true
-      });
-    }
-    
-    console.error('Error caught by boundary:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              Something went wrong
-            </h1>
-            <p className="text-gray-600 mb-4">
-              We've encountered an unexpected error. Please refresh the page.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
 function App() {
-  // Tracking configuration
-  const trackingConfig = {
-    apiEndpoint: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
-    trackingEndpoint: '/track',
-    batchEndpoint: '/track/batch',
-    enableLogging: import.meta.env.DEV, // Use Vite's DEV mode check
-    batchSize: 20,
-    batchInterval: 10000, // 10 seconds
-    enableFingerprinting: true,
-    enableScrollTracking: true,
-    enableClickTracking: true,
-    enableFormTracking: true,
-    enableErrorTracking: true,
-  };
-
   return (
-    <ErrorBoundary>
-      <Router>
-        <TrackingProvider config={trackingConfig}>
-          <AppContent />
-        </TrackingProvider>
-      </Router>
-    </ErrorBoundary>
+    <Router>
+      <AppContent />
+    </Router>
   );
 }
 

@@ -19,7 +19,6 @@ export default function SignIn() {
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -84,7 +83,7 @@ export default function SignIn() {
     try {
       // Prepare login data - your backend might expect 'username' instead of 'email'
       const loginData = {
-        username: formData.email, // or email if your backend expects email
+        email: formData.email, // or email if your backend expects email
         password: formData.password
       };
 
@@ -145,34 +144,6 @@ export default function SignIn() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    setIsGoogleLoading(true);
-    
-    // Get the backend URL from environment or use default
-    const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
-    
-    // Redirect to Django's Google OAuth endpoint
-    window.location.href = `${backendUrl}/auth/google/login/?next=${encodeURIComponent(window.location.origin + '/signin')}`;
-  };
-
-  // Demo login for development
-  const handleDemoLogin = () => {
-    const demoUser = {
-      id: "1",
-      email: "demo@caseclosure.org",
-      username: "demo",
-      first_name: "Demo",
-      last_name: "User",
-      is_staff: false
-    };
-    
-    localStorage.setItem("user", JSON.stringify(demoUser));
-    localStorage.setItem("access", "demo-token-12345");
-    
-    const from = location.state?.from?.pathname || "/dashboard";
-    navigate(from, { replace: true });
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
@@ -206,29 +177,19 @@ export default function SignIn() {
               </Alert>
             )}
 
-            {/* Google OAuth Button */}
+            {/* Google OAuth Button - Disabled/Greyed Out */}
             <Button
-              onClick={handleGoogleLogin}
               variant="outline"
-              className="w-full h-12 text-slate-700 border-slate-300 hover:bg-slate-50 rounded-xl"
-              disabled={isGoogleLoading}
+              className="w-full h-12 text-slate-400 border-slate-200 bg-slate-50 cursor-not-allowed rounded-xl"
+              disabled={true}
             >
-              {isGoogleLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Redirecting to Google...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Continue with Google
-                </>
-              )}
+              <svg className="w-5 h-5 mr-3 opacity-50" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Continue with Google (Coming Soon)
             </Button>
 
             <div className="relative">
@@ -301,7 +262,10 @@ export default function SignIn() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full accent-gradient text-slate-800 hover:shadow-lg transition-all duration-300 rounded-xl h-12 text-lg font-semibold"
+                className="w-full text-slate-800 hover:shadow-lg transition-all duration-300 rounded-xl h-12 text-lg font-semibold"
+                style={{
+                  background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)"
+                }}
               >
                 {isLoading ? (
                   <>
@@ -313,21 +277,6 @@ export default function SignIn() {
                 )}
               </Button>
             </form>
-
-            {/* Demo Login for Development */}
-            {import.meta.env.DEV && (
-              <>
-                <Separator />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleDemoLogin}
-                  className="w-full h-11 bg-yellow-50 hover:bg-yellow-100 border-yellow-300 text-yellow-900"
-                >
-                  <span className="text-xs font-medium">DEV MODE:</span>&nbsp;Demo Login
-                </Button>
-              </>
-            )}
 
             <div className="text-center text-sm text-slate-600">
               Don't have an account?{' '}

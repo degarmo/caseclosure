@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { CasePost } from "@/api/entities";
+import api from "@/utils/axios";
 import FeedPost from "../components/spotlight/FeedPost";
 import { Sparkles, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";

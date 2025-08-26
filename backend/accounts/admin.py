@@ -1,9 +1,34 @@
+# accounts/admin.py
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import AccountRequest, UserProfile
+from .models import CustomUser, AccountRequest, UserProfile
 
+# Custom User Admin
+@admin.register(CustomUser)
+class CustomUserAdmin(UserAdmin):
+    model = CustomUser
+    list_display = ['email', 'first_name', 'last_name', 'phone_verified', 'account_type']
+    list_filter = ['account_type', 'phone_verified']
+    
+    fieldsets = UserAdmin.fieldsets + (
+        ('Contact Info', {'fields': ('phone', 'phone_verified')}),
+        ('Verification', {'fields': ('account_type', 'city', 'state')}),
+    )
+    
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('email', 'password1', 'password2', 'first_name', 'last_name'),
+        }),
+    )
+    
+    search_fields = ('email', 'first_name', 'last_name')
+    ordering = ('email',)
+
+# Account Request Admin
 @admin.register(AccountRequest)
 class AccountRequestAdmin(admin.ModelAdmin):
     list_display = [
@@ -20,10 +45,10 @@ class AccountRequestAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Request Information', {
-            'fields': ('first_name', 'last_name', 'email', 'phone', 'role', 'organization', 'location')
+            'fields': ('first_name', 'last_name', 'email', 'phone', 'description')
         }),
         ('Verification', {
-            'fields': ('description', 'supporting_links')
+            'fields': ('supporting_links',)
         }),
         ('Status', {
             'fields': ('status', 'rejection_reason', 'submitted_at', 'reviewed_at', 'reviewed_by')
@@ -55,7 +80,6 @@ class AccountRequestAdmin(admin.ModelAdmin):
         approved_count = 0
         
         for account_request in queryset.filter(status='pending'):
-            # Update status
             account_request.status = 'approved'
             account_request.reviewed_by = request.user
             account_request.reviewed_at = timezone.now()
@@ -99,7 +123,6 @@ The CaseClosure Team
     
     def reject_with_reason(self, request, queryset):
         """Reject with a reason"""
-        # You could make this open a form for rejection reason
         rejected_count = queryset.filter(status='pending').update(
             status='rejected',
             reviewed_by=request.user,
@@ -114,12 +137,12 @@ The CaseClosure Team
     
     reject_with_reason.short_description = "❌ Reject selected requests"
 
-
+# User Profile Admin
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = [
         'user_email',
-        'display_name', 
+        'get_display_name',  # Changed from 'display_name' to 'get_display_name'
         'account_type',
         'phone_verified',
         'current_cases',
@@ -131,3 +154,12 @@ class UserProfileAdmin(admin.ModelAdmin):
     def user_email(self, obj):
         return obj.user.email
     user_email.short_description = 'Email'
+    
+    def get_display_name(self, obj):
+        """Get display name for the admin list"""
+        if hasattr(obj, 'display_name'):
+            return obj.display_name
+        elif obj.user.first_name and obj.user.last_name:
+            return f"{obj.user.first_name} {obj.user.last_name}"
+        return obj.user.username or obj.user.email
+    get_display_name.short_description = 'Display Name'

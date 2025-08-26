@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Case } from "@/api/entities";
+import api from "@/utils/axios";
 import CaseCard from "../components/discover/CaseCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";

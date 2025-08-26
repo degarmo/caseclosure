@@ -1,6 +1,7 @@
+# tracker/models.py
 import uuid
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings  # Add this import
 from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -97,8 +98,13 @@ class UserSession(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session_id = models.CharField(max_length=255, unique=True, db_index=True)
-    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='tracker_sessions', null=True, blank=True)  # Made nullable
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='tracker_sessions', null=True, blank=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # Changed from User
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
     
     # Identification
     fingerprint_hash = models.CharField(max_length=255, db_index=True)
@@ -130,7 +136,7 @@ class UserSession(models.Model):
     
     # Time information
     timezone = models.CharField(max_length=50, blank=True)
-    timezone_offset = models.IntegerField(null=True, blank=True)  # minutes from UTC
+    timezone_offset = models.IntegerField(null=True, blank=True)
     local_time = models.DateTimeField(null=True, blank=True)
     is_unusual_hour = models.BooleanField(default=False)
     
@@ -151,7 +157,7 @@ class UserSession(models.Model):
     # Suspicious activity
     suspicious_score = models.FloatField(default=0.0)
     is_suspicious = models.BooleanField(default=False, db_index=True)
-    risk_level = models.CharField(max_length=20, blank=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    risk_level = models.CharField(max_length=20, blank=True)
     
     # ML Analysis fields
     ml_analysis_results = models.JSONField(default=dict, blank=True)
@@ -232,9 +238,14 @@ class TrackingEvent(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='tracking_events', null=True, blank=True)  # Made nullable
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='tracking_events', null=True, blank=True)
     session = models.ForeignKey(UserSession, on_delete=models.SET_NULL, null=True, blank=True, related_name='events')
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # Changed from User
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
     
     # Session/User identification
     session_identifier = models.CharField(max_length=255, db_index=True)
@@ -267,7 +278,7 @@ class TrackingEvent(models.Model):
     browser_version = models.CharField(max_length=20, blank=True)
     os = models.CharField(max_length=50, blank=True)
     os_version = models.CharField(max_length=20, blank=True)
-    device_type = models.CharField(max_length=20, blank=True)  # desktop, mobile, tablet
+    device_type = models.CharField(max_length=20, blank=True)
     device_brand = models.CharField(max_length=50, blank=True)
     device_model = models.CharField(max_length=50, blank=True)
     
@@ -285,8 +296,8 @@ class TrackingEvent(models.Model):
     is_unusual_hour = models.BooleanField(default=False)
     
     # Page interaction metrics
-    time_on_page = models.IntegerField(null=True, blank=True)  # seconds
-    scroll_depth = models.FloatField(null=True, blank=True)  # percentage
+    time_on_page = models.IntegerField(null=True, blank=True)
+    scroll_depth = models.FloatField(null=True, blank=True)
     clicks_count = models.IntegerField(default=0)
     
     # Suspicious activity scoring
@@ -353,7 +364,7 @@ class SuspiciousActivity(models.Model):
         ('fake_tip', 'Fake Tip Submission'),
         ('spam_content', 'Spam Content'),
         ('harassment', 'Harassment'),
-        ('suspicious_pattern', 'Suspicious Pattern'),  # Added default
+        ('suspicious_pattern', 'Suspicious Pattern'),
     ]
     
     SEVERITY_LEVELS = [
@@ -365,7 +376,7 @@ class SuspiciousActivity(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='suspicious_activities', null=True, blank=True)  # Made nullable
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='suspicious_activities', null=True, blank=True)
     session = models.ForeignKey(UserSession, on_delete=models.SET_NULL, null=True, blank=True, related_name='suspicious_activities')
     
     # Identification
@@ -392,7 +403,13 @@ class SuspiciousActivity(models.Model):
     
     # Response/Action taken
     reviewed = models.BooleanField(default=False)
-    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_activities')
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # Changed from User
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='reviewed_activities'
+    )
     reviewed_at = models.DateTimeField(null=True, blank=True)
     action_taken = models.TextField(blank=True)
     
@@ -445,7 +462,7 @@ class Alert(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='tracker_alerts', null=True, blank=True)  # Made nullable
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='tracker_alerts', null=True, blank=True)
     
     # Alert details
     alert_type = models.CharField(max_length=50, choices=ALERT_TYPES)
@@ -464,10 +481,22 @@ class Alert(models.Model):
     
     # Status
     acknowledged = models.BooleanField(default=False)
-    acknowledged_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='acknowledged_alerts')
+    acknowledged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # Changed from User
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='acknowledged_alerts'
+    )
     acknowledged_at = models.DateTimeField(null=True, blank=True)
     resolved = models.BooleanField(default=False)
-    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_alerts')
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # Changed from User
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='resolved_alerts'
+    )
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolution_notes = models.TextField(blank=True)
     
@@ -528,11 +557,11 @@ class MLModel(models.Model):
     # Training details
     training_samples = models.IntegerField(null=True, blank=True)
     training_date = models.DateTimeField(null=True, blank=True)
-    training_duration = models.IntegerField(null=True, blank=True)  # seconds
+    training_duration = models.IntegerField(null=True, blank=True)
     
     # Model file
     model_file_path = models.CharField(max_length=255, blank=True)
-    model_size = models.IntegerField(null=True, blank=True)  # bytes
+    model_size = models.IntegerField(null=True, blank=True)
     
     # Status
     is_active = models.BooleanField(default=False)

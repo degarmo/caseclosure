@@ -1,0 +1,42 @@
+# requirements.txt - Production dependencies for Django on Render
+
+# Django and core
+Django==4.2.7
+django-environ==0.11.2
+python-decouple==3.8
+
+# Database
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+
+# Web server
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# API and Authentication
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.0
+django-cors-headers==4.3.0
+django-allauth==0.57.0
+
+# Celery and Redis
+celery==5.3.4
+django-celery-beat==2.5.0
+django-celery-results==2.5.1
+redis==5.0.1
+channels==4.0.0
+channels-redis==4.1.0
+
+# Storage (for AWS S3)
+boto3==1.29.7
+django-storages==1.14.2
+
+# Utilities
+Pillow==10.1.0
+django-extensions==3.2.3
+
+# Monitoring (optional but recommended)
+sentry-sdk==1.38.0
+
+# Security
+django-ratelimit==4.1.0
