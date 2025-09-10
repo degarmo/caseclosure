@@ -1,0 +1,31 @@
+{
+  "name": "@components/customization-view",
+  "version": "1.0.0",
+  "description": "Modular CustomizationView component for case website customization",
+  "main": "index.jsx",
+  "private": true,
+  "dependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.0.0",
+    "lucide-react": "^0.263.0"
+  },
+  "exports": {
+    ".": "./index.jsx",
+    "./components": "./components/index.js",
+    "./hooks": "./hooks/index.js",
+    "./utils": {
+      "import": "./utils/index.js",
+      "require": "./utils/index.js"
+    },
+    "./constants": "./constants/templateRegistry.js"
+  },
+  "sideEffects": false,
+  "keywords": [
+    "react",
+    "customization",
+    "editor",
+    "template",
+    "deployment"
+  ]
+}

@@ -8,7 +8,21 @@ from datetime import timedelta
 import os
 from decouple import config, Csv
 import dj_database_url
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
+cloudinary.config(
+    cloud_name='dp7ys0qqa',
+    api_key='184179145155636',
+    api_secret='mtr5bpMGGmnG1Lkk7yNJ8RwatzQ'
+)
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'dp7ys0qqa',  # From Cloudinary dashboard
+    'API_KEY': '184179145155636',
+    'API_SECRET': 'mtr5bpMGGmnG1Lkk7yNJ8RwatzQ'
+}
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -238,6 +252,11 @@ else:
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Create media directories if they don't exist (fix indentation)
+if not config('USE_S3', default=False, cast=bool):
+    os.makedirs(MEDIA_ROOT, exist_ok=True)
+    os.makedirs(os.path.join(MEDIA_ROOT, 'case_photos'), exist_ok=True)
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -245,6 +264,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://127.0.0.1:3000",
 ]
 
 if not DEBUG:
@@ -411,6 +431,9 @@ if not DEBUG and config('SENTRY_DSN', default=''):
         send_default_pii=False,
         environment=ENV,
     )
+
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Twilio Settings (for SMS verification)
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')

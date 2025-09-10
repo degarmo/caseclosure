@@ -1,0 +1,25 @@
+.ProseMirror {
+  outline: none;
+  width: 100%;
+  height: 100%;
+}
+
+.ProseMirror > * {
+  margin: 0 0 0.75rem 0;
+}
+
+.ProseMirror > *:last-child {
+  margin-bottom: 0;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror-focused {
+  outline: none;
+}

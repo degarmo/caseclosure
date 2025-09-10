@@ -1,136 +1,125 @@
-import React from "react";
-import { Button } from "../ui/button";
-import { Heart, Share2 } from "lucide-react";
+import React, { useState } from "react";
+import { Heart, Share2, MessageSquare, Plus } from "lucide-react";
 
-// Available hero images for selection
-const HERO_IMAGES = [
-  { 
-    id: 'sunset', 
-    url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=800&fit=crop',
-    name: 'Sunset Mountains'
-  },
-  { 
-    id: 'sky', 
-    url: 'https://images.unsplash.com/photo-1517685352821-92cf88aee5a5?w=1200&h=800&fit=crop',
-    name: 'Peaceful Sky'
-  },
-  { 
-    id: 'forest', 
-    url: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&h=800&fit=crop',
-    name: 'Forest Path'
-  },
-  { 
-    id: 'ocean', 
-    url: 'https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=1200&h=800&fit=crop',
-    name: 'Ocean Horizon'
-  },
-  { 
-    id: 'field', 
-    url: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=1200&h=800&fit=crop',
-    name: 'Open Field'
-  }
-];
-
-export default function HeroSection({ caseData, customizations, isEditing, onCustomizationChange }) {
-  // Get victim's name from form data - NOT STATIC
-  const firstName = caseData?.first_name || '';
-  const lastName = caseData?.last_name || '';
-  const fullName = `${firstName} ${lastName}`.trim();
+export default function HeroSection({ 
+  caseData = {}, 
+  customizations = {}, 
+  isEditing = false, 
+  onCustomizationChange,
+  primaryPhotoUrl,
+  displayName,
+  lastUpdate
+}) {
+  const [showImageModal, setShowImageModal] = useState(false);
   
-  // Determine the hero title based on case type from FORM
-  const getHeroTitle = () => {
-    const caseType = caseData?.case_type || caseData?.crime_type || '';
+  // Determine the title prefix based on case type
+  const getTitlePrefix = () => {
+    if (customizations?.hero?.titlePrefix) {
+      return customizations.hero.titlePrefix;
+    }
     
-    switch(caseType.toLowerCase()) {
-      case 'missing':
-        return 'Help Find';
-      case 'homicide':
-      case 'murder':
-        return 'Justice for';
-      case 'assault':
-        return 'Justice for';
-      default:
-        return 'Help Find';
+    const caseType = caseData.crime_type || caseData.case_type || 'missing';
+    
+    if (caseType === 'homicide') {
+      return 'Justice for';
+    } else if (caseType === 'missing') {
+      return 'Help Find';
+    } else if (caseType === 'unidentified') {
+      return 'Help Identify';
+    } else if (caseType === 'cold_case') {
+      return 'Seeking Answers for';
     }
-  };
-  
-  // Get customization values with defaults
-  const heroImage = customizations?.hero?.heroImage || HERO_IMAGES[0].url;
-  const heroTagline = customizations?.hero?.heroTagline || `Help us find answers and bring justice to our family`;
-  const showInvestigationStatus = customizations?.hero?.showInvestigationStatus !== false;
-  const investigationStatus = customizations?.hero?.investigationStatus || 'ACTIVE INVESTIGATION';
-  
-  // Only show reward if it's offered in the FORM AND amount exists and is > 0
-  const showReward = caseData?.reward_offered === true && 
-                     caseData?.reward_amount && 
-                     caseData.reward_amount > 0 && 
-                     customizations?.hero?.showReward !== false;
-  
-  // Format last update date
-  const getLastUpdate = () => {
-    if (caseData?.spotlight_posts && caseData.spotlight_posts.length > 0) {
-      const lastPost = caseData.spotlight_posts[0];
-      return new Date(lastPost.published_at).toLocaleDateString('en-US', { 
-        month: 'long', 
-        day: 'numeric', 
-        year: 'numeric' 
-      });
-    }
-    return new Date().toLocaleDateString('en-US', { 
-      month: 'long', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
+    return 'Remember';
   };
 
-  // Handle navigation to contact page
-  const handleTipClick = () => {
-    if (!isEditing) {
-      const caseId = window.location.pathname.split('/')[2] || 'new';
-      const template = new URLSearchParams(window.location.search).get('template') || 'beacon';
-      window.location.href = `/preview/${caseId}/contact?template=${template}`;
+  // Get investigation status
+  const getInvestigationStatus = () => {
+    if (customizations?.hero?.investigationStatus) {
+      return customizations.hero.investigationStatus;
     }
+    
+    const caseType = caseData.crime_type || caseData.case_type || 'missing';
+    
+    if (caseData.deployment_status === 'deployed' && !caseData.is_public) {
+      return 'CASE CLOSED';
+    } else if (caseType === 'cold_case') {
+      return 'COLD CASE';
+    } else if (caseType === 'missing') {
+      return 'MISSING PERSON';
+    }
+    return 'ACTIVE INVESTIGATION';
   };
 
-  // Handle scroll to about section
-  const handleStoryClick = () => {
-    if (!isEditing) {
-      document.querySelector('#about-section')?.scrollIntoView({ behavior: 'smooth' });
+  // Get hero image with proper fallback
+  const getHeroImage = () => {
+    if (customizations?.hero?.backgroundImage) {
+      return customizations.hero.backgroundImage;
     }
+    if (primaryPhotoUrl && primaryPhotoUrl !== 'null' && primaryPhotoUrl !== null) {
+      return primaryPhotoUrl;
+    }
+    // Use a gradient placeholder instead of external URL
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' viewBox='0 0 1200 800'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%2364748b;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231e293b;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1200' height='800' fill='url(%23grad)'/%3E%3C/svg%3E";
   };
+
+  // Format case number
+  const formatCaseNumber = () => {
+    if (caseData.case_number) {
+      return `Case #: ${caseData.case_number}`;
+    }
+    return `Case #: ${new Date().getFullYear()}-${String(caseData.id || '000000').padStart(6, '0')}`;
+  };
+
+  // Get followers count (could be from actual data or calculated)
+  const getFollowersCount = () => {
+    if (caseData.followers_count) {
+      return caseData.followers_count.toLocaleString();
+    }
+    // Mock calculation based on view count or other metrics
+    const baseFollowers = 100;
+    const daysOld = caseData.created_at ? 
+      Math.floor((new Date() - new Date(caseData.created_at)) / (1000 * 60 * 60 * 24)) : 
+      30;
+    return (baseFollowers + (daysOld * 3)).toLocaleString();
+  };
+
+  // Format reward amount
+  const formatReward = () => {
+    if (caseData.reward_amount) {
+      const amount = parseFloat(caseData.reward_amount);
+      if (amount >= 1000) {
+        return `$${(amount / 1000).toFixed(0)},000`;
+      }
+      return `$${amount.toFixed(0)}`;
+    }
+    return null;
+  };
+
+  const showReward = customizations?.hero?.showReward !== false && formatReward();
+  const showStatus = customizations?.hero?.showStatus !== false;
 
   return (
     <div className="relative">
-      {/* Hero Image Selection (Edit Mode Only) */}
-      {isEditing && (
-        <div className="absolute top-4 right-4 z-30 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Hero Image</label>
-          <div className="flex gap-2">
-            {HERO_IMAGES.map((img) => (
-              <button
-                key={img.id}
-                onClick={() => onCustomizationChange('hero.heroImage', img.url)}
-                className={`relative w-16 h-12 rounded overflow-hidden border-2 transition-all ${
-                  heroImage === img.url ? 'border-blue-500 shadow-md' : 'border-gray-300 hover:border-gray-400'
-                }`}
-                title={img.name}
-              >
-                <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Hero Image */}
       <div className="relative h-[60vh] min-h-[500px] overflow-hidden">
         <div className="absolute inset-0">
           <img
-            src={heroImage}
-            alt={`Memorial for ${fullName}`}
+            src={getHeroImage()}
+            alt={displayName}
             className="w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+          
+          {/* Edit Button for Image */}
+          {isEditing && (
+            <button
+              onClick={() => onCustomizationChange('hero.backgroundImage', 'OPEN_IMAGE_MODAL')}
+              className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-gray-700 p-2 rounded-lg shadow-lg hover:bg-white transition-colors z-10"
+              title="Change hero image"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          )}
         </div>
         
         {/* Hero Content */}
@@ -138,44 +127,45 @@ export default function HeroSection({ caseData, customizations, isEditing, onCus
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
             <div className="max-w-3xl">
               <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-                {getHeroTitle()}
-                <span className="block text-yellow-400">{firstName}</span>
+                <span className="inline-flex items-center gap-2">
+                  {getTitlePrefix()}
+                  {isEditing && (
+                    <button
+                      onClick={() => onCustomizationChange('hero.titlePrefix', 'OPEN_PREFIX_MODAL')}
+                      className="bg-white/20 backdrop-blur-sm text-white p-1 rounded hover:bg-white/30 transition-colors"
+                      title="Edit title prefix"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
+                </span>
+                <span className="block text-yellow-400">{displayName}</span>
               </h1>
               
-              {isEditing ? (
-                <textarea
-                  value={heroTagline}
-                  onChange={(e) => onCustomizationChange('hero.heroTagline', e.target.value)}
-                  className="w-full text-xl md:text-2xl bg-white/10 backdrop-blur-sm text-white placeholder-white/70 border border-white/30 rounded-lg px-4 py-2 mb-8"
-                  placeholder="Enter a tagline..."
-                  rows={2}
-                />
-              ) : (
-                <p className="text-xl md:text-2xl text-slate-200 mb-8 leading-relaxed">
-                  {heroTagline}
-                </p>
-              )}
+              <p className="text-xl md:text-2xl text-slate-200 mb-8 leading-relaxed">
+                {customizations?.hero?.subtitle || caseData.description?.substring(0, 150) || 
+                 `Help us find answers and bring justice to ${caseData.first_name || 'our'} family.`}
+                {isEditing && (
+                  <button
+                    onClick={() => onCustomizationChange('hero.subtitle', 'OPEN_TEXT_EDITOR')}
+                    className="ml-2 bg-white/20 backdrop-blur-sm text-white p-1 rounded hover:bg-white/30 transition-colors inline-block"
+                    title="Edit subtitle"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                )}
+              </p>
               
               {/* Call to Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  size="lg" 
-                  className="gold-gradient text-slate-800 hover:shadow-xl transition-all duration-300 font-semibold px-8"
-                  onClick={handleTipClick}
-                  disabled={isEditing}
-                >
-                  <Heart className="w-5 h-5 mr-2" />
-                  Submit a Tip
-                </Button>
-                <Button 
-                  size="lg" 
-                  className="gold-gradient text-slate-800 hover:shadow-xl transition-all duration-300 font-semibold px-8"
-                  onClick={handleStoryClick}
-                  disabled={isEditing}
-                >
-                  <Share2 className="w-5 h-5 mr-2" />
-                  Share Their Story
-                </Button>
+                <button className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-slate-800 font-semibold rounded-lg hover:shadow-xl transition-all duration-300">
+                  <Heart className="w-5 h-5" />
+                  Share a Tip
+                </button>
+                <button className="flex items-center justify-center gap-2 px-8 py-3 bg-white/10 backdrop-blur-sm border border-white/30 text-white font-semibold rounded-lg hover:bg-white/20 transition-all duration-300">
+                  <Share2 className="w-5 h-5" />
+                  Share Story
+                </button>
               </div>
             </div>
           </div>
@@ -183,82 +173,44 @@ export default function HeroSection({ caseData, customizations, isEditing, onCus
       </div>
 
       {/* Case Status Banner */}
-      <div className="bg-slate-800 text-white py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-6">
-              {/* Investigation Status Toggle */}
-              {isEditing ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={showInvestigationStatus}
-                    onChange={(e) => onCustomizationChange('hero.showInvestigationStatus', e.target.checked)}
-                    id="showStatus"
-                    className="w-4 h-4"
-                  />
-                  <label htmlFor="showStatus" className="text-sm">Show Status</label>
-                  {showInvestigationStatus && (
-                    <select
-                      value={investigationStatus}
-                      onChange={(e) => onCustomizationChange('hero.investigationStatus', e.target.value)}
-                      className="ml-2 px-2 py-1 bg-slate-700 rounded text-sm"
-                    >
-                      <option value="ACTIVE INVESTIGATION">ACTIVE INVESTIGATION</option>
-                      <option value="CASE SOLVED">CASE SOLVED</option>
-                      <option value="SEEKING INFORMATION">SEEKING INFORMATION</option>
-                    </select>
-                  )}
-                </div>
-              ) : showInvestigationStatus && (
+      {showStatus && (
+        <div className="bg-slate-800 text-white py-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <span className="font-semibold text-yellow-400">{investigationStatus}</span>
-                </div>
-              )}
-              
-              <div className="text-slate-300">
-                {caseData?.case_number && (
-                  <>Case #: {caseData.case_number} | </>
-                )}
-                Last Updated: {getLastUpdate()}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4 text-sm">
-              {/* Reward Display - ONLY if offered in form */}
-              {isEditing ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={showReward}
-                    onChange={(e) => onCustomizationChange('hero.showReward', e.target.checked)}
-                    id="showReward"
-                    className="w-4 h-4"
-                  />
-                  <label htmlFor="showReward" className="text-sm">
-                    Show Reward 
-                    {caseData?.reward_offered && caseData?.reward_amount && caseData.reward_amount > 0 && 
-                      ` ($${caseData.reward_amount.toLocaleString()})`
-                    }
-                  </label>
-                </div>
-              ) : (
-                showReward && (
-                  <span className="bg-slate-700 px-3 py-1 rounded-full">
-                    ${caseData.reward_amount.toLocaleString()} Reward Offered
+                  <span className="font-semibold text-yellow-400">
+                    {getInvestigationStatus()}
+                    {isEditing && (
+                      <button
+                        onClick={() => onCustomizationChange('hero.investigationStatus', 'OPEN_STATUS_MODAL')}
+                        className="ml-2 bg-white/20 text-white p-1 rounded hover:bg-white/30 transition-colors inline-block"
+                        title="Edit status"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    )}
                   </span>
-                )
-              )}
-              
-              {/* Visitor Count */}
-              <span className="text-slate-300">
-                {caseData?.visitor_count || 0} people following this case
-              </span>
+                </div>
+                <div className="text-slate-300">
+                  {formatCaseNumber()} | Last Updated: {lastUpdate}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                {showReward && (
+                  <span className="bg-slate-700 px-3 py-1 rounded-full">
+                    {formatReward()} Reward Offered
+                  </span>
+                )}
+                <span className="text-slate-300">
+                  {getFollowersCount()} people following this case
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

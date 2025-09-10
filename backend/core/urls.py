@@ -15,6 +15,7 @@ def api_root(request):
         "endpoints": {
             "auth": "/api/auth/",
             "cases": "/api/cases/",
+            "images": "/api/images/upload/",
             "tracker": "/api/tracker/",
             "admin": "/admin/",
         }
@@ -30,7 +31,7 @@ urlpatterns = [
     
     # API Endpoints - Consolidated to avoid duplication
     path('api/auth/', include('accounts.urls')),  # Authentication endpoints
-    path('api/', include('cases.urls')),    # Cases endpoints
+    path('api/', include('cases.urls')),    # Cases endpoints (includes images/upload/)
     path('api/tracker/', include('tracker.urls')), # Tracker endpoints
     
     # Django-allauth URLs for Google OAuth

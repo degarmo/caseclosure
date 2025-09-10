@@ -243,9 +243,22 @@ class Case(models.Model):
         default='missing'
     )
     
+    # Add crime_type as an alias for case_type for compatibility
+    crime_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Alias for case_type for backward compatibility"
+    )
+    
     incident_date = models.DateField(blank=True, null=True)
     incident_location = models.CharField(max_length=255, blank=True)
     last_seen_location = models.CharField(max_length=255, blank=True)
+    last_seen_date = models.DateField(blank=True, null=True)
+    last_seen_time = models.TimeField(blank=True, null=True)
+    last_seen_wearing = models.TextField(blank=True)
+    last_seen_with = models.TextField(blank=True)
+    planned_activities = models.TextField(blank=True)
+    transportation_details = models.TextField(blank=True)
     
     # Investigation Details
     investigating_agency = models.CharField(max_length=255, blank=True)
@@ -342,6 +355,16 @@ class Case(models.Model):
         help_text="Temporarily disable the website"
     )
     
+    # Virtual slug property for compatibility with tracking middleware
+    @property
+    def slug(self):
+        """Virtual slug property for compatibility with tracking middleware"""
+        if self.case_title:
+            return slugify(f"{self.case_title}-{self.id}" if self.id else self.case_title)
+        elif self.first_name and self.last_name:
+            return slugify(f"{self.first_name}-{self.last_name}-{self.id}" if self.id else f"{self.first_name}-{self.last_name}")
+        return f"case-{self.id}" if self.id else "case-new"
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -369,6 +392,10 @@ class Case(models.Model):
         return name
     
     def save(self, *args, **kwargs):
+        # Auto-sync crime_type with case_type
+        if not self.crime_type:
+            self.crime_type = self.case_type
+        
         # Auto-generate subdomain if not set
         if not self.subdomain and self.first_name and self.last_name:
             base_subdomain = slugify(f"{self.first_name}-{self.last_name}")[:40]
@@ -505,7 +532,7 @@ class CasePhoto(models.Model):
     
     image = models.ImageField(upload_to=case_photo_upload_path)
     caption = models.CharField(max_length=255, blank=True)
-    
+    is_primary = models.BooleanField(default=False)
     is_public = models.BooleanField(default=True)
     order = models.IntegerField(default=0)
     

@@ -1,253 +1,268 @@
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Button } from "../ui/button";
+import React, { useState } from "react";
 import { 
+  Heart, 
   Share2, 
   Camera, 
+  FileText, 
+  Users, 
+  DollarSign,
   ExternalLink,
-  Plus,
-  X,
-  Facebook,
-  Twitter,
-  Instagram,
-  Link
+  ChevronRight,
+  Plus
 } from "lucide-react";
 
-export default function SidebarWidget({ caseData, customizations, isEditing, onCustomizationChange }) {
-  // Widget visibility toggles
-  const showShareWidget = customizations?.sidebar?.showShareWidget !== false;
-  const showMediaGallery = customizations?.sidebar?.showMediaGallery !== false;
-  const mediaItems = customizations?.sidebar?.mediaItems || [];
+export default function SidebarWidget({ caseData = {}, customizations = {}, displayName, isEditing = false }) {
+  const [donationAmount, setDonationAmount] = useState("");
   
-  // Handle media upload
-  const handleMediaUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const newItems = [...mediaItems];
+  // Calculate fundraiser data from case data
+  const getFundraiserData = () => {
+    const defaultGoal = 25000;
+    const goal = customizations?.fundraiser?.goal || parseFloat(caseData.reward_amount) || defaultGoal;
     
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        newItems.push({
-          id: Date.now() + Math.random(),
-          url: event.target.result,
-          title: file.name
-        });
-        onCustomizationChange('sidebar.mediaItems', newItems);
-      };
-      reader.readAsDataURL(file);
-    });
+    // Mock calculation - in production, this would come from actual donation tracking
+    const percentRaised = 0.63; // 63% raised
+    const raised = Math.floor(goal * percentRaised);
+    const donorCount = Math.floor(raised / 177); // Average donation ~$177
+    
+    return {
+      raised,
+      goal,
+      donorCount,
+      recentDonors: [
+        { name: "Anonymous", amount: 100, time: "2 hours ago" },
+        { name: "Maria S.", amount: 50, time: "5 hours ago" },
+        { name: "John D.", amount: 25, time: "1 day ago" },
+      ]
+    };
   };
 
-  const handleRemoveMedia = (id) => {
-    const filtered = mediaItems.filter(item => item.id !== id);
-    onCustomizationChange('sidebar.mediaItems', filtered);
-  };
-
-  // Social share handlers
-  const handleShare = (platform) => {
-    if (isEditing) return;
-    
-    const url = window.location.href;
-    const text = `Help us find justice for ${caseData?.first_name} ${caseData?.last_name}`;
-    
-    switch(platform) {
-      case 'facebook':
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`);
-        break;
-      case 'twitter':
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`);
-        break;
-      case 'instagram':
-        // Instagram doesn't have direct share URL, copy link instead
-        navigator.clipboard.writeText(url);
-        alert('Link copied! Share on Instagram');
-        break;
-      case 'copy':
-        navigator.clipboard.writeText(url);
-        alert('Link copied to clipboard!');
-        break;
+  // Get media items from case photos
+  const getMediaItems = () => {
+    if (caseData.photos && caseData.photos.length > 0) {
+      return caseData.photos.slice(0, 4).map((photo, index) => ({
+        type: "image",
+        url: photo.image_url || photo.image,
+        title: photo.caption || `Photo ${index + 1}`
+      }));
     }
+    
+    // Fallback to placeholder images
+    return [
+      { type: "image", url: "https://images.unsplash.com/photo-1494790108755-2616c9703b73?w=150&h=150&fit=crop", title: "Family photo" },
+      { type: "image", url: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop", title: "Recent photo" },
+      { type: "image", url: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&h=150&fit=crop", title: "Memorial service" },
+      { type: "image", url: "https://images.unsplash.com/photo-1488161628813-04466f872be2?w=150&h=150&fit=crop", title: "Missing person flyer" }
+    ];
   };
+
+  // Get petition count
+  const getPetitionCount = () => {
+    // Could be calculated from actual signatures or mock data
+    const baseSignatures = 500;
+    const daysOld = caseData.created_at ? 
+      Math.floor((new Date() - new Date(caseData.created_at)) / (1000 * 60 * 60 * 24)) : 
+      30;
+    return baseSignatures + (daysOld * 25);
+  };
+
+  const fundraiserData = getFundraiserData();
+  const mediaItems = getMediaItems();
+  const progressPercentage = (fundraiserData.raised / fundraiserData.goal) * 100;
+  const showRewardSection = caseData.reward_amount || customizations?.sidebar?.showDonation !== false;
+  const totalPhotos = caseData.photos_count || caseData.photos?.length || 16;
 
   return (
     <div className="w-full lg:w-80 space-y-6">
-      {/* Widget Controls in Edit Mode */}
-      {isEditing && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-blue-900">
-              Sidebar Widgets
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showShareWidget}
-                onChange={(e) => onCustomizationChange('sidebar.showShareWidget', e.target.checked)}
-                className="w-4 h-4"
+      {/* Donation/Reward Widget */}
+      {showRewardSection && (
+        <div className="bg-white rounded-xl shadow-lg border border-yellow-200">
+          <div className="px-6 py-4 border-b border-yellow-100">
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+              <Heart className="w-5 h-5 text-red-500" />
+              Support the Family
+            </h3>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-slate-800">
+                ${fundraiserData.raised.toLocaleString()}
+              </div>
+              <div className="text-sm text-slate-600">
+                raised of ${fundraiserData.goal.toLocaleString()} goal
+              </div>
+            </div>
+            
+            <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="absolute left-0 top-0 h-full bg-gradient-to-r from-yellow-400 to-yellow-500 transition-all duration-500"
+                style={{ width: `${Math.min(progressPercentage, 100)}%` }}
               />
-              <span className="text-sm">Show "Spread the Word" widget</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showMediaGallery}
-                onChange={(e) => onCustomizationChange('sidebar.showMediaGallery', e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm">Show Media Gallery widget</span>
-            </label>
-          </CardContent>
-        </Card>
+            </div>
+            
+            <div className="flex justify-between text-sm text-slate-600">
+              <span>{fundraiserData.donorCount} donors</span>
+              <span>{Math.round(progressPercentage)}% complete</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {["$25", "$50", "$100"].map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => setDonationAmount(amount.slice(1))}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-yellow-50 hover:border-yellow-300 transition-colors"
+                >
+                  {amount}
+                </button>
+              ))}
+            </div>
+
+            <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-slate-800 font-medium rounded-lg hover:shadow-lg transition-all duration-200">
+              <DollarSign className="w-4 h-4" />
+              Donate Now
+            </button>
+
+            {/* Recent Donors */}
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <h4 className="font-medium text-sm text-slate-700">Recent Supporters</h4>
+              {fundraiserData.recentDonors.map((donor, index) => (
+                <div key={index} className="flex justify-between items-center text-xs">
+                  <span className="text-slate-600">{donor.name}</span>
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span>${donor.amount}</span>
+                    <span>•</span>
+                    <span>{donor.time}</span>
+                  </div>
+                </div>
+              ))}
+              <button className="w-full flex items-center justify-center gap-1 text-xs text-slate-600 hover:bg-slate-50 py-2 rounded transition-colors">
+                View all donors
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Share Widget */}
-      {showShareWidget && (
-        <Card className="shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-slate-800">
-              <Share2 className="w-5 h-5 text-blue-500" />
-              Spread the Word
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-slate-600">
-              Help us reach more people who might have information about {caseData?.first_name}'s case.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="hover:bg-blue-50 flex items-center gap-1"
-                onClick={() => handleShare('facebook')}
-                disabled={isEditing}
-              >
-                <Facebook className="w-4 h-4" />
-                Facebook
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="hover:bg-blue-50 flex items-center gap-1"
-                onClick={() => handleShare('twitter')}
-                disabled={isEditing}
-              >
-                <Twitter className="w-4 h-4" />
-                Twitter
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="hover:bg-blue-50 flex items-center gap-1"
-                onClick={() => handleShare('instagram')}
-                disabled={isEditing}
-              >
-                <Instagram className="w-4 h-4" />
-                Instagram
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="hover:bg-blue-50 flex items-center gap-1"
-                onClick={() => handleShare('copy')}
-                disabled={isEditing}
-              >
-                <Link className="w-4 h-4" />
-                Copy Link
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <div className="bg-white rounded-xl shadow-lg">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+            <Share2 className="w-5 h-5 text-blue-500" />
+            Spread the Word
+          </h3>
+        </div>
+        <div className="p-6 space-y-3">
+          <p className="text-sm text-slate-600">
+            Help us reach more people who might have information about {caseData.first_name || 'this'} case.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 transition-colors">
+              Facebook
+            </button>
+            <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 transition-colors">
+              Twitter
+            </button>
+            <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 transition-colors">
+              Instagram
+            </button>
+            <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 transition-colors">
+              Copy Link
+            </button>
+          </div>
+        </div>
+      </div>
 
-      {/* Media Gallery Widget */}
-      {showMediaGallery && (
-        <Card className="shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-slate-800">
-              <Camera className="w-5 h-5 text-green-500" />
-              Media Gallery
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isEditing && (
-              <div className="mb-3">
-                <label className="block">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleMediaUpload}
-                    className="hidden"
-                  />
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={(e) => e.currentTarget.previousElementSibling.click()}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Upload Photos
-                  </Button>
-                </label>
-              </div>
-            )}
-            
-            {mediaItems.length > 0 ? (
-              <>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  {mediaItems.slice(0, 4).map((item, index) => (
-                    <div
-                      key={item.id || index}
-                      className="relative group cursor-pointer rounded-lg overflow-hidden aspect-square"
-                    >
-                      <img
-                        src={item.url}
-                        alt={item.title}
-                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
-                      />
-                      {isEditing && (
-                        <button
-                          onClick={() => handleRemoveMedia(item.id)}
-                          className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
-                      {index === 3 && mediaItems.length > 4 && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="text-white font-medium">+{mediaItems.length - 4} more</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                
-                {!isEditing && (
-                  <Button variant="outline" size="sm" className="w-full">
-                    View All Photos
-                    <ExternalLink className="w-3 h-3 ml-1" />
-                  </Button>
+      {/* Media Gallery Preview */}
+      <div className="bg-white rounded-xl shadow-lg">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+            <Camera className="w-5 h-5 text-green-500" />
+            Media Gallery
+          </h3>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {mediaItems.map((item, index) => (
+              <div
+                key={index}
+                className="relative group cursor-pointer rounded-lg overflow-hidden aspect-square"
+              >
+                <img
+                  src={item.url}
+                  alt={item.title}
+                  className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
+                {index === 3 && totalPhotos > 4 && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <span className="text-white font-medium">+{totalPhotos - 4} more</span>
+                  </div>
                 )}
-              </>
-            ) : (
-              <div className="text-center py-8 text-slate-500">
-                <Camera className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-                <p className="text-sm">
-                  {isEditing ? 'Upload photos to display in the gallery' : 'No photos available'}
-                </p>
               </div>
+            ))}
+          </div>
+          <button className="w-full flex items-center justify-center gap-1 text-sm border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+            View All Photos
+            <ExternalLink className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* Petition Widget */}
+      <div className="bg-white rounded-xl shadow-lg border border-purple-200">
+        <div className="px-6 py-4 border-b border-purple-100">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+            <FileText className="w-5 h-5 text-purple-500" />
+            Take Action
+          </h3>
+        </div>
+        <div className="p-6 space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-purple-500" />
+            <span className="text-sm text-slate-600">
+              {getPetitionCount().toLocaleString()} people have signed
+            </span>
+          </div>
+          <p className="text-sm text-slate-600">
+            Sign our petition demanding {caseData.investigating_agency ? 
+              `${caseData.investigating_agency} increase` : 
+              'increased'} resources for this investigation.
+          </p>
+          <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors">
+            <FileText className="w-4 h-4" />
+            Sign Petition
+          </button>
+        </div>
+      </div>
+
+      {/* Contact Information (if available) */}
+      {(caseData.detective_name || caseData.detective_phone) && (
+        <div className="bg-white rounded-xl shadow-lg border border-blue-200">
+          <div className="px-6 py-4 border-b border-blue-100">
+            <h3 className="text-lg font-semibold text-slate-800">Contact Information</h3>
+          </div>
+          <div className="p-6 space-y-2 text-sm">
+            {caseData.investigating_agency && (
+              <p className="text-slate-700">
+                <span className="font-medium">Agency:</span> {caseData.investigating_agency}
+              </p>
             )}
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Show placeholder if all widgets are hidden */}
-      {!showShareWidget && !showMediaGallery && !isEditing && (
-        <div className="text-center py-8 text-slate-400">
-          <p className="text-sm">No widgets enabled</p>
+            {caseData.detective_name && (
+              <p className="text-slate-700">
+                <span className="font-medium">Detective:</span> {caseData.detective_name}
+              </p>
+            )}
+            {caseData.detective_phone && (
+              <p className="text-slate-700">
+                <span className="font-medium">Phone:</span> {caseData.detective_phone}
+              </p>
+            )}
+            {caseData.detective_email && (
+              <p className="text-slate-700">
+                <span className="font-medium">Email:</span> {caseData.detective_email}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>

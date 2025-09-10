@@ -1,10 +1,10 @@
 /**
- * App.jsx - Fixed version with proper template routing
+ * App.jsx - Updated with Editor/Customization routes
  * Location: frontend/src/App.jsx
  */
 
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import "./App.css";
 import "./assets/styles/tailwind.css";
 import "./assets/styles/index.css";
@@ -30,11 +30,12 @@ import CasesList from "./components/CaseList";
 // Case Creator Components
 import CaseCreator from "./components/CaseCreator";
 import ProfileSettings from "./pages/ProfileSettings";
+import EditorWrapper from "./components/CaseCreator/EditorWrapper";
 
-// Template System Components - USE THE WRAPPER THAT LOADS REAL TEMPLATES
+// Template System Components
 import TemplatePreviewWrapper from './components/CaseCreator/views/TemplatePreviewWrapper';
 import TemplateRenderer from "./templates/TemplateRenderer";
-import TemplateEditor from "./components/TemplateEditor";
+import CustomizationView from './components/CaseCreator/views/CustomizationView/CustomizationView';
 
 // Utils
 import getSubdomain from "./utils/getSubdomain";
@@ -60,6 +61,7 @@ function RequireAuth({ children }) {
 function AppContent() {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const subdomain = getSubdomain();
   
   // State for modals
@@ -113,8 +115,19 @@ function AppContent() {
     setShowCaseCreator(false);
     
     if (caseData.id) {
-      window.location.href = `/cases/${caseData.id}/edit`;
+      // Navigate to editor after case creation
+      navigate(`/editor/${caseData.id}`);
     }
+  };
+
+  // Navigation function for CaseCreator to use
+  const handleNavigateFromModal = (path) => {
+    // Close the modal first
+    setShowCaseCreator(false);
+    // Then navigate
+    setTimeout(() => {
+      navigate(path);
+    }, 100);
   };
 
   const handleOpenProfileSettings = () => {
@@ -146,9 +159,35 @@ function AppContent() {
   return (
     <>
       <Routes>
-        {/* CRITICAL FIX: Use TemplatePreviewWrapper for preview routes */}
+        {/* Template Preview Routes (for iframe in editor) */}
         <Route path="/preview/:caseId/:page" element={<TemplatePreviewWrapper />} />
         <Route path="/preview/:caseId" element={<TemplatePreviewWrapper />} />
+
+        {/* Editor/Customization Routes - ADDED THESE */}
+        <Route 
+          path="/editor/:caseId" 
+          element={
+            <RequireAuth>
+              <EditorWrapper />
+            </RequireAuth>
+          } 
+        />
+        <Route 
+          path="/editor/new" 
+          element={
+            <RequireAuth>
+              <EditorWrapper />
+            </RequireAuth>
+          } 
+        />
+        <Route 
+          path="/cases/:caseId/editor" 
+          element={
+            <RequireAuth>
+              <EditorWrapper />
+            </RequireAuth>
+          } 
+        />
 
         {/* Public Website Routes */}
         <Route path="/" element={<Layout><Home /></Layout>} />
@@ -177,16 +216,6 @@ function AppContent() {
                 onOpenCaseModal={handleOpenCaseModal}
                 onOpenProfileSettings={handleOpenProfileSettings}
               />
-            </RequireAuth>
-          }
-        />
-        
-        {/* Case Management */}
-        <Route
-          path="/cases/:caseId/edit"
-          element={
-            <RequireAuth>
-              <TemplateEditor />
             </RequireAuth>
           }
         />
@@ -261,12 +290,13 @@ function AppContent() {
         />
       </Routes>
 
-      {/* Modals */}
+      {/* Modals - Outside Router context */}
       {showCaseCreator && (
         <div className="fixed inset-0 z-[60]">
           <CaseCreator
             onClose={handleCloseCaseModal}
             onComplete={handleCaseComplete}
+            onNavigate={handleNavigateFromModal}
           />
         </div>
       )}

@@ -6,20 +6,39 @@ import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { MessageCircle, Loader2 } from "lucide-react";
 
-export default function Spotlight({ caseData, customizations, isPreview }) {
-  // Get spotlight posts from caseData instead of API
-  const updates = caseData?.spotlight_posts || [];
-  
-  // For preview mode, show sample data if no posts exist
-  const displayUpdates = isPreview && updates.length === 0 ? [
+export default function Spotlight({ caseData, customizations, isPreview, isEditing }) {
+  // Sample posts for preview/editing
+  const samplePosts = [
     {
-      id: 'preview-1',
-      title: 'Case Update',
-      content: 'This is where case updates will appear.',
-      created_at: new Date().toISOString(),
-      likes_count: 0
+      id: 'sample-1',
+      title: 'Investigation Update',
+      content: 'Detectives are following new leads in the case. We appreciate all the tips that have come in and encourage anyone with information to continue reaching out.',
+      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+      likes_count: 45,
+      view_count: 234
+    },
+    {
+      id: 'sample-2',
+      title: 'Community Search This Weekend',
+      content: 'We are organizing a community search this Saturday at 9 AM. Please meet at the community center if you would like to help. Bring water and wear comfortable shoes.',
+      created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+      likes_count: 89,
+      view_count: 567
+    },
+    {
+      id: 'sample-3',
+      title: 'Thank You for Your Support',
+      content: `The family would like to thank everyone for their continued support and prayers during this difficult time. Your kindness means more than words can express.`,
+      created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week ago
+      likes_count: 156,
+      view_count: 892
     }
-  ] : updates;
+  ];
+  
+  // Use real posts if available, otherwise use sample posts in edit/preview mode
+  const updates = caseData?.spotlight_posts && caseData.spotlight_posts.length > 0 
+    ? caseData.spotlight_posts 
+    : (isEditing || isPreview) ? samplePosts : [];
 
   return (
     <div className="bg-slate-50 min-h-screen">
@@ -35,7 +54,7 @@ export default function Spotlight({ caseData, customizations, isPreview }) {
         {/* Main Content */}
         <div className="flex justify-center">
           <div className="w-full max-w-2xl space-y-6">
-            {displayUpdates.length === 0 ? (
+            {updates.length === 0 ? (
               <Card className="shadow-lg">
                 <CardContent className="p-12 text-center">
                   <MessageCircle className="w-16 h-16 text-slate-400 mx-auto mb-4" />
@@ -46,7 +65,7 @@ export default function Spotlight({ caseData, customizations, isPreview }) {
                 </CardContent>
               </Card>
             ) : (
-              displayUpdates.map((update) => (
+              updates.map((update) => (
                 <Card key={update.id} className="shadow-lg">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-3 mb-4">

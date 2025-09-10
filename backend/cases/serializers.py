@@ -48,11 +48,12 @@ class CasePhotoSerializer(serializers.ModelSerializer):
             'image',
             'image_url',
             'caption',
+            'is_primary',  # Added is_primary field
             'is_public',
             'order',
             'uploaded_at'
         ]
-        read_only_fields = ['id', 'uploaded_at']
+        read_only_fields = ['id', 'uploaded_at', 'image_url']
     
     def get_image_url(self, obj):
         if obj.image:
@@ -136,26 +137,28 @@ class DeploymentLogSerializer(serializers.ModelSerializer):
         return None
 
 
-# Updated CaseSerializer - Remove invalid fields that don't exist in the model
-
 class CaseSerializer(serializers.ModelSerializer):
     """
-    Main serializer for Case model - FIXED VERSION
+    Main serializer for Case model - FIXED VERSION with proper photo handling
     """
     # Read-only computed fields
-    logo_url = serializers.SerializerMethodField(read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
     display_name = serializers.CharField(source='get_display_name', read_only=True)
     full_url = serializers.CharField(source='get_full_url', read_only=True)
+    
+    # Related serializers
+    photos = CasePhotoSerializer(many=True, read_only=True)
+    
+    # Computed photo fields
+    primary_photo = serializers.SerializerMethodField()
+    primary_photo_url = serializers.SerializerMethodField()
+    victim_photo_url = serializers.SerializerMethodField()  # Alias for compatibility
     
     # Related counts
     spotlight_posts_count = serializers.SerializerMethodField()
     photos_count = serializers.SerializerMethodField()
     latest_deployment = serializers.SerializerMethodField()
     template_info = serializers.SerializerMethodField()
-    
-    # Photo URLs
-    primary_photo_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Case
@@ -173,8 +176,8 @@ class CaseSerializer(serializers.ModelSerializer):
             'template_data',
             'template_info',
             
-            # Basic case info - REMOVED 'name' as it doesn't exist
-            'case_title',  # This is the actual field name
+            # Basic case info
+            'case_title',
             'first_name',
             'last_name',
             'middle_name',
@@ -198,17 +201,25 @@ class CaseSerializer(serializers.ModelSerializer):
             'eye_color',
             'distinguishing_features',
             
-            # Photos - only include what exists in model
-            'primary_photo',
-            'primary_photo_url',
-            'logo_url',  # Keep this as a computed field
+            # Photos - updated to use relationship
+            'photos',  # All photos
+            'primary_photo',  # Primary photo object
+            'primary_photo_url',  # Direct URL for primary photo
+            'victim_photo_url',  # Alias for primary_photo_url
             
             # Case details
             'description',
             'case_number',
             'case_type',
+            'crime_type',  # Added crime_type field
             'incident_location',
             'last_seen_location',
+            'last_seen_date',
+            'last_seen_time',
+            'last_seen_wearing',
+            'last_seen_with',
+            'planned_activities',
+            'transportation_details',
             
             # Investigation
             'investigating_agency',
@@ -245,8 +256,10 @@ class CaseSerializer(serializers.ModelSerializer):
             'user',
             'created_at', 
             'updated_at',
-            'logo_url',
+            'photos',
+            'primary_photo',
             'primary_photo_url',
+            'victim_photo_url',
             'render_service_id',
             'deployment_url',
             'last_deployed_at',
@@ -260,24 +273,34 @@ class CaseSerializer(serializers.ModelSerializer):
             'template_info'
         ]
     
-    def get_logo_url(self, obj):
-        """Get logo URL if available"""
-        # Note: The Case model doesn't have a logo field, 
-        # so this might need to be removed or linked to primary_photo
-        if hasattr(obj, 'primary_photo') and obj.primary_photo:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.primary_photo.url)
-            return obj.primary_photo.url
+    def get_primary_photo(self, obj):
+        """Get the primary photo object with full details"""
+        primary = obj.photos.filter(is_primary=True).first()
+        if primary:
+            return CasePhotoSerializer(primary, context=self.context).data
+        # If no primary photo marked, return the first photo
+        first_photo = obj.photos.first()
+        if first_photo:
+            return CasePhotoSerializer(first_photo, context=self.context).data
         return None
     
     def get_primary_photo_url(self, obj):
-        if obj.primary_photo:
+        """Get just the URL of the primary photo"""
+        primary = obj.photos.filter(is_primary=True).first()
+        if not primary:
+            # If no primary photo marked, use the first photo
+            primary = obj.photos.first()
+        
+        if primary and primary.image:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.primary_photo.url)
-            return obj.primary_photo.url
+                return request.build_absolute_uri(primary.image.url)
+            return primary.image.url
         return None
+    
+    def get_victim_photo_url(self, obj):
+        """Alias for primary_photo_url for backward compatibility"""
+        return self.get_primary_photo_url(obj)
     
     def get_spotlight_posts_count(self, obj):
         return obj.spotlight_posts.filter(status='published').count()
@@ -363,7 +386,6 @@ class CaseListSerializer(serializers.ModelSerializer):
     """
     Simplified serializer for listing cases (better performance)
     """
-    logo_url = serializers.SerializerMethodField(read_only=True)
     display_name = serializers.CharField(source='get_display_name', read_only=True)
     full_url = serializers.CharField(source='get_full_url', read_only=True)
     primary_photo_url = serializers.SerializerMethodField()
@@ -372,35 +394,30 @@ class CaseListSerializer(serializers.ModelSerializer):
         model = Case
         fields = [
             'id',
-            'case_title',  # The actual field name
+            'case_title',
             'display_name',
             'case_type',
+            'crime_type',
             'template_id',
             'deployment_status',
             'subdomain',
             'full_url',
             'is_public',
-            'logo_url',
-            'primary_photo',
             'primary_photo_url',
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'logo_url', 'primary_photo_url']
-    
-    def get_logo_url(self, obj):
-        # Map to primary_photo since there's no logo field
-        if obj.primary_photo:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.primary_photo.url)
-            return obj.primary_photo.url
-        return None
+        read_only_fields = ['id', 'created_at', 'updated_at', 'primary_photo_url']
     
     def get_primary_photo_url(self, obj):
-        if obj.primary_photo:
+        """Get the primary photo URL for list view"""
+        primary = obj.photos.filter(is_primary=True).first()
+        if not primary:
+            primary = obj.photos.first()
+        
+        if primary and primary.image:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.primary_photo.url)
-            return obj.primary_photo.url
+                return request.build_absolute_uri(primary.image.url)
+            return primary.image.url
         return None

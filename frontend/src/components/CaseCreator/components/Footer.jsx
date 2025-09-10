@@ -30,6 +30,7 @@ const Footer = ({
   onDeploy,
   validateSection
 }) => {
+
   
   const handleNavigation = (direction) => {
     const views = ['form', 'template', 'customize', 'preview'];
@@ -42,7 +43,7 @@ const Footer = ({
             onNavigate(views[currentIndex + 1]);
           });
         } else if (activeView === 'template' && selectedTemplate) {
-          onNavigate(views[currentIndex + 1]);
+          onNavigate('customize');
         } else if (activeView === 'customize') {
           onNavigate(views[currentIndex + 1]);
         }
@@ -52,11 +53,23 @@ const Footer = ({
     }
   };
   
+  const handleCustomizeClick = (e) => {  // FIXED: Added 'e' parameter
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (typeof onNavigate === 'function') {
+      onNavigate('customize');
+    } else {
+      console.error('onNavigate is not a function:', onNavigate);
+    }
+  };
+  
   const renderActions = () => {
     switch (activeView) {
       case 'form':
         return (
           <button
+            type='button'
             onClick={() => handleNavigation('next')}
             className="px-6 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 font-medium flex items-center gap-2"
           >
@@ -68,18 +81,29 @@ const Footer = ({
       case 'template':
         return (
           <button
-            onClick={() => handleNavigation('next')}
-            disabled={!selectedTemplate}
+            type="button"
+            onClick={handleCustomizeClick}
+            disabled={!selectedTemplate || saving}
             className="px-6 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
           >
-            Customize Template
-            <ChevronRight className="w-4 h-4" />
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                Customize Template
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         );
         
       case 'customize':
         return (
           <button
+            type="button"
             onClick={() => handleNavigation('next')}
             className="px-6 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 font-medium flex items-center gap-2"
           >
@@ -91,6 +115,7 @@ const Footer = ({
       case 'preview':
         return (
           <button
+            type='button'
             onClick={onDeploy}
             disabled={loading}
             className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
@@ -120,6 +145,7 @@ const Footer = ({
         {/* Left side - Save button */}
         <div className="flex items-center gap-2">
           <button
+            type='button'
             onClick={onSave}
             disabled={saving}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 font-medium flex items-center gap-2"
@@ -149,6 +175,7 @@ const Footer = ({
         <div className="flex items-center gap-3">
           {activeView !== 'form' && (
             <button
+              type='button'
               onClick={() => handleNavigation('back')}
               className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium flex items-center gap-2"
             >

@@ -1,6 +1,7 @@
 # cases/views.py - Updated views with template customization and deployment
 
 from rest_framework import viewsets, status
+from rest_framework.views import APIView  
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -9,8 +10,13 @@ from django.db.models import Q
 from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+import cloudinary  # Add this import
+from cloudinary.uploader import upload
 import json
 import logging
+import os
 
 from .models import Case, SpotlightPost, TemplateRegistry, DeploymentLog, CasePhoto
 from .serializers import (
@@ -25,64 +31,59 @@ from .services.deployment import RenderDeploymentService, SimpleStaticDeployment
 logger = logging.getLogger(__name__)
 
 
-class CaseViewSet(viewsets.ModelViewSet):
-
-# Add this method INSIDE the CaseViewSet class in your views.py
-# It should be at the same indentation level as other methods like perform_create, stats, etc.
-
-# In cases/views.py, inside the CaseViewSet class (around line 200, after the stats method):
-
-    @action(detail=False, methods=['get'], url_path='by-subdomain/(?P<subdomain>[^/.]+)')
-    def by_subdomain(self, request, subdomain=None):
-        """
-        Get case by subdomain for public website rendering
-        """
+class ImageUploadView(APIView):
+    """
+    Generic image upload endpoint for customizations.
+    Uploads to Cloudinary and returns the URL.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        print(f"[DEBUG] Upload request from user: {request.user}")  # Debug line
+        
+        image = request.FILES.get('image')
+        if not image:
+            return Response(
+                {'error': 'No image provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         try:
-            # Find the case by subdomain
-            case = Case.objects.get(
-                subdomain=subdomain,
-                is_public=True,
-                is_disabled=False
+            print(f"[DEBUG] Uploading image: {image.name}, size: {image.size}")  # Debug line
+            
+            # Upload to Cloudinary
+            result = upload(
+                image,
+                folder="caseclosure/customizations",
+                resource_type="image",
+                allowed_formats=['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                transformation=[
+                    {'quality': 'auto:good'},
+                    {'fetch_format': 'auto'}
+                ]
             )
             
-            # Check if the case is deployed
-            if case.deployment_status != 'deployed':
-                return Response(
-                    {'error': 'This website is not yet deployed'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+            print(f"[DEBUG] Cloudinary upload successful: {result['secure_url']}")  # Debug line
             
-            # Serialize the case data
-            serializer = self.get_serializer(case)
+            return Response({
+                'url': result['secure_url'],
+                'public_id': result['public_id'],
+                'width': result.get('width'),
+                'height': result.get('height')
+            })
             
-            # Add spotlight posts if the template supports it
-            spotlight_posts = []
-            try:
-                posts = SpotlightPost.objects.filter(
-                    case=case,
-                    status='published'
-                ).order_by('-published_at')[:10]
-                
-                spotlight_posts = SpotlightPostSerializer(posts, many=True, context={'request': request}).data
-            except:
-                pass  # Template might not have spotlight feature
-            
-            response_data = serializer.data
-            response_data['spotlight_posts'] = spotlight_posts
-            
-            return Response(response_data)
-            
-        except Case.DoesNotExist:
-            return Response(
-                {'error': 'Case not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
         except Exception as e:
-            logger.error(f"Error fetching case by subdomain: {str(e)}")
+            print(f"[ERROR] Cloudinary upload failed: {str(e)}")  # Debug line
+            import traceback
+            traceback.print_exc()  # This will print the full error
+            
             return Response(
-                {'error': 'An error occurred'},
+                {'error': f'Upload failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class CaseViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Case model with template customization and deployment support.
     """
@@ -133,6 +134,90 @@ class CaseViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.error(f"Error in get_queryset: {str(e)}")
             return Case.objects.none()
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Override create to handle photo upload separately.
+        """
+        # Create the case first without the image
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Get the created case
+        case = serializer.instance
+        
+        # Handle victim photo if provided in request.FILES
+        if 'victim_photo' in request.FILES:
+            victim_photo = request.FILES['victim_photo']
+            self._handle_victim_photo_upload(case, victim_photo)
+        
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    def update(self, request, *args, **kwargs):
+        """
+        Override update to handle photo upload separately.
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Update case data
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        # Handle victim photo if provided
+        if 'victim_photo' in request.FILES:
+            victim_photo = request.FILES['victim_photo']
+            self._handle_victim_photo_upload(instance, victim_photo)
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+        
+        return Response(serializer.data)
+    
+    def _handle_victim_photo_upload(self, case, photo_file):
+        """
+        Helper method to handle victim photo upload.
+        Creates a CasePhoto entry for the uploaded file.
+        """
+        try:
+            # Check if a primary photo already exists
+            existing_primary = CasePhoto.objects.filter(
+                case=case,
+                is_primary=True
+            ).first()
+            
+            # If exists, delete the old one
+            if existing_primary:
+                # Delete the actual file
+                if existing_primary.image:
+                    default_storage.delete(existing_primary.image.name)
+                existing_primary.delete()
+            
+            # Create new CasePhoto entry
+            case_photo = CasePhoto.objects.create(
+                case=case,
+                image=photo_file,
+                caption='Primary victim photo',
+                is_primary=True,
+                is_public=True,
+                order=0
+            )
+            
+            logger.info(f"Victim photo uploaded for case {case.id}: {case_photo.image.url}")
+            
+            # Update the case's victim_photo field if it exists
+            if hasattr(case, 'victim_photo'):
+                case.victim_photo = case_photo.image
+                case.save(update_fields=['victim_photo'])
+            
+            return case_photo
+            
+        except Exception as e:
+            logger.error(f"Error uploading victim photo for case {case.id}: {str(e)}")
+            raise ValidationError(f"Failed to upload photo: {str(e)}")
     
     def perform_create(self, serializer):
         """
@@ -200,9 +285,41 @@ class CaseViewSet(viewsets.ModelViewSet):
         return customizations
     
     @action(detail=True, methods=['post'])
-    def save_customizations(self, request, id=None):
+    def upload_victim_photo(self, request, id=None):
         """
-        Save template customizations for a case.
+        Dedicated endpoint for uploading victim photo.
+        """
+        case = self.get_object()
+        
+        # Check ownership
+        if case.user != request.user and not request.user.is_staff:
+            raise PermissionDenied("You can only upload photos for your own cases.")
+        
+        if 'victim_photo' not in request.FILES:
+            return Response(
+                {'error': 'No photo file provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            photo = self._handle_victim_photo_upload(case, request.FILES['victim_photo'])
+            
+            return Response({
+                'success': True,
+                'message': 'Photo uploaded successfully',
+                'photo_url': photo.image.url if photo.image else None,
+                'photo_id': photo.id
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=True, methods=['post'])
+    def save_customizations(self, request, id=None):  # Changed pk to id
+        """
+        Save customizations with improved error handling and logging
         """
         try:
             case = self.get_object()
@@ -211,31 +328,99 @@ class CaseViewSet(viewsets.ModelViewSet):
             if case.user != request.user and not request.user.is_staff:
                 raise PermissionDenied("You can only edit your own cases.")
             
+            # Get customizations from request
             customizations = request.data.get('customizations', {})
             
-            # Update template_data
+            # Validate that customizations is a dict
+            if not isinstance(customizations, dict):
+                return Response(
+                    {'error': 'Customizations must be an object/dictionary'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Clean the customizations - remove None/null values but keep empty strings
+            cleaned_customizations = {}
+            for key, value in customizations.items():
+                # Only exclude None/null, but keep empty strings and other falsy values
+                if value is not None:
+                    cleaned_customizations[key] = value
+            
+            # Log what's being saved
+            logger.info(f"Saving {len(cleaned_customizations)} customization fields for case {id}")  # Changed pk to id
+            
+            # Count different types of customizations for logging
+            gallery_count = sum(1 for key in cleaned_customizations.keys() if key.startswith('gallery_image_'))
+            home_count = sum(1 for key in cleaned_customizations.keys() if key.startswith('hero_') or key.startswith('quick_facts_') or key.startswith('cta_'))
+            about_count = sum(1 for key in cleaned_customizations.keys() if key.startswith('about_'))
+            
+            logger.info(f"Customization breakdown - Gallery: {gallery_count}, Home: {home_count}, About: {about_count}")
+            
+            # Ensure template_data exists and has proper structure
             if not case.template_data:
                 case.template_data = {}
             
-            case.template_data['customizations'] = customizations
-            case.template_data['metadata'] = {
-                'last_edited': timezone.now().isoformat(),
-                'editor_version': '1.0.0'
+            if not isinstance(case.template_data, dict):
+                case.template_data = {}
+            
+            # Update customizations
+            case.template_data['customizations'] = cleaned_customizations
+            
+            # Add metadata about the save
+            case.template_data['last_saved'] = timezone.now().isoformat()
+            case.template_data['customization_stats'] = {
+                'total': len(cleaned_customizations),
+                'gallery_images': gallery_count,
+                'home_fields': home_count,
+                'about_fields': about_count
             }
             
-            case.save()
+            # Save the case with error handling
+            try:
+                case.save(update_fields=['template_data'])
+                logger.info(f"Successfully saved customizations for case {id}")  # Changed pk to id
+            except Exception as save_error:
+                logger.error(f"Database save error for case {id}: {str(save_error)}")  # Changed pk to id
+                return Response(
+                    {'error': f'Failed to save to database: {str(save_error)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
             
+            # Return success response
+            serializer = self.get_serializer(case)
             return Response({
                 'success': True,
                 'message': 'Customizations saved successfully',
-                'template_data': case.template_data
+                'template_data': case.template_data,
+                'customization_count': len(cleaned_customizations),
+                'stats': case.template_data.get('customization_stats', {})
             })
             
-        except Exception as e:
-            logger.error(f"Error saving customizations: {str(e)}")
+        except PermissionDenied as e:
+            logger.warning(f"Permission denied for case {id}: {str(e)}")  # Changed pk to id
             return Response(
                 {'error': str(e)},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        except Case.DoesNotExist:
+            logger.error(f"Case {id} not found")  # Changed pk to id
+            return Response(
+                {'error': 'Case not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON encoding error for case {id}: {str(e)}")  # Changed pk to id
+            return Response(
+                {'error': f'Invalid JSON data: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error saving customizations for case {id}: {str(e)}")  # Changed pk to id
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Request data keys: {list(request.data.keys()) if hasattr(request, 'data') else 'No data'}")
+            
+            return Response(
+                {'error': f'Server error: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
     @action(detail=True, methods=['post'])
@@ -475,6 +660,58 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+    @action(detail=False, methods=['get'], url_path='by-subdomain/(?P<subdomain>[^/.]+)')
+    def by_subdomain(self, request, subdomain=None):
+        """
+        Get case by subdomain for public website rendering
+        """
+        try:
+            # Find the case by subdomain
+            case = Case.objects.get(
+                subdomain=subdomain,
+                is_public=True,
+                is_disabled=False
+            )
+            
+            # Check if the case is deployed
+            if case.deployment_status != 'deployed':
+                return Response(
+                    {'error': 'This website is not yet deployed'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Serialize the case data
+            serializer = self.get_serializer(case)
+            
+            # Add spotlight posts if the template supports it
+            spotlight_posts = []
+            try:
+                posts = SpotlightPost.objects.filter(
+                    case=case,
+                    status='published'
+                ).order_by('-published_at')[:10]
+                
+                spotlight_posts = SpotlightPostSerializer(posts, many=True, context={'request': request}).data
+            except:
+                pass  # Template might not have spotlight feature
+            
+            response_data = serializer.data
+            response_data['spotlight_posts'] = spotlight_posts
+            
+            return Response(response_data)
+            
+        except Case.DoesNotExist:
+            return Response(
+                {'error': 'Case not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error fetching case by subdomain: {str(e)}")
+            return Response(
+                {'error': 'An error occurred'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     def perform_destroy(self, instance):
         """
         When deleting a case, cleanup related data and decrement user's case count.
@@ -687,6 +924,13 @@ class CasePhotoViewSet(viewsets.ModelViewSet):
             case = Case.objects.get(id=case_id, user=self.request.user)
         except Case.DoesNotExist:
             raise ValidationError("Case not found or you don't have permission.")
+        
+        # Check if this should be a primary photo
+        is_primary = self.request.data.get('is_primary', False)
+        
+        # If this is being set as primary, remove primary status from others
+        if is_primary:
+            CasePhoto.objects.filter(case=case, is_primary=True).update(is_primary=False)
         
         serializer.save(case=case)
     
