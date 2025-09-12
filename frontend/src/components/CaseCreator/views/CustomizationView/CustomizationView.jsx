@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Eye, Edit3, Loader2, X, Upload, Image as ImageIcon, Check, AlertCircle, Bold, Italic, Heading1, Heading2, List, Link2 } from 'lucide-react';
 import { updateCase, uploadImage } from '@/components/CaseCreator/services/caseAPI';
 import api from '@/api/axios';
-
+import DeployButton from '@/components/DeployButton';
 // Try to import RichTextEditorModal - if it exists, use it; otherwise use built-in
 let RichTextEditorModal = null;
 try {
@@ -1058,6 +1058,13 @@ const CustomizationView = ({
           </p>
         </div>
       )}
+      {caseId && (
+        <DeployButton 
+          caseId={caseId} 
+          caseData={caseData}
+        />
+      )}
+
     </div>
   );
 };

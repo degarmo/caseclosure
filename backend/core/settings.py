@@ -227,6 +227,18 @@ if DEBUG:
     STATICFILES_DIRS = [
         os.path.join(BASE_DIR, 'static'),
     ]
+    ALLOWED_HOSTS += [
+        'localhost:8000',
+        '127.0.0.1:8000',
+        'localhost:5173',
+        '127.0.0.1:5173',
+        'caseclosure.org:8000',
+        'caseclosure.org:5173',
+        '.caseclosure.org',  # This allows all subdomains!
+    ]
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://.*\.caseclosure\.org:5173$",  # Allow all subdomains on port 5173
+    ]
 
 # Use WhiteNoise for static files in production
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
@@ -265,6 +277,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://127.0.0.1:3000",
+    "http://caseclosure.org:5173",
+    "http://www.caseclosure.org:5173",
 ]
 
 if not DEBUG:
@@ -325,6 +339,9 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
+
+DEPLOYMENT_PROVIDER = 'netlify'
+NETLIFY_API_KEY = 'nfp_QL2rtUat3ueFSbNiuPvFuDKcqSeGAHvH1a54' 
 
 # Email Configuration
 if DEBUG:

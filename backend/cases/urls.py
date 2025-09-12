@@ -49,7 +49,9 @@ POST   /cases/{id}/upload_victim_photo/     - Upload victim photo
 POST   /cases/{id}/save_customizations/     - Save template customizations
 POST   /cases/{id}/deploy/                  - Deploy website
 GET    /cases/{id}/deployment_status/       - Check deployment status  
+POST   /cases/{id}/add_custom_domain/       - Add custom domain (NEW)
 POST   /cases/{id}/update_template_section/ - Update specific template section
+POST   /cases/check_subdomain/              - Check subdomain availability (NEW)
 GET    /cases/my_cases/                     - Get only current user's cases
 GET    /cases/stats/                        - Get case statistics
 GET    /cases/by-subdomain/{subdomain}/     - Get case by subdomain (for public sites)

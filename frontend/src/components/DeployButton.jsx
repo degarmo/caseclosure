@@ -1,8 +1,8 @@
 // components/DeployButton/DeployButton.jsx
 import React, { useState, useEffect } from 'react';
 import { RocketLaunchIcon } from '@heroicons/react/24/solid';
-import DeploymentModal from '../DeploymentModal/DeploymentModal';
-import { getCaseDeploymentStatus } from '../../services/deploymentAPI';
+import DeploymentModal from './DeploymentModal';
+import { getCaseDeploymentStatus } from '../services/deploymentAPI';
 
 const DeployButton = ({ caseId, caseData }) => {
   const [showModal, setShowModal] = useState(false);

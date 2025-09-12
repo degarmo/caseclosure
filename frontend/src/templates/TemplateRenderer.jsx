@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, Routes, Route } from 'react-router-dom';
 import api from '@/api/axios';
 import { getTemplate } from './registry';
+import getSubdomain from '@/utils/getSubdomain'; // Use your existing utility
 
 export default function TemplateRenderer() {
   const location = useLocation();
@@ -18,18 +19,23 @@ export default function TemplateRenderer() {
 
   const loadCase = async () => {
     try {
-      // Determine how to load the case
-      const hostname = window.location.hostname;
       let response;
+      const subdomain = getSubdomain(); // Use your utility function
       
-      if (hostname.includes('.caseclosure.org') && !hostname.startsWith('www')) {
-        // Subdomain routing
-        const subdomain = hostname.split('.')[0];
+      if (subdomain) {
+        // Subdomain routing - works for both local and production
+        console.log('Loading case for subdomain:', subdomain);
         response = await api.get(`/api/cases/by-subdomain/${subdomain}/`);
       } else {
-        // For development or path-based routing
+        // Fallback to path-based routing for development
         const pathParts = location.pathname.split('/');
         const caseId = pathParts[2]; // assumes /memorial/[caseId]/...
+        
+        if (!caseId) {
+          throw new Error('No case identifier found');
+        }
+        
+        console.log('Loading case by ID:', caseId);
         response = await api.get(`/api/cases/${caseId}/`);
       }
       
@@ -49,7 +55,7 @@ export default function TemplateRenderer() {
       
     } catch (err) {
       console.error('Failed to load case:', err);
-      setError('Case not found');
+      setError(err.message || 'Case not found');
     } finally {
       setLoading(false);
     }
@@ -103,7 +109,7 @@ export default function TemplateRenderer() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Site Not Found</h1>
-          <p className="text-gray-600">This memorial page could not be found.</p>
+          <p className="text-gray-600">{error || 'This memorial page could not be found.'}</p>
         </div>
       </div>
     );

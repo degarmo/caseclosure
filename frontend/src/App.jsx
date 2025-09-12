@@ -75,10 +75,16 @@ function AppContent() {
     if (location.pathname.startsWith('/preview/')) {
       return false;
     }
+
     
     if (hostname.includes('.caseclosure.org') || hostname.includes('.caseclosure.com')) {
       const sub = hostname.split('.')[0];
       return sub && sub !== 'www' && sub !== 'app' && sub !== 'caseclosure';
+    }
+    
+    if (hostname.includes('.localhost')) {
+    const sub = hostname.split('.')[0];
+    return sub && sub !== 'www' && sub !== 'app';
     }
     
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
@@ -87,6 +93,13 @@ function AppContent() {
     
     return !hostname.includes('caseclosure');
   }, [hostname, location.pathname]);
+
+    console.log('Debug Info:', {
+      hostname,
+      pathname: location.pathname,
+      isMemorialSite,
+      subdomain: getSubdomain()
+    });
 
   // Logout handler
   const handleLogout = () => {
@@ -110,7 +123,6 @@ function AppContent() {
   };
 
   const handleCaseComplete = (caseData) => {
-    console.log('Case created:', caseData);
     setCurrentCase(caseData);
     setShowCaseCreator(false);
     

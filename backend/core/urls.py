@@ -33,7 +33,7 @@ urlpatterns = [
     path('api/auth/', include('accounts.urls')),  # Authentication endpoints
     path('api/', include('cases.urls')),    # Cases endpoints (includes images/upload/)
     path('api/tracker/', include('tracker.urls')), # Tracker endpoints
-    
+    path('api/', include('cases.urls')), 
     # Django-allauth URLs for Google OAuth
     # This must be at the root level for OAuth callbacks to work
     path('accounts/', include('allauth.urls')),

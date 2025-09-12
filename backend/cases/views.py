@@ -17,7 +17,9 @@ from cloudinary.uploader import upload
 import json
 import logging
 import os
+import re  # Add this for subdomain validation
 
+from rest_framework.permissions import AllowAny
 from .models import Case, SpotlightPost, TemplateRegistry, DeploymentLog, CasePhoto
 from .serializers import (
     CaseSerializer, 
@@ -26,7 +28,7 @@ from .serializers import (
     DeploymentLogSerializer,
     CasePhotoSerializer
 )
-from .services.deployment import RenderDeploymentService, SimpleStaticDeployment
+from .services.deployment import get_deployment_service
 
 logger = logging.getLogger(__name__)
 
@@ -423,37 +425,112 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+    @action(detail=False, methods=['post'])
+    def check_subdomain(self, request):
+        """
+        Check if a subdomain is available for use.
+        """
+        subdomain = request.data.get('subdomain', '').lower().strip()
+        case_id = request.data.get('case_id') 
+        # Validate subdomain format
+        if not subdomain:
+            return Response({
+                'available': False,
+                'message': 'Subdomain is required'
+            })
+        
+        if len(subdomain) < 3:
+            return Response({
+                'available': False,
+                'message': 'Subdomain must be at least 3 characters'
+            })
+        
+        if not re.match(r'^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$', subdomain):
+            return Response({
+                'available': False,
+                'message': 'Invalid format. Use only lowercase letters, numbers, and hyphens.'
+            })
+        
+        # Check reserved subdomains
+        reserved_subdomains = [
+            'www', 'api', 'admin', 'app', 'mail', 'ftp', 'blog',
+            'dashboard', 'support', 'help', 'docs', 'status',
+            'cdn', 'assets', 'static', 'media', 'files'
+        ]
+        
+        if subdomain in reserved_subdomains:
+            return Response({
+                'available': False,
+                'message': 'This subdomain is reserved'
+            })
+        
+        # Check if subdomain exists in database
+        exists = Case.objects.filter(subdomain=subdomain).exists()
+        
+        return Response({
+            'available': not exists,
+            'message': 'Available!' if not exists else 'This subdomain is already taken',
+            'subdomain': subdomain
+        })
+
     @action(detail=True, methods=['post'])
     def deploy(self, request, id=None):
         """
-        Deploy the case website to Render/CDN.
+        Deploy the case website with proper error handling.
         """
+        case = self.get_object()
+        
+        # Check ownership
+        if case.user != request.user and not request.user.is_staff:
+            raise PermissionDenied("You can only deploy your own cases.")
+        
         try:
-            case = self.get_object()
-            
-            # Check ownership
-            if case.user != request.user and not request.user.is_staff:
-                raise PermissionDenied("You can only deploy your own cases.")
-            
             # Get domain configuration
-            subdomain = request.data.get('subdomain')
-            custom_domain = request.data.get('custom_domain')
+            subdomain = request.data.get('subdomain', '').lower().strip()
+            custom_domain = request.data.get('custom_domain', '').lower().strip()
             
-            # Validate subdomain
+            # Validate and set subdomain
             if subdomain:
+                if not re.match(r'^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$', subdomain):
+                    return Response(
+                        {'error': 'Invalid subdomain format'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
                 if Case.objects.filter(subdomain=subdomain).exclude(id=case.id).exists():
                     return Response(
-                        {'error': 'This subdomain is already taken.'},
+                        {'error': 'This subdomain is already taken'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+                
+                case.subdomain = subdomain
+            elif not case.subdomain:
+                # Auto-generate subdomain
+                base_subdomain = f"{case.first_name}-{case.last_name}".lower()
+                base_subdomain = re.sub(r'[^a-z0-9-]', '', base_subdomain)[:40]
+                subdomain = base_subdomain
+                counter = 1
+                
+                while Case.objects.filter(subdomain=subdomain).exclude(id=case.id).exists():
+                    subdomain = f"{base_subdomain}-{counter}"
+                    counter += 1
+                
                 case.subdomain = subdomain
             
+            # Handle custom domain if provided
             if custom_domain:
-                if Case.objects.filter(custom_domain=custom_domain).exclude(id=case.id).exists():
+                if not re.match(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$', custom_domain):
                     return Response(
-                        {'error': 'This domain is already in use.'},
+                        {'error': 'Invalid domain format'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+                
+                if Case.objects.filter(custom_domain=custom_domain).exclude(id=case.id).exists():
+                    return Response(
+                        {'error': 'This domain is already in use'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
                 case.custom_domain = custom_domain
             
             # Update deployment status
@@ -466,39 +543,74 @@ class CaseViewSet(viewsets.ModelViewSet):
                 action='deploy' if not case.render_service_id else 'update',
                 status='started',
                 details={
-                    'subdomain': subdomain,
-                    'custom_domain': custom_domain,
-                    'template': case.template_id
+                    'subdomain': case.subdomain,
+                    'custom_domain': case.custom_domain,
+                    'template': case.template_id,
+                    'initiated_by': request.user.email
                 }
             )
             
-            # Use deployment service (async in production)
-            if settings.USE_CELERY:
-                from .tasks import deploy_case_task
-                deploy_case_task.delay(case.id, deployment_log.id)
-            else:
-                # Synchronous deployment for development
-                deployment_service = RenderDeploymentService()
+            # Synchronous deployment
+            try:
+                # Try the deployment
+                deployment_service = get_deployment_service()
                 result = deployment_service.deploy_case(case)
-            
-            return Response({
-                'success': True,
-                'message': 'Deployment started',
-                'deployment_id': str(deployment_log.id),
-                'url': case.get_full_url()
-            })
+                
+                if result.get('success'):
+                    # Success - already updated by service
+                    deployment_log.status = 'success'
+                    deployment_log.completed_at = timezone.now()
+                    deployment_log.save()
+                    
+                    return Response({
+                        'success': True,
+                        'message': 'Deployment successful',
+                        'deployment_id': str(deployment_log.id),
+                        'subdomain': case.subdomain,
+                        'url': case.get_full_url(),
+                        'status': 'deployed'
+                    })
+                else:
+                    # Deployment returned but indicated failure
+                    raise Exception(result.get('error', 'Deployment failed'))
+                    
+            except Exception as deploy_error:
+                # CRITICAL: Reset status on ANY deployment error
+                case.deployment_status = 'failed'
+                case.deployment_error = str(deploy_error)
+                case.save()
+                
+                deployment_log.status = 'failed'
+                deployment_log.error_message = str(deploy_error)
+                deployment_log.completed_at = timezone.now()
+                deployment_log.save()
+                
+                logger.error(f"Deployment failed for case {id}: {str(deploy_error)}")
+                
+                return Response({
+                    'success': False,
+                    'error': str(deploy_error),
+                    'deployment_id': str(deployment_log.id),
+                    'status': 'failed'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         except Exception as e:
-            logger.error(f"Error deploying case: {str(e)}")
+            # Ensure status is reset on any outer exception
+            if case.deployment_status == 'deploying':
+                case.deployment_status = 'failed'
+                case.deployment_error = str(e)
+                case.save()
+            
+            logger.error(f"Error in deploy endpoint: {str(e)}")
             return Response(
-                {'error': str(e)},
+                {'error': str(e), 'status': 'failed'},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
     @action(detail=True, methods=['get'])
     def deployment_status(self, request, id=None):
         """
-        Check deployment status for a case.
+        Check deployment status for a case with enhanced details.
         """
         try:
             case = self.get_object()
@@ -507,11 +619,15 @@ class CaseViewSet(viewsets.ModelViewSet):
             latest_log = case.deployment_logs.first()
             
             response_data = {
-                'status': case.deployment_status,
-                'url': case.get_full_url(),
+                'deployment_status': case.deployment_status,
+                'subdomain': case.subdomain,
+                'custom_domain': case.custom_domain,
+                'deployment_url': case.get_full_url(),
                 'ssl_status': case.ssl_status,
-                'last_deployed': case.last_deployed_at.isoformat() if case.last_deployed_at else None,
-                'steps': {}  # For progress tracking
+                'last_deployed_at': case.last_deployed_at.isoformat() if case.last_deployed_at else None,
+                'is_public': case.is_public,
+                'is_disabled': case.is_disabled,
+                'deployment_error': case.deployment_error
             }
             
             if latest_log:
@@ -521,17 +637,146 @@ class CaseViewSet(viewsets.ModelViewSet):
                     'status': latest_log.status,
                     'started_at': latest_log.started_at.isoformat(),
                     'completed_at': latest_log.completed_at.isoformat() if latest_log.completed_at else None,
-                    'error': latest_log.error_message
+                    'duration_seconds': latest_log.duration_seconds,
+                    'error': latest_log.error_message,
+                    'details': latest_log.details
                 }
                 
-                # Add progress steps from details
-                if latest_log.details:
-                    response_data['steps'] = latest_log.details.get('steps', {})
+                # Add progress steps if available
+                if latest_log.details and 'steps' in latest_log.details:
+                    response_data['deployment_steps'] = latest_log.details['steps']
+            
+            # Add deployment history count
+            response_data['total_deployments'] = case.deployment_logs.count()
             
             return Response(response_data)
             
         except Exception as e:
             logger.error(f"Error checking deployment status: {str(e)}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=True, methods=['post'])
+    def add_custom_domain(self, request, id=None):
+        """
+        Add or update a custom domain for the deployed case.
+        """
+        try:
+            case = self.get_object()
+            
+            # Check ownership
+            if case.user != request.user and not request.user.is_staff:
+                raise PermissionDenied("You can only manage domains for your own cases.")
+            
+            # Check if case is deployed
+            if case.deployment_status != 'deployed':
+                return Response(
+                    {'error': 'Please deploy your site first before adding a custom domain'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            custom_domain = request.data.get('domain', '').lower().strip()
+            
+            if not custom_domain:
+                return Response(
+                    {'error': 'Domain is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Basic domain validation
+            if not re.match(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$', custom_domain):
+                return Response(
+                    {'error': 'Invalid domain format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if domain is already in use
+            if Case.objects.filter(custom_domain=custom_domain).exclude(id=case.id).exists():
+                return Response(
+                    {'error': 'This domain is already in use by another case'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Save the custom domain
+            old_domain = case.custom_domain
+            case.custom_domain = custom_domain
+            case.ssl_status = 'pending'  # SSL needs to be provisioned for custom domain
+            case.save()
+            
+            # Create deployment log for DNS update
+            deployment_log = DeploymentLog.objects.create(
+                case=case,
+                action='dns_update',
+                status='started',
+                details={
+                    'old_domain': old_domain,
+                    'new_domain': custom_domain,
+                    'subdomain': case.subdomain
+                }
+            )
+            
+            # Update Render service with new domain (if using Render)
+            if case.render_service_id:
+                try:
+                    deployment_service = get_deployment_service()
+                    result = deployment_service.add_custom_domain(case, custom_domain)
+                    
+                    if result.get('success'):
+                        deployment_log.status = 'success'
+                        deployment_log.completed_at = timezone.now()
+                        deployment_log.save()
+                        
+                        return Response({
+                            'success': True,
+                            'message': 'Custom domain added successfully',
+                            'domain': custom_domain,
+                            'dns_instructions': {
+                                'type': 'CNAME',
+                                'name': custom_domain,
+                                'value': f'{case.subdomain}.caseclosure.org',
+                                'ttl': '3600'
+                            },
+                            'ssl_status': case.ssl_status
+                        })
+                    else:
+                        raise Exception(result.get('error', 'Failed to add custom domain'))
+                        
+                except Exception as e:
+                    deployment_log.status = 'failed'
+                    deployment_log.error_message = str(e)
+                    deployment_log.completed_at = timezone.now()
+                    deployment_log.save()
+                    
+                    # Revert domain change
+                    case.custom_domain = old_domain
+                    case.save()
+                    
+                    return Response(
+                        {'error': f'Failed to configure domain: {str(e)}'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            else:
+                # For non-Render deployments, just return DNS instructions
+                deployment_log.status = 'success'
+                deployment_log.completed_at = timezone.now()
+                deployment_log.save()
+                
+                return Response({
+                    'success': True,
+                    'message': 'Custom domain saved. Please configure your DNS settings.',
+                    'domain': custom_domain,
+                    'dns_instructions': {
+                        'type': 'CNAME',
+                        'name': custom_domain,
+                        'value': f'{case.subdomain}.caseclosure.org',
+                        'ttl': '3600'
+                    }
+                })
+            
+        except Exception as e:
+            logger.error(f"Error adding custom domain: {str(e)}")
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
@@ -660,7 +905,8 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @action(detail=False, methods=['get'], url_path='by-subdomain/(?P<subdomain>[^/.]+)')
+    @action(detail=False, methods=['get'], url_path='by-subdomain/(?P<subdomain>[^/.]+)', 
+            permission_classes=[AllowAny])  # ADD THIS LINE
     def by_subdomain(self, request, subdomain=None):
         """
         Get case by subdomain for public website rendering
@@ -723,7 +969,6 @@ class CaseViewSet(viewsets.ModelViewSet):
             
             # TODO: Clean up deployed resources if needed
             # if instance.render_service_id:
-            #     deployment_service = RenderDeploymentService()
             #     deployment_service.delete_service(instance)
             
         except Exception as e:
@@ -792,7 +1037,7 @@ class SpotlightPostViewSet(viewsets.ModelViewSet):
         case.save()
     
     @action(detail=True, methods=['post'])
-    def publish(self, request, pk=None):
+    def publish(self, request, id=None):
         """
         Publish a spotlight post.
         """
@@ -809,7 +1054,7 @@ class SpotlightPostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
-    def schedule(self, request, pk=None):
+    def schedule(self, request, id=None):
         """
         Schedule a post for future publication.
         """
@@ -856,7 +1101,7 @@ class TemplateRegistryViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset.order_by('name')
     
     @action(detail=True, methods=['get'])
-    def schema(self, request, pk=None):
+    def schema(self, request, id=None):
         """
         Get the customization schema for a specific template.
         """
