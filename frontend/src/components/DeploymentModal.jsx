@@ -1,11 +1,10 @@
-// components/DeploymentModal/DeploymentModal.jsx - Fixed version
+// components/DeploymentModal/DeploymentModal.jsx - Updated with custom subdomain functionality
 import React, { useState, useEffect, useRef } from 'react';
-import { XMarkIcon, SparklesIcon, GlobeAltIcon, CheckCircleIcon, RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { 
   checkSubdomainAvailability, 
   deployCase, 
   updateDeployment,
-  getCaseDeploymentStatus  // Added missing import
+  getCaseDeploymentStatus
 } from '../services/deploymentAPI';
 
 const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeploymentComplete }) => {
@@ -18,41 +17,151 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentResult, setDeploymentResult] = useState(null);
   const [error, setError] = useState('');
-  const pollIntervalRef = useRef(null);  // Added ref to track interval
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
+  const [isUsingCustom, setIsUsingCustom] = useState(false);
+  const pollIntervalRef = useRef(null);
+  const checkTimeoutRef = useRef(null);
+
+  // Check if this is an update scenario
+  const isUpdating = currentDeployment?.deployment_status === 'deployed';
 
   useEffect(() => {
-    generateSubdomainSuggestions();
-    if (currentDeployment?.subdomain) {
+    if (isUpdating && currentDeployment?.subdomain) {
+      // For updates, lock in the existing subdomain
       setSelectedSubdomain(currentDeployment.subdomain);
+      setAvailabilityStatus({ available: true, message: 'Current subdomain' });
+      setIsLoadingSuggestions(false);
+    } else {
+      // For new deployments, generate suggestions
+      generateUniqueSubdomains();
     }
 
-    // Cleanup on unmount
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
     };
   }, []);
 
-  const generateSubdomainSuggestions = () => {
+  const generateUniqueSubdomains = async () => {
+    setIsLoadingSuggestions(true);
     const firstName = caseData.first_name?.toLowerCase() || '';
     const lastName = caseData.last_name?.toLowerCase() || '';
-    const fullName = `${firstName}-${lastName}`;
     
-    const suggestions = [
-      { value: fullName, label: 'Classic', icon: '✨' },
-      { value: `${firstName}${lastName}`, label: 'Simple', icon: '💫' },
-      { value: `remember-${firstName}`, label: 'Memorial', icon: '🕊️' },
-      { value: `${firstName}-memorial`, label: 'Tribute', icon: '🌹' },
-      { value: `honor-${firstName}`, label: 'Honor', icon: '⭐' }
-    ].filter(s => s.value && s.value.length >= 3 && s.value.length <= 50);
+    // Generate potential subdomain combinations
+    const potentialSubdomains = [];
+    
+    // Format 1: 4[firstname] (memorial format)
+    if (firstName) {
+      potentialSubdomains.push(`4${firstName}`);
+    }
+    
+    // Format 2: Short version if name is long
+    if (firstName.length > 6) {
+      potentialSubdomains.push(`4${firstName.substring(0, 4)}`);
+    }
+    
+    // Format 3: Full name combined
+    if (firstName && lastName) {
+      potentialSubdomains.push(`${firstName}${lastName}`);
+    }
+    
+    // Format 4: First name + last initial
+    if (firstName && lastName) {
+      potentialSubdomains.push(`${firstName}${lastName.charAt(0)}`);
+    }
+    
+    // Format 5: Memorial variants
+    potentialSubdomains.push(`${firstName}mem`);
+    potentialSubdomains.push(`remember${firstName}`);
+    
+    // Format 6: First initial + last name
+    if (firstName && lastName) {
+      potentialSubdomains.push(`${firstName.charAt(0)}${lastName}`);
+    }
+    
+    // Check availability for each potential subdomain
+    const availableSubdomains = [];
+    for (const subdomain of potentialSubdomains) {
+      if (subdomain && subdomain.length >= 3 && subdomain.length <= 50) {
+        try {
+          const response = await checkSubdomainAvailability(subdomain, caseId);
+          if (response.available) {
+            availableSubdomains.push({
+              value: subdomain,
+              label: getSubdomainLabel(subdomain, firstName, lastName)
+            });
+          }
+          
+          // Stop after finding 3 available subdomains
+          if (availableSubdomains.length >= 3) {
+            break;
+          }
+        } catch (error) {
+          console.error('Error checking subdomain availability:', error);
+        }
+      }
+    }
+    
+    // If we don't have 3 suggestions yet, add numbered variants
+    let counter = 1;
+    while (availableSubdomains.length < 3 && counter < 100) {
+      const numberedSubdomain = `${firstName}${counter}`;
+      try {
+        const response = await checkSubdomainAvailability(numberedSubdomain, caseId);
+        if (response.available) {
+          availableSubdomains.push({
+            value: numberedSubdomain,
+            label: 'Alternative'
+          });
+        }
+      } catch (error) {
+        console.error('Error checking numbered subdomain:', error);
+      }
+      counter++;
+    }
+    
+    setSuggestedSubdomains(availableSubdomains.slice(0, 3));
+    setIsLoadingSuggestions(false);
+  };
 
-    setSuggestedSubdomains(suggestions.slice(0, 5));
+  const getSubdomainLabel = (subdomain, firstName, lastName) => {
+    if (subdomain.startsWith('4')) {
+      return 'Memorial';
+    } else if (subdomain === `${firstName}${lastName}`) {
+      return 'Full Name';
+    } else if (subdomain.includes('mem') || subdomain.includes('remember')) {
+      return 'Tribute';
+    } else if (subdomain === `${firstName}${lastName?.charAt(0)}`) {
+      return 'Name + Initial';
+    } else if (subdomain === `${firstName?.charAt(0)}${lastName}`) {
+      return 'Initial + Surname';
+    } else {
+      return 'Short Format';
+    }
   };
 
   const checkAvailability = async (subdomain) => {
     if (!subdomain || subdomain.length < 3) {
-      setAvailabilityStatus({ available: false, message: 'Please use at least 3 characters' });
+      setAvailabilityStatus({ available: false, message: 'Minimum 3 characters required' });
+      return;
+    }
+
+    if (subdomain.length > 50) {
+      setAvailabilityStatus({ available: false, message: 'Maximum 50 characters allowed' });
+      return;
+    }
+
+    // Validate subdomain format
+    const subdomainRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
+    if (!subdomainRegex.test(subdomain)) {
+      setAvailabilityStatus({ 
+        available: false, 
+        message: 'Only lowercase letters, numbers, and hyphens allowed. Cannot start or end with hyphen.' 
+      });
       return;
     }
 
@@ -65,7 +174,7 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
     } catch (error) {
       setAvailabilityStatus({ 
         available: false, 
-        message: 'Oops! Could not check availability' 
+        message: 'Unable to check availability. Please try again.' 
       });
     } finally {
       setIsCheckingAvailability(false);
@@ -75,25 +184,41 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
   const handleSubdomainSelect = (subdomain) => {
     setSelectedSubdomain(subdomain);
     setCustomSubdomain('');
-    checkAvailability(subdomain);
+    setIsUsingCustom(false);
+    setAvailabilityStatus({ available: true, message: 'Available' });
   };
 
   const handleCustomSubdomainChange = (e) => {
     const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
     setCustomSubdomain(value);
     setSelectedSubdomain(value);
+    setIsUsingCustom(true);
     
-    clearTimeout(window.subdomainTimeout);
-    window.subdomainTimeout = setTimeout(() => {
+    // Clear any previous timeout
+    if (checkTimeoutRef.current) {
+      clearTimeout(checkTimeoutRef.current);
+    }
+    
+    // Clear availability status while typing
+    if (value.length < 3) {
+      setAvailabilityStatus(null);
+    }
+    
+    // Set new timeout for checking availability
+    checkTimeoutRef.current = setTimeout(() => {
       if (value.length >= 3) {
         checkAvailability(value);
+      } else if (value.length > 0) {
+        setAvailabilityStatus({ available: false, message: 'Minimum 3 characters required' });
+      } else {
+        setAvailabilityStatus(null);
       }
     }, 500);
   };
 
   const handleDeploy = async () => {
-    if (!selectedSubdomain || !availabilityStatus?.available) {
-      setError('Please choose an available web address');
+    if (!selectedSubdomain || (!isUpdating && !availabilityStatus?.available)) {
+      setError('Please select an available web address');
       return;
     }
 
@@ -107,7 +232,7 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
         template_data: caseData.template_data
       };
 
-      const result = currentDeployment?.deployment_status === 'deployed' 
+      const result = isUpdating
         ? await updateDeployment(caseId, deployData)
         : await deployCase(caseId, deployData);
 
@@ -116,14 +241,14 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
       
       pollDeploymentStatus(result.deployment_id);
     } catch (error) {
-      setError(error.message || 'Something went wrong. Let\'s try again!');
+      setError(error.message || 'An error occurred. Please try again.');
       setIsDeploying(false);
     }
   };
 
   const pollDeploymentStatus = (deploymentId) => {
     let pollAttempts = 0;
-    const maxPollAttempts = 60; // 60 * 5 seconds = 5 minutes
+    const maxPollAttempts = 60;
     
     const interval = setInterval(async () => {
       pollAttempts++;
@@ -140,182 +265,222 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
           clearInterval(interval);
           pollIntervalRef.current = null;
           setIsDeploying(false);
-          setError('Deployment ran into an issue. Let\'s try again!');
-          setStep(2); // Stay on step 2 to show error
+          setError('Operation failed. Please try again.');
+          setStep(2);
         } else if (pollAttempts >= maxPollAttempts) {
-          // Handle timeout - deployment taking too long
           clearInterval(interval);
           pollIntervalRef.current = null;
           setIsDeploying(false);
-          setError('Deployment is taking longer than expected. Please check back in a few minutes or contact support.');
-          setStep(2); // Stay on step 2 to show error
+          setError('Operation is taking longer than expected. Please check back in a few minutes.');
+          setStep(2);
         }
-        // Continue polling if still deploying and under max attempts
       } catch (error) {
         console.error('Error polling deployment status:', error);
-        pollAttempts += 5; // Count errors more heavily
+        pollAttempts += 5;
         
         if (pollAttempts >= maxPollAttempts) {
           clearInterval(interval);
           pollIntervalRef.current = null;
           setIsDeploying(false);
-          setError('Unable to check deployment status. Please refresh the page.');
-          setStep(2); // Stay on step 2 to show error
+          setError('Unable to check status. Please refresh the page.');
+          setStep(2);
         }
       }
     }, 5000);
 
-    // Store interval ID for cleanup
     pollIntervalRef.current = interval;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-6 py-5 border-b border-gray-100">
+        <div className="bg-gray-50 px-8 py-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <RocketLaunchIcon className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  {currentDeployment?.deployment_status === 'deployed' ? 
-                    'Update Your Memorial' : 
-                    'Launch Your Memorial Site'}
-                </h2>
-                <p className="text-sm text-gray-600 mt-0.5">
-                  Share {caseData.first_name}'s story with the world
-                </p>
-              </div>
+            <div>
+              <h2 className="text-2xl font-light text-gray-900" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.02em' }}>
+                {isUpdating ? 'Update Memorial Site' : 'Deploy Memorial Site'}
+              </h2>
+              <p className="text-base text-gray-600 mt-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                {isUpdating 
+                  ? `Update the memorial site for ${caseData.first_name}`
+                  : `Create a lasting tribute for ${caseData.first_name}`}
+              </p>
             </div>
             <button 
               onClick={onClose} 
-              className="p-2 hover:bg-white/60 rounded-lg transition-all"
+              className="text-gray-400 hover:text-gray-600 text-2xl font-light leading-none p-2"
+              aria-label="Close"
             >
-              <XMarkIcon className="w-5 h-5 text-gray-500" />
+              X
             </button>
           </div>
         </div>
 
         {/* Progress Indicator */}
-        {step < 3 && (
-          <div className="px-6 py-3 bg-gradient-to-r from-blue-50/50 to-purple-50/50">
-            <div className="flex items-center gap-2">
-              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-                step === 1 ? 'bg-blue-100 text-blue-700' : 'text-gray-500'
-              }`}>
-                <span className="font-medium">1</span>
-                <span>Choose Address</span>
+        {step < 3 && !isUpdating && (
+          <div className="px-8 py-4 bg-gray-50/50 border-b border-gray-100">
+            <div className="flex items-center">
+              <div className={`flex items-center px-4 py-2 rounded text-sm ${
+                step === 1 ? 'bg-gray-800 text-white' : 'text-gray-500'
+              }`} style={{ fontFamily: 'Arial, sans-serif' }}>
+                <span className="font-medium mr-2">Step 1:</span>
+                <span>Web Address</span>
               </div>
-              <div className="flex-1 h-0.5 bg-gray-200">
-                <div className={`h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all ${
+              <div className="flex-1 mx-4 h-px bg-gray-300">
+                <div className={`h-full bg-gray-800 transition-all ${
                   step > 1 ? 'w-full' : 'w-0'
                 }`} />
               </div>
-              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-                step === 2 ? 'bg-blue-100 text-blue-700' : 'text-gray-500'
-              }`}>
-                <span className="font-medium">2</span>
-                <span>Launch</span>
+              <div className={`flex items-center px-4 py-2 rounded text-sm ${
+                step === 2 ? 'bg-gray-800 text-white' : 'text-gray-500'
+              }`} style={{ fontFamily: 'Arial, sans-serif' }}>
+                <span className="font-medium mr-2">Step 2:</span>
+                <span>Deploy</span>
               </div>
             </div>
           </div>
         )}
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
+        <div className="p-8 overflow-y-auto max-h-[60vh]">
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-800 mb-2">
-                  Pick a memorable web address
+                <h3 className="text-lg font-medium text-gray-900 mb-3" style={{ fontFamily: 'Georgia, serif' }}>
+                  {isUpdating ? 'Current Web Address' : 'Select Web Address'}
                 </h3>
-                <p className="text-gray-600 mb-6">
-                  This is how people will find and remember {caseData.first_name}'s memorial site.
+                <p className="text-gray-600 mb-6" style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px', lineHeight: '1.6' }}>
+                  {isUpdating 
+                    ? `The memorial site is currently deployed at the address below.`
+                    : `Choose a unique web address for ${caseData.first_name}'s memorial site.`}
                 </p>
 
                 {/* Preview URL */}
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 mb-6">
-                  <p className="text-sm text-gray-600 mb-2">Your memorial will be at:</p>
-                  <div className="flex items-center gap-2">
-                    <GlobeAltIcon className="w-5 h-5 text-blue-600" />
-                    <span className="font-mono text-lg text-gray-800">
-                      {selectedSubdomain || '[choose-name]'}.caseclosure.org
-                    </span>
+                <div className="bg-gray-50 rounded-lg p-5 mb-6 border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    Memorial URL:
+                  </p>
+                  <div className="font-mono text-lg text-gray-900" style={{ letterSpacing: '0.02em' }}>
+                    {selectedSubdomain || '[select-address]'}.caseclosure.org
                   </div>
+                  {isUpdating && (
+                    <p className="text-sm text-gray-500 mt-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                      This address cannot be changed during updates.
+                    </p>
+                  )}
+                  {!isUpdating && availabilityStatus && isUsingCustom && (
+                    <p className={`text-sm mt-2 ${
+                      availabilityStatus.available ? 'text-green-600' : 'text-red-600'
+                    }`} style={{ fontFamily: 'Arial, sans-serif' }}>
+                      {isCheckingAvailability ? 'Checking availability...' : availabilityStatus.message}
+                    </p>
+                  )}
                 </div>
 
-                {/* Suggested Options */}
-                <div className="space-y-3 mb-6">
-                  <p className="text-sm font-medium text-gray-700">Suggested names for you:</p>
-                  <div className="grid gap-2">
-                    {suggestedSubdomains.map((suggestion) => (
-                      <button
-                        key={suggestion.value}
-                        onClick={() => handleSubdomainSelect(suggestion.value)}
-                        className={`p-4 text-left border-2 rounded-xl transition-all ${
-                          selectedSubdomain === suggestion.value
-                            ? 'border-blue-500 bg-blue-50 shadow-sm'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{suggestion.icon}</span>
-                            <div>
-                              <p className="font-mono text-gray-800">
-                                {suggestion.value}.caseclosure.org
-                              </p>
-                              <p className="text-xs text-gray-500 mt-0.5">{suggestion.label}</p>
+                {/* Suggested Options - Only show for new deployments */}
+                {!isUpdating && (
+                  <>
+                    <div className="space-y-3 mb-6">
+                      <p className="text-sm font-medium text-gray-700" style={{ fontFamily: 'Arial, sans-serif' }}>
+                        Suggested Addresses:
+                      </p>
+                      {isLoadingSuggestions ? (
+                        <div className="text-center py-4">
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800"></div>
+                          <p className="text-sm text-gray-500 mt-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                            Finding available addresses...
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {suggestedSubdomains.map((suggestion) => (
+                            <button
+                              key={suggestion.value}
+                              onClick={() => handleSubdomainSelect(suggestion.value)}
+                              className={`w-full p-4 text-left border rounded-lg transition-all ${
+                                selectedSubdomain === suggestion.value && !isUsingCustom
+                                  ? 'border-gray-800 bg-gray-50'
+                                  : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50/50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-mono text-gray-900" style={{ fontSize: '15px' }}>
+                                    {suggestion.value}.caseclosure.org
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+                                    {suggestion.label}
+                                  </p>
+                                </div>
+                                {selectedSubdomain === suggestion.value && !isUsingCustom && (
+                                  <span className="text-gray-800 text-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Custom Option - Now Enabled */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700" style={{ fontFamily: 'Arial, sans-serif' }}>
+                        Custom Address:
+                      </label>
+                      <div className="flex gap-2 items-center">
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            value={customSubdomain}
+                            onChange={handleCustomSubdomainChange}
+                            placeholder="enter-custom-address"
+                            className={`w-full px-4 py-3 border rounded-lg transition-colors ${
+                              isUsingCustom && availabilityStatus && !availabilityStatus.available
+                                ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                                : isUsingCustom && availabilityStatus && availabilityStatus.available
+                                ? 'border-green-300 focus:border-green-500 focus:ring-green-500'
+                                : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500'
+                            } focus:outline-none focus:ring-2`}
+                            style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px' }}
+                            minLength={3}
+                            maxLength={50}
+                          />
+                          {isCheckingAvailability && (
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
                             </div>
-                          </div>
-                          {selectedSubdomain === suggestion.value && (
-                            <CheckCircleIcon className="w-5 h-5 text-blue-600" />
+                          )}
+                          {!isCheckingAvailability && isUsingCustom && availabilityStatus && (
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                              {availabilityStatus.available ? (
+                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              )}
+                            </div>
                           )}
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Custom Option */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Or create your own:
-                  </label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={customSubdomain}
-                      onChange={handleCustomSubdomainChange}
-                      placeholder="your-custom-name"
-                      className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 transition-all"
-                      minLength={3}
-                      maxLength={50}
-                    />
-                    <span className="text-gray-500 text-sm">.caseclosure.org</span>
-                  </div>
-                  
-                  {isCheckingAvailability && (
-                    <p className="text-sm text-gray-500 flex items-center gap-2">
-                      <span className="animate-spin">⏳</span> Checking...
-                    </p>
-                  )}
-                  {availabilityStatus && (
-                    <p className={`text-sm flex items-center gap-2 ${
-                      availabilityStatus.available ? 'text-green-600' : 'text-amber-600'
-                    }`}>
-                      {availabilityStatus.available ? '✅' : '⚠️'}
-                      {availabilityStatus.message}
-                    </p>
-                  )}
-                </div>
+                        <span className="text-gray-600 text-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
+                          .caseclosure.org
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500" style={{ fontFamily: 'Arial, sans-serif' }}>
+                        Use lowercase letters, numbers, and hyphens. Must be 3-50 characters.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800" style={{ fontFamily: 'Arial, sans-serif' }}>
                   {error}
                 </div>
               )}
@@ -323,39 +488,35 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
           )}
 
           {step === 2 && (
-            <div className="space-y-6 text-center py-8">
-              <div className="inline-flex p-4 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full">
-                <RocketLaunchIcon className="w-16 h-16 text-blue-600" />
-              </div>
-              
+            <div className="space-y-6 text-center py-12">
               <div>
-                <h3 className="text-2xl font-semibold text-gray-800 mb-3">
-                  Ready to launch?
+                <h3 className="text-2xl font-light text-gray-900 mb-4" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.02em' }}>
+                  {isUpdating ? 'Confirm Update' : 'Confirm Deployment'}
                 </h3>
-                <p className="text-gray-600 max-w-md mx-auto">
-                  Your memorial will be live at:
+                <p className="text-gray-600 max-w-md mx-auto" style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px', lineHeight: '1.6' }}>
+                  {isUpdating 
+                    ? 'Your memorial site will be updated at:'
+                    : 'Your memorial site will be published at:'}
                 </p>
-                <p className="text-xl font-mono text-blue-600 mt-2">
+                <p className="text-xl font-mono text-gray-900 mt-3" style={{ letterSpacing: '0.02em' }}>
                   {selectedSubdomain}.caseclosure.org
                 </p>
               </div>
 
               {isDeploying && (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600"></div>
-                  <p className="text-gray-600">Creating your memorial site...</p>
-                  <p className="text-sm text-gray-500">This usually takes about 30 seconds</p>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="mt-4 text-sm text-blue-600 hover:text-blue-700 underline"
-                  >
-                    Taking too long? Refresh the page
-                  </button>
+                <div className="flex flex-col items-center gap-4 mt-8">
+                  <div className="w-12 h-12 border-3 border-gray-300 border-t-gray-800 rounded-full animate-spin"></div>
+                  <p className="text-gray-600" style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px' }}>
+                    {isUpdating ? 'Updating memorial site...' : 'Deploying memorial site...'}
+                  </p>
+                  <p className="text-sm text-gray-500" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    This typically takes 30-60 seconds
+                  </p>
                 </div>
               )}
 
               {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-left max-w-md mx-auto">
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-left max-w-md mx-auto" style={{ fontFamily: 'Arial, sans-serif' }}>
                   {error}
                 </div>
               )}
@@ -364,25 +525,26 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
 
           {step === 3 && (
             <div className="space-y-6 text-center py-12">
-              <div className="inline-flex p-4 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full">
-                <SparklesIcon className="w-16 h-16 text-green-600" />
-              </div>
-              
               <div>
-                <h3 className="text-2xl font-bold text-gray-800 mb-3">
-                  Your memorial is live! 🎉
+                <h3 className="text-2xl font-light text-gray-900 mb-4" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.02em' }}>
+                  {isUpdating ? 'Update Successful' : 'Deployment Successful'}
                 </h3>
-                <p className="text-gray-600 mb-4">
-                  {caseData.first_name}'s story is now available for everyone to see and share.
+                <p className="text-gray-600 mb-6" style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px', lineHeight: '1.6' }}>
+                  {isUpdating 
+                    ? `The memorial site for ${caseData.first_name} has been updated.`
+                    : `The memorial site for ${caseData.first_name} is now live.`}
                 </p>
                 
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4">
-                  <p className="text-sm text-gray-600 mb-2">Share this link:</p>
+                <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    Site URL:
+                  </p>
                   <a 
                     href={`https://${selectedSubdomain}.caseclosure.org`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-lg font-mono text-blue-600 hover:text-blue-700 hover:underline"
+                    className="text-lg font-mono text-blue-700 hover:text-blue-800 hover:underline"
+                    style={{ letterSpacing: '0.02em' }}
                   >
                     https://{selectedSubdomain}.caseclosure.org
                   </a>
@@ -393,26 +555,28 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+        <div className="px-8 py-5 bg-gray-50 border-t border-gray-200">
           <div className="flex justify-between items-center">
             {step === 1 && (
               <>
                 <button
                   onClick={onClose}
-                  className="px-5 py-2.5 text-gray-700 hover:text-gray-900 transition-colors"
+                  className="px-6 py-2.5 text-gray-700 hover:text-gray-900 transition-colors"
+                  style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px' }}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => setStep(2)}
-                  disabled={!selectedSubdomain || !availabilityStatus?.available}
-                  className={`px-6 py-2.5 rounded-xl font-medium transition-all ${
-                    selectedSubdomain && availabilityStatus?.available
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transform hover:scale-105'
+                  disabled={!selectedSubdomain || (!isUpdating && !availabilityStatus?.available) || isCheckingAvailability}
+                  className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
+                    selectedSubdomain && (isUpdating || availabilityStatus?.available) && !isCheckingAvailability
+                      ? 'bg-gray-800 text-white hover:bg-gray-900'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
+                  style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px' }}
                 >
-                  Continue →
+                  {isUpdating ? 'Continue to Update' : 'Continue'}
                 </button>
               </>
             )}
@@ -421,31 +585,34 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
               <>
                 <button
                   onClick={() => setStep(1)}
-                  className="px-5 py-2.5 text-gray-700 hover:text-gray-900 transition-colors"
+                  className="px-6 py-2.5 text-gray-700 hover:text-gray-900 transition-colors"
+                  style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px' }}
                 >
-                  ← Back
+                  Back
                 </button>
                 <button
                   onClick={handleDeploy}
-                  className="px-8 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-medium hover:shadow-lg transform hover:scale-105 transition-all"
+                  className="px-8 py-2.5 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-900 transition-all"
+                  style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px' }}
                 >
-                  Launch Site 🚀
+                  {isUpdating ? 'Update Site' : 'Deploy Site'}
                 </button>
               </>
             )}
 
             {step === 2 && isDeploying && (
-              <div className="mx-auto text-gray-500 text-sm">
-                Please wait while we deploy your site...
+              <div className="mx-auto text-gray-500 text-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
+                Please wait while the operation completes...
               </div>
             )}
 
             {step === 3 && (
               <button
                 onClick={onClose}
-                className="mx-auto px-8 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transform hover:scale-105 transition-all"
+                className="mx-auto px-8 py-2.5 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-900 transition-all"
+                style={{ fontFamily: 'Arial, sans-serif', fontSize: '15px' }}
               >
-                Done
+                Close
               </button>
             )}
           </div>
