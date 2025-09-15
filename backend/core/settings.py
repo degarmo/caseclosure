@@ -12,17 +12,22 @@ import cloudinary
 import cloudinary.uploader
 import cloudinary.api
 
+# Replace lines 14-22 with:
 cloudinary.config(
-    cloud_name='dp7ys0qqa',
-    api_key='184179145155636',
-    api_secret='mtr5bpMGGmnG1Lkk7yNJ8RwatzQ'
+    cloud_name=config('CLOUDINARY_CLOUD_NAME'),
+    api_key=config('CLOUDINARY_API_KEY'),
+    api_secret=config('CLOUDINARY_API_SECRET')
 )
 
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': 'dp7ys0qqa',  # From Cloudinary dashboard
-    'API_KEY': '184179145155636',
-    'API_SECRET': 'mtr5bpMGGmnG1Lkk7yNJ8RwatzQ'
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': config('CLOUDINARY_API_KEY'),
+    'API_SECRET': config('CLOUDINARY_API_SECRET')
 }
+
+# Replace line 345 with:
+NETLIFY_API_KEY = config('NETLIFY_API_KEY')
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
