@@ -25,9 +25,6 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': config('CLOUDINARY_API_SECRET')
 }
 
-# Replace line 345 with:
-NETLIFY_API_KEY = config('NETLIFY_API_KEY')
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -43,12 +40,14 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 
 if DEBUG:
     ALLOWED_HOSTS += [
+        'testserver',
         'localhost:8000',
         '127.0.0.1:8000',
         'localhost:5173',
         '127.0.0.1:5173',
         'caseclosure.org:8000',
-        'caseclosure.org:5173'
+        'caseclosure.org:5173',
+        'caseclosure.org'
     ]
 
 # Add production domains
@@ -345,19 +344,13 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-DEPLOYMENT_PROVIDER = 'netlify'
-NETLIFY_API_KEY = 'nfp_QL2rtUat3ueFSbNiuPvFuDKcqSeGAHvH1a54' 
-
-# Email Configuration
-if DEBUG:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-else:
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = config('EMAIL_HOST', default='smtp.sendgrid.net')
-    EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-    EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-    EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+# Email configuration - always use SMTP
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@caseclosure.org')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
@@ -457,7 +450,4 @@ if not DEBUG and config('SENTRY_DSN', default=''):
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
-# Twilio Settings (for SMS verification)
-TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')
-TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='')
-TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER', default='')
+

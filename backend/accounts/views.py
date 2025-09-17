@@ -1,3 +1,6 @@
+# accounts/views.py
+# UPDATED VERSION WITH ENHANCED EMAIL FUNCTIONALITY AND ERROR HANDLING
+
 from rest_framework import generics, permissions, status
 from django.contrib.auth import get_user_model
 from rest_framework.serializers import ModelSerializer
@@ -14,7 +17,26 @@ from django.conf import settings
 from django.utils import timezone
 import urllib.parse
 import logging
-from django.core.mail import send_mail
+import traceback  # Added for better error logging
+
+# Import email utilities with error handling
+try:
+    from utils.email import send_invite_email, send_rejection_email, send_request_confirmation_email
+    EMAIL_UTILS_AVAILABLE = True
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.error(f"Failed to import email utilities: {e}")
+    EMAIL_UTILS_AVAILABLE = False
+    # Create dummy functions if import fails
+    def send_invite_email(email, code, name):
+        logger.error("Email utilities not available - cannot send invite email")
+        return False
+    def send_rejection_email(email, name, reason):
+        logger.error("Email utilities not available - cannot send rejection email")
+        return False
+    def send_request_confirmation_email(email, name):
+        logger.error("Email utilities not available - cannot send confirmation email")
+        return False
 
 # For Google OAuth (if using dj-rest-auth)
 try:
@@ -26,79 +48,12 @@ except ImportError:
     ALLAUTH_INSTALLED = False
     
 from .models import UserProfile, SiteSettings, InviteCode, AccountRequest
-from .serializers import UserProfileSerializer, UserSerializer
+from .serializers import UserProfileSerializer, UserSerializer, RegisterSerializer
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-def send_invite_email(email, invite_code, first_name):
-    """Send invite code email to approved user"""
-    subject = 'Your CaseClosure Invite Code'
-    
-    html_message = f"""
-    <h2>Welcome to CaseClosure, {first_name}!</h2>
-    
-    <p>Your account request has been approved. Here's your personal invite code:</p>
-    
-    <div style="background: #f0f0f0; padding: 20px; margin: 20px 0; text-align: center;">
-        <h1 style="font-family: monospace; letter-spacing: 2px; color: #333;">
-            {invite_code}
-        </h1>
-    </div>
-    
-    <p>To complete your registration:</p>
-    <ol>
-        <li>Go to <a href="{settings.SITE_URL}/signup">caseclosure.org/signup</a></li>
-        <li>Enter your invite code: <strong>{invite_code}</strong></li>
-        <li>Use this email address: <strong>{email}</strong></li>
-        <li>Create your password</li>
-    </ol>
-    
-    <p>This invite code is valid for one use only and is tied to your email address.</p>
-    
-    <p>Best regards,<br>
-    The CaseClosure Team</p>
-    """
-    
-    plain_message = f"""
-    Welcome to CaseClosure, {first_name}!
-    
-    Your invite code: {invite_code}
-    
-    Go to caseclosure.org/signup to complete registration.
-    
-    The CaseClosure Team
-    """
-    
-    try:
-        send_mail(
-            subject,
-            plain_message,
-            settings.DEFAULT_FROM_EMAIL,
-            [email],
-            html_message=html_message,
-            fail_silently=False,
-        )
-        logger.info(f"Invite email sent successfully to {email}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send invite email to {email}: {str(e)}")
-        # For development, print the invite code to console
-        if settings.DEBUG:
-            print(f"""
-            ===== EMAIL WOULD BE SENT =====
-            To: {email}
-            Subject: {subject}
-            
-            Hi {first_name},
-            Your invite code is: {invite_code}
-            ================================
-            """)
-        return False
-
 # ============== JWT Token Customization ==============
-
-from rest_framework import serializers
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Custom token serializer to include user data in response"""
@@ -140,105 +95,181 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 # ============== User Registration & Management ==============
 
-class RegisterSerializer(ModelSerializer):
-    class Meta:
-        model = User
-        fields = ('id', 'password', 'email', 'first_name', 'last_name')  # Removed username
-        extra_kwargs = {
-            'password': {'write_only': True},
-            'email': {'required': True}
-        }
-
-    def create(self, validated_data):
-        # Auto-set username to email
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            username=validated_data['email'],  # Set username same as email
-            password=validated_data['password'],
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', '')
-        )
-        # Create user profile automatically
-        UserProfile.objects.get_or_create(user=user)
-        return user
-
 class RegisterView(generics.CreateAPIView):
     """User registration endpoint with invite code support"""
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
     
+    print("REGISTERVIEW CLASS LOADED!") 
+
     def create(self, request, *args, **kwargs):
-        # Get site settings
-        settings = SiteSettings.get_settings()
+        print("=" * 70)
+        print("DEBUG: Registration started")
+        print(f"DEBUG: Request data: {request.data}")
+        print("=" * 70)
         
-        # Check registration mode
-        if settings.registration_mode == 'closed':
-            return Response({
-                'error': 'Registration is currently closed.',
-                'message': settings.beta_message
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        # Check user limit if set
-        if settings.max_users > 0 and settings.current_user_count >= settings.max_users:
-            return Response({
-                'error': 'We\'ve reached our user limit. Please try again later.'
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        # Check for invite code if in invite_only mode
-        invite = None
-        if settings.registration_mode == 'invite_only':
-            invite_code = request.data.get('invite_code', '').upper()
+        try:
+            # Get site settings
+            print("DEBUG: Getting site settings...")
+            settings = SiteSettings.get_settings()
+            print(f"DEBUG: Registration mode: {settings.registration_mode}")
             
-            if not invite_code:
+            # Check registration mode
+            if settings.registration_mode == 'closed':
+                print("DEBUG: Registration is closed")
                 return Response({
-                    'invite_code': ['An invite code is required during our beta period.']
-                }, status=status.HTTP_400_BAD_REQUEST)
+                    'error': 'Registration is currently closed.',
+                    'message': settings.beta_message
+                }, status=status.HTTP_403_FORBIDDEN)
             
-            # Validate invite code
-            try:
-                invite = InviteCode.objects.get(code=invite_code)
-                if not invite.is_valid():
+            # Check user limit if set
+            if settings.max_users > 0 and settings.current_user_count >= settings.max_users:
+                print(f"DEBUG: User limit reached: {settings.current_user_count}/{settings.max_users}")
+                return Response({
+                    'error': 'We\'ve reached our user limit. Please try again later.'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Check for invite code if in invite_only mode
+            invite = None
+            if settings.registration_mode == 'invite_only':
+                invite_code = request.data.get('invite_code', '').upper()
+                print(f"DEBUG: Invite code provided: {invite_code}")
+                
+                if not invite_code:
+                    print("DEBUG: No invite code provided")
                     return Response({
-                        'invite_code': ['This invite code is expired or has been used.']
+                        'error': 'An invite code is required during our beta period.',
+                        'field_errors': {'invite_code': ['This field is required.']}
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
-                # Check if restricted to specific email
-                if invite.email and invite.email != request.data.get('email'):
-                    return Response({
-                        'invite_code': ['This invite code is not valid for your email address.']
-                    }, status=status.HTTP_400_BAD_REQUEST)
+                # Validate invite code
+                try:
+                    print(f"DEBUG: Looking up invite code: {invite_code}")
+                    invite = InviteCode.objects.get(code=invite_code)
+                    print(f"DEBUG: Invite found - Valid: {invite.is_valid()}")
                     
-            except InviteCode.DoesNotExist:
+                    if not invite.is_valid():
+                        print("DEBUG: Invite code is invalid/expired")
+                        return Response({
+                            'error': 'This invite code is expired or has been used.',
+                            'field_errors': {'invite_code': ['Invalid or expired code.']}
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    # Check if restricted to specific email
+                    email = request.data.get('email', '').lower()
+                    print(f"DEBUG: Email check - Invite email: {invite.email}, User email: {email}")
+                    
+                    if invite.email and invite.email.lower() != email:
+                        print("DEBUG: Email mismatch with invite code")
+                        return Response({
+                            'error': 'This invite code is not valid for your email address.',
+                            'field_errors': {'invite_code': ['Code not valid for this email.']}
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                        
+                except InviteCode.DoesNotExist:
+                    print(f"DEBUG: Invite code not found: {invite_code}")
+                    return Response({
+                        'error': 'Invalid invite code.',
+                        'field_errors': {'invite_code': ['Code not found.']}
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create the user
+            print("DEBUG: Creating serializer...")
+            serializer = self.get_serializer(data=request.data)
+            
+            print("DEBUG: Validating serializer...")
+            if not serializer.is_valid():
+                print(f"DEBUG: Serializer validation failed: {serializer.errors}")
                 return Response({
-                    'invite_code': ['Invalid invite code.']
+                    'error': 'Validation failed',
+                    'field_errors': serializer.errors
                 }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Prepare data with email as username
-        serializer_data = request.data.copy()
-        # Don't need to set username here since RegisterSerializer handles it
-        
-        serializer = self.get_serializer(data=serializer_data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        
-        # Mark invite code as used if applicable
-        if invite:
-            invite.use(user)
-        
-        # Update user count
-        settings.current_user_count = User.objects.filter(is_active=True).count()
-        settings.save()
-        
-        # Generate tokens for the new user
-        refresh = RefreshToken.for_user(user)
-        
-        return Response({
-            'user': UserSerializer(user).data,
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'message': 'Registration successful!'
-        }, status=status.HTTP_201_CREATED)
+            
+            # Save the user (the serializer's create method will set is_staff=False)
+            print("DEBUG: About to save user...")
+            user = serializer.save()
+            print(f"DEBUG: User created - ID: {user.id}, Email: {user.email}")
+            print(f"DEBUG: User account_type: {user.account_type}")
+            print(f"DEBUG: User is_staff: {user.is_staff}")
+            
+            # Double-check that the user is not staff (safety check)
+            if user.is_staff or user.is_superuser:
+                print("DEBUG: Resetting staff/superuser flags")
+                user.is_staff = False
+                user.is_superuser = False
+                user.save()
+                logger.warning(f"Had to reset staff/superuser flags for new user: {user.email}")
+            
+            # Mark invite code as used if applicable
+            if invite:
+                print(f"DEBUG: Marking invite code as used...")
+                invite.use(user)
+                
+                # If this invite came from an AccountRequest, mark it as completed
+                account_request = AccountRequest.objects.filter(
+                    invite_code=invite
+                ).first()
+                if account_request:
+                    print(f"DEBUG: Marking account request as completed")
+                    account_request.status = 'completed'
+                    account_request.save()
+            
+            # Update user count
+            print("DEBUG: Updating user count...")
+            settings.current_user_count = User.objects.filter(is_active=True).count()
+            settings.save()
+            print(f"DEBUG: New user count: {settings.current_user_count}")
+            
+            # Generate tokens for the new user
+            print("DEBUG: Generating tokens...")
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+            print(f"DEBUG: Tokens generated - Access length: {len(access_token)}, Refresh length: {len(refresh_token)}")
+            
+            logger.info(f"New user registered: {user.email} with invite code: {invite_code if invite else 'None'}")
+            
+            # Build response data
+            print("DEBUG: Building response...")
+            response_data = {
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'is_staff': False,  # Always False for new registrations
+                    'account_type': user.account_type,  # Include since field exists
+                },
+                'access': access_token,
+                'refresh': refresh_token,
+                'message': 'Registration successful! You can now create your memorial page.'
+            }
+            
+            print(f"DEBUG: Response data prepared: {response_data['user']}")
+            print("DEBUG: About to return success response...")
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            print("=" * 70)
+            print(f"ERROR: Registration failed!")
+            print(f"ERROR Type: {type(e).__name__}")
+            print(f"ERROR Message: {str(e)}")
+            print("=" * 70)
+            
+            import traceback
+            traceback.print_exc()
+            
+            logger.error(f"Registration error for email {request.data.get('email', 'unknown')}: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            # Return a generic error to avoid exposing internals
+            return Response({
+                'error': 'An error occurred during registration. Please try again.',
+                'field_errors': {}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 # ============== Registration Status Check ==============
 
@@ -320,20 +351,6 @@ class NotificationView(APIView):
                     'urgent': True
                 })
         
-        # Add other notifications here (tips, alerts, etc)
-        # You can fetch from a Notification model if you have one
-        # Example:
-        # user_notifications = Notification.objects.filter(user=request.user, read=False)[:10]
-        # for notif in user_notifications:
-        #     notifications.append({
-        #         'id': str(notif.id),
-        #         'type': notif.type,
-        #         'message': notif.message,
-        #         'time': notif.created_at.strftime('%B %d at %I:%M %p'),
-        #         'read': notif.read,
-        #         'urgent': notif.urgent
-        #     })
-        
         return Response(notifications)    
 
 # ============== Account Request Management ==============
@@ -397,11 +414,34 @@ class AccountRequestView(APIView):
                 supporting_links=request.data.get('supporting_links', '')
             )
             
+            # Send confirmation email to the requester (optional but good UX)
+            try:
+                if EMAIL_UTILS_AVAILABLE and hasattr(locals(), 'send_request_confirmation_email'):
+                    send_request_confirmation_email(email, request.data['first_name'])
+                    logger.info(f"Confirmation email sent to {email}")
+            except Exception as e:
+                logger.warning(f"Failed to send confirmation email: {e}")
+                # Don't fail the request if email fails
+            
             # Check if auto-approval is enabled
             settings = SiteSettings.get_settings()
             if settings.auto_approve_requests:
                 # Auto-approve and create invite
                 invite = account_request.approve_and_create_invite(None)
+                
+                # Send invite email for auto-approved requests
+                email_sent = False
+                try:
+                    if EMAIL_UTILS_AVAILABLE:
+                        email_sent = send_invite_email(
+                            account_request.email, 
+                            invite.code, 
+                            account_request.first_name
+                        )
+                        logger.info(f"Auto-approval: Invite email {'sent' if email_sent else 'failed'} for {email}")
+                except Exception as e:
+                    logger.error(f"Failed to send auto-approval email: {e}")
+                
                 message = f'Your request has been approved! Check your email for invite code: {invite.code}'
             else:
                 message = 'Your request has been submitted and is under review. We\'ll contact you within 48 hours.'
@@ -415,10 +455,12 @@ class AccountRequestView(APIView):
             
         except Exception as e:
             logger.error(f"Error creating account request: {str(e)}")
+            logger.error(traceback.format_exc())  # Log full traceback
             return Response({
                 'error': 'Failed to create account request. Please try again.',
                 'error_type': 'server_error'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class AccountRequestAdminView(APIView):
     """Admin endpoints for managing account requests"""
@@ -427,8 +469,6 @@ class AccountRequestAdminView(APIView):
     def get(self, request):
         """Get account requests with optional filtering"""
         status_filter = request.GET.get('status', 'pending')
-        
-        # Build query based on filter
         if status_filter == 'all':
             account_requests = AccountRequest.objects.all().order_by('-submitted_at')
         else:
@@ -469,40 +509,180 @@ class AccountRequestAdminView(APIView):
         request_id = request.data.get('request_id')
         action = request.data.get('action')  # 'approve' or 'reject'
         
+        # DEBUG: Log incoming request
+        print("=" * 70)
+        print("DEBUG: AccountRequestAdminView.post() called")
+        print(f"DEBUG: Action: {action}")
+        print(f"DEBUG: Request ID: {request_id}")
+        print(f"DEBUG: EMAIL_UTILS_AVAILABLE = {EMAIL_UTILS_AVAILABLE}")
+        print("=" * 70)
+        
+        logger.info(f"Admin action received: {action} for request_id: {request_id}")
+        
         if not request_id or action not in ['approve', 'reject']:
+            print(f"DEBUG: Invalid request - action={action}, request_id={request_id}")
             return Response({
-                'error': 'Invalid request'
+                'error': 'Invalid request - missing request_id or invalid action'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             account_request = AccountRequest.objects.get(id=request_id)
+            print(f"DEBUG: Found account request for: {account_request.email}")
             
             if action == 'approve':
-                invite = account_request.approve_and_create_invite(request.user)
+                print("=" * 70)
+                print("DEBUG: APPROVAL PROCESS STARTED")
+                print(f"DEBUG: User email: {account_request.email}")
+                print(f"DEBUG: User name: {account_request.first_name} {account_request.last_name}")
+                print(f"DEBUG: Current status: {account_request.status}")
+                print("=" * 70)
                 
-                # Send email
-                email_sent = send_invite_email(
-                    account_request.email, 
-                    invite.code, 
-                    account_request.first_name
-                )
+                logger.info(f"Approving request for {account_request.email}")
                 
-                return Response({
+                # Create invite code
+                print("DEBUG: Creating invite code...")
+                try:
+                    invite = account_request.approve_and_create_invite(request.user)
+                    print(f"DEBUG: ✅ Invite code created successfully: {invite.code}")
+                    logger.info(f"Invite code created: {invite.code}")
+                except Exception as e:
+                    print(f"DEBUG: ❌ Failed to create invite code: {e}")
+                    logger.error(f"Failed to create invite code: {e}")
+                    logger.error(traceback.format_exc())
+                    return Response({
+                        'error': 'Failed to create invite code',
+                        'details': str(e)
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                # Send email with better error handling
+                email_sent = False
+                email_error = None
+                
+                print("=" * 70)
+                print("DEBUG: EMAIL SENDING SECTION")
+                print(f"DEBUG: EMAIL_UTILS_AVAILABLE = {EMAIL_UTILS_AVAILABLE}")
+                
+                try:
+                    if EMAIL_UTILS_AVAILABLE:
+                        print(f"DEBUG: Email utilities ARE available")
+                        print(f"DEBUG: Attempting to send invite email to: {account_request.email}")
+                        print(f"DEBUG: With invite code: {invite.code}")
+                        print(f"DEBUG: First name: {account_request.first_name}")
+                        
+                        logger.info(f"Attempting to send invite email to {account_request.email}")
+                        
+                        # Try to call the email function
+                        print("DEBUG: Calling send_invite_email()...")
+                        email_sent = send_invite_email(
+                            account_request.email, 
+                            invite.code, 
+                            account_request.first_name
+                        )
+                        
+                        print(f"DEBUG: send_invite_email() returned: {email_sent}")
+                        logger.info(f"Email send result: {email_sent}")
+                        
+                        if email_sent:
+                            print("DEBUG: ✅ Email sent successfully!")
+                        else:
+                            print("DEBUG: ⚠️ Email function returned False")
+                    else:
+                        print("DEBUG: ❌ Email utilities NOT available!")
+                        print("DEBUG: Check if utils/email.py has all required functions")
+                        logger.warning("Email utilities not available")
+                        email_error = "Email system not configured"
+                        
+                except Exception as e:
+                    print(f"DEBUG: ❌ Exception during email send: {e}")
+                    print(f"DEBUG: Exception type: {type(e).__name__}")
+                    email_error = str(e)
+                    logger.error(f"Email sending failed: {e}")
+                    logger.error(traceback.format_exc())
+                
+                print("=" * 70)
+                
+                # Build response with detailed status
+                response_data = {
                     'message': f'Request approved! Invite code: {invite.code}',
                     'invite_code': invite.code,
                     'email_sent': email_sent
-                })
-            else:
-                reason = request.data.get('reason', '')
-                account_request.reject(request.user, reason)
+                }
+                
+                if email_error:
+                    response_data['email_error'] = email_error
+                    response_data['message'] += f' (Email failed: {email_error})'
+                elif email_sent:
+                    response_data['message'] += ' (Email sent successfully)'
+                else:
+                    response_data['message'] += ' (Email system may be disabled in development)'
+                
+                print(f"DEBUG: Final response data: {response_data}")
+                logger.info(f"Approval complete for {account_request.email}: {response_data}")
+                
+                return Response(response_data)
+                
+            else:  # action == 'reject'
+                reason = request.data.get('reason', 'No reason provided')
+                
+                print("=" * 70)
+                print("DEBUG: REJECTION PROCESS STARTED")
+                print(f"DEBUG: User email: {account_request.email}")
+                print(f"DEBUG: Reason: {reason}")
+                print("=" * 70)
+                
+                logger.info(f"Rejecting request for {account_request.email} with reason: {reason}")
+                
+                # Reject the request
+                try:
+                    account_request.reject(request.user, reason)
+                    print("DEBUG: ✅ Request rejected in database")
+                    logger.info(f"Request rejected in database")
+                except Exception as e:
+                    print(f"DEBUG: ❌ Failed to reject request: {e}")
+                    logger.error(f"Failed to reject request: {e}")
+                    return Response({
+                        'error': 'Failed to reject request',
+                        'details': str(e)
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                # Send rejection email (optional, don't fail if email fails)
+                email_sent = False
+                try:
+                    if EMAIL_UTILS_AVAILABLE:
+                        print("DEBUG: Attempting to send rejection email...")
+                        email_sent = send_rejection_email(
+                            account_request.email,
+                            account_request.first_name,
+                            reason
+                        )
+                        print(f"DEBUG: Rejection email {'sent' if email_sent else 'failed'}")
+                        logger.info(f"Rejection email {'sent' if email_sent else 'failed'}")
+                    else:
+                        print("DEBUG: Email utilities not available for rejection")
+                except Exception as e:
+                    print(f"DEBUG: Failed to send rejection email: {e}")
+                    logger.warning(f"Failed to send rejection email: {e}")
+                
                 return Response({
-                    'message': 'Request rejected'
+                    'message': f'Request rejected{" and user notified" if email_sent else " (email notification failed)"}'
                 })
                 
         except AccountRequest.DoesNotExist:
+            print(f"DEBUG: ❌ Account request not found: {request_id}")
+            logger.error(f"Account request not found: {request_id}")
             return Response({
                 'error': 'Account request not found'
             }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            print(f"DEBUG: ❌ Unexpected error: {e}")
+            print(f"DEBUG: Error type: {type(e).__name__}")
+            logger.error(f"Unexpected error in admin action: {e}")
+            logger.error(traceback.format_exc())
+            return Response({
+                'error': 'An unexpected error occurred',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 # ============== Current User Views ==============
 

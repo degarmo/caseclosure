@@ -1,13 +1,16 @@
+# accounts/serializers.py
 from rest_framework import serializers
-from django.contrib.auth.models import User
-from .models import UserProfile
+from django.contrib.auth import get_user_model
+from .models import UserProfile, InviteCode
+
+User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
             "id", "username", "email", "first_name", "last_name",
-            "is_staff", "is_superuser"
+            "is_staff", "is_superuser", "account_type"
         ]
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -33,3 +36,52 @@ class UserProfileSerializer(serializers.ModelSerializer):
             setattr(user, attr, value)
         user.save()
         return instance
+
+class RegisterSerializer(serializers.ModelSerializer):
+    invite_code = serializers.CharField(write_only=True, required=False)
+    
+    class Meta:
+        model = User
+        fields = ('id', 'password', 'email', 'first_name', 'last_name', 'invite_code')
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'email': {'required': True}
+        }
+
+    def validate(self, attrs):
+        # Extract invite_code for later use
+        self.invite_code = attrs.pop('invite_code', None)
+        return attrs
+
+    def create(self, validated_data):
+        # Create user with account_type set on the User model
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            password=validated_data['password'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            account_type='verified',  # Set on User model, not UserProfile
+            is_staff=False,
+            is_superuser=False,
+        )
+        
+        # Create or get the UserProfile (without account_type since it doesn't have that field)
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'verified': True,
+                'can_create_cases': True,
+                'max_cases': 1,
+                'current_cases': 0
+            }
+        )
+        
+        if not created:
+            # Profile already existed (shouldn't happen but just in case)
+            profile.verified = True
+            profile.can_create_cases = True
+            profile.max_cases = 1
+            profile.save()
+            print(f"WARNING: UserProfile already existed for user {user.id}")
+        
+        return user
