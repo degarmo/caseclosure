@@ -57,8 +57,14 @@ if not DEBUG:
         'www.caseclosure.org',
         '.caseclosure.org',  # Allows subdomains
         'caseclosure.onrender.com',  # Render's default domain
+        '.elasticbeanstalk.com',  # AWS Elastic Beanstalk
+        '.amplifyapp.com', 
     ]
 
+if 'EB_HOSTNAME' in os.environ:
+    ALLOWED_HOSTS.append(os.environ['EB_HOSTNAME'])
+
+    
 # Custom User Model - KEEP THIS AT THE TOP
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
