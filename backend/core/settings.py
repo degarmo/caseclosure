@@ -64,7 +64,7 @@ if not DEBUG:
 if 'EB_HOSTNAME' in os.environ:
     ALLOWED_HOSTS.append(os.environ['EB_HOSTNAME'])
 
-    
+
 # Custom User Model - KEEP THIS AT THE TOP
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
@@ -106,7 +106,6 @@ REGISTRATION_MODES = {
 if not DEBUG:
     INSTALLED_APPS += [
         'storages',  # for S3
-        'django_extensions',
     ]
 
 SITE_ID = 1
