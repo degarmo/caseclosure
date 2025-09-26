@@ -977,6 +977,136 @@ class CaseViewSet(viewsets.ModelViewSet):
         super().perform_destroy(instance)
 
 
+    @action(detail=True, methods=['post'])
+    def invite_leo(self, request, pk=None):
+        """Case owner invites a law enforcement officer"""
+        case = self.get_object()
+        
+        # Verify user owns this case
+        if case.user != request.user and not request.user.is_staff:
+            return Response({'error': 'Unauthorized'}, status=403)
+        
+        # Create invite
+        invite = LEOInvite.objects.create(
+            case=case,
+            officer_name=request.data['officer_name'],
+            officer_email=request.data['officer_email'],
+            department=request.data['department'],
+            badge_number=request.data.get('badge_number', ''),
+            created_by=request.user
+        )
+        
+        # Send email with code
+        self.send_leo_invite_email(invite)
+        
+        return Response({
+            'success': True,
+            'invite_code': invite.invite_code,
+            'message': f'Invitation sent to {invite.officer_email}'
+        })
+    
+    def send_leo_invite_email(self, invite):
+        """Send invitation email to LEO"""
+        message = f"""
+        Officer {invite.officer_name},
+        
+        You have been granted access to case information for:
+        {invite.case.get_display_name()} - {invite.case.case_title}
+        
+        Your access code: {invite.invite_code}
+        
+        To access the case:
+        1. Visit https://caseclosure.com/leo-access
+        2. Enter your access code
+        3. Create your secure account
+        
+        This invitation expires on {invite.expires_at.strftime('%B %d, %Y')}.
+        
+        You will have read-only access to:
+        - Case information
+        - Tips and messages
+        - Limited tracking analytics
+        - Spotlight updates
+        
+        Thank you for your service,
+        CaseClosure Team
+        """
+        
+        send_mail(
+            subject=f'Case Access Invitation - {invite.case.case_title}',
+            message=message,
+            from_email='noreply@caseclosure.com',
+            recipient_list=[invite.officer_email],
+            fail_silently=False,
+        )
+
+# accounts/views.py (add LEO registration endpoint)
+class LEOAccessView(APIView):
+    """Handle LEO access code redemption"""
+    
+    permission_classes = []  # Public endpoint
+    
+    def post(self, request):
+        code = request.data.get('invite_code', '').upper()
+        
+        try:
+            invite = LEOInvite.objects.get(
+                invite_code=code,
+                used=False
+            )
+        except LEOInvite.DoesNotExist:
+            return Response({'error': 'Invalid or expired code'}, status=400)
+        
+        if not invite.is_valid():
+            return Response({'error': 'This invitation has expired'}, status=400)
+        
+        # Create LEO account
+        user = CustomUser.objects.create_user(
+            email=invite.officer_email,
+            first_name=invite.officer_name.split()[0],
+            last_name=' '.join(invite.officer_name.split()[1:]),
+            password=request.data.get('password'),
+            account_type='detective'
+        )
+        
+        # Create CaseAccess record
+        CaseAccess.objects.create(
+            case=invite.case,
+            user=user,
+            access_level='investigator',
+            can_view_tips=True,
+            can_view_tracking=True,  # Limited tracking
+            can_view_personal_info=False,
+            can_export_data=False,
+            invited_by=invite.created_by,
+            accepted=True,
+            accepted_at=timezone.now()
+        )
+        
+        # Mark invite as used
+        invite.used = True
+        invite.used_at = timezone.now()
+        invite.used_by = user
+        invite.save()
+        
+        # Generate tokens for auto-login
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': f"{user.first_name} {user.last_name}",
+            },
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'case_id': str(invite.case.id)
+        })
+        
+
+
 class SpotlightPostViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Spotlight blog posts.

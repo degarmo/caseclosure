@@ -44,9 +44,9 @@ export default function SignIn() {
 
   const handleOAuthSuccess = async (accessToken, refreshToken) => {
     try {
-      // Store tokens
-      localStorage.setItem("access", accessToken);
-      localStorage.setItem("refresh", refreshToken);
+      // Store tokens - FIXED: Using consistent naming
+      localStorage.setItem("authToken", accessToken);  // Changed from "access" to "authToken"
+      localStorage.setItem("refreshToken", refreshToken);  // Changed from "refresh" to "refreshToken"
       
       // Get user info
       const userResponse = await api.get("auth/user/", {
@@ -81,9 +81,9 @@ export default function SignIn() {
     setMessage("");
 
     try {
-      // Prepare login data - your backend might expect 'username' instead of 'email'
+      // Prepare login data - your backend expects 'email' field based on Django config
       const loginData = {
-        email: formData.email, // or email if your backend expects email
+        email: formData.email,
         password: formData.password
       };
 
@@ -91,9 +91,9 @@ export default function SignIn() {
         headers: { "Content-Type": "application/json" },
       });
 
-      // Store tokens
-      localStorage.setItem("access", response.data.access);
-      localStorage.setItem("refresh", response.data.refresh);
+      // Store tokens - FIXED: Using consistent naming
+      localStorage.setItem("authToken", response.data.access);  // Changed from "access" to "authToken"
+      localStorage.setItem("refreshToken", response.data.refresh);  // Changed from "refresh" to "refreshToken"
 
       // Store user info
       if (response.data.user) {
@@ -107,6 +107,9 @@ export default function SignIn() {
         });
         localStorage.setItem("user", JSON.stringify(userResponse.data));
       }
+
+      // Log successful login for debugging
+      console.log("Login successful, token stored as 'authToken'");
 
       // Redirect to dashboard or intended page
       const from = location.state?.from?.pathname || "/dashboard";
@@ -124,8 +127,8 @@ export default function SignIn() {
           setError(errorData.detail);
         } else if (errorData.non_field_errors) {
           setError(errorData.non_field_errors[0]);
-        } else if (errorData.username) {
-          setError(errorData.username[0]);
+        } else if (errorData.email) {
+          setError(errorData.email[0]);
         } else if (errorData.password) {
           setError(errorData.password[0]);
         } else {

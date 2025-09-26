@@ -20,6 +20,16 @@ from .views import (
     SiteSettingsView,  # Admin site settings
     AccountRequestView,  # Account requests
     AccountRequestAdminView,  # Admin account request management
+    AdminUsersListView,
+    AdminUserDetailView,
+    UserCasesView,
+)
+
+# Import dashboard API views
+from .api_views import (
+    dashboard_config,
+    dashboard_stats,
+    module_data,
 )
 
 # Import optional view if allauth is installed
@@ -51,6 +61,14 @@ urlpatterns = [
     path('admin/settings/', SiteSettingsView.as_view(), name='admin_settings'),
     path('account-request/', AccountRequestView.as_view(), name='account_request'),
     path('admin/account-requests/', AccountRequestAdminView.as_view(), name='admin_account_requests'),
+    path('admin/users/', AdminUsersListView.as_view(), name='admin_users_list'),
+    path('admin/users/<int:user_id>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
+    path('admin/users/<int:user_id>/cases/', UserCasesView.as_view(), name='user-cases'),
+    
+    # Dashboard API endpoints
+    path('dashboard/config/', dashboard_config, name='dashboard-config'),
+    path('dashboard/stats/', dashboard_stats, name='dashboard-stats'),
+    path('dashboard/modules/<str:module_name>/', module_data, name='module-data'),
 ]
 
 # Add API-based Google login if available (optional)

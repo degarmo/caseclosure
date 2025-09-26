@@ -1,0 +1,426 @@
+/* Spotlight.css */
+.spotlight-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.spotlight-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e8ed;
+}
+
+.spotlight-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.btn-create-post {
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.btn-create-post:hover {
+  transform: translateY(-2px);
+}
+
+/* Editor Styles */
+.spotlight-editor {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  margin-bottom: 30px;
+  overflow: hidden;
+}
+
+.editor-header {
+  padding: 20px;
+  border-bottom: 1px solid #e1e8ed;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.editor-title-input {
+  flex: 1;
+  border: none;
+  font-size: 20px;
+  font-weight: 600;
+  outline: none;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #e1e8ed;
+}
+
+.editor-toolbar button {
+  padding: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.editor-toolbar button:hover {
+  background: #f0f2f5;
+}
+
+.editor-toolbar button.active {
+  background: #667eea;
+  color: white;
+}
+
+.spotlight-editor-content {
+  min-height: 150px;
+  padding: 20px;
+  outline: none;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.editor-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 20px;
+}
+
+.editor-image-preview {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.editor-image-preview img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+}
+
+.btn-remove-image {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: rgba(0,0,0,0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Feed & Post Styles */
+.spotlight-feed {
+  display: grid;
+  gap: 30px;
+}
+
+.spotlight-post {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.post-header {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.post-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.author-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+}
+
+.author-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.author-name {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.post-time {
+  font-size: 14px;
+  color: #718096;
+}
+
+.post-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.post-badge.scheduled {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.post-title {
+  padding: 0 20px;
+  margin-bottom: 15px;
+  font-size: 24px;
+  color: #1a202c;
+}
+
+.post-content {
+  padding: 0 20px 20px;
+  color: #2d3748;
+  line-height: 1.6;
+}
+
+.post-media {
+  position: relative;
+}
+
+.post-image {
+  width: 100%;
+  max-height: 500px;
+  object-fit: cover;
+}
+
+.media-indicators {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  display: flex;
+  gap: 5px;
+}
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  cursor: pointer;
+}
+
+.indicator.active {
+  background: white;
+}
+
+.post-stats {
+  padding: 15px 20px;
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+  color: #718096;
+  border-top: 1px solid #e1e8ed;
+}
+
+.post-actions {
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-around;
+  border-top: 1px solid #e1e8ed;
+}
+
+.btn-action {
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #718096;
+  transition: color 0.2s;
+}
+
+.btn-action:hover {
+  color: #667eea;
+}
+
+.btn-action.liked {
+  color: #ef4444;
+}
+
+.post-comments {
+  border-top: 1px solid #e1e8ed;
+  padding: 20px;
+}
+
+.comment-input {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.comment-input input {
+  flex: 1;
+  padding: 10px 15px;
+  border: 1px solid #e1e8ed;
+  border-radius: 25px;
+  outline: none;
+}
+
+.comment-input button {
+  padding: 10px 20px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.comment {
+  padding: 12px;
+  background: #f7fafc;
+  border-radius: 8px;
+}
+
+.comment-author {
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.comment-time {
+  font-size: 12px;
+  color: #718096;
+  margin-top: 5px;
+}
+
+/* Scheduler Styles */
+.spotlight-scheduler {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  z-index: 1000;
+  width: 90%;
+  max-width: 500px;
+}
+
+.scheduler-header {
+  padding: 20px;
+  border-bottom: 1px solid #e1e8ed;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.scheduler-content {
+  padding: 20px;
+}
+
+.quick-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.quick-option {
+  padding: 10px;
+  border: 1px solid #e1e8ed;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-option:hover {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.scheduler-footer {
+  padding: 20px;
+  border-top: 1px solid #e1e8ed;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-cancel {
+  padding: 10px 20px;
+  border: 1px solid #e1e8ed;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-schedule {
+  padding: 10px 20px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .spotlight-container {
+    padding: 10px;
+  }
+
+  .spotlight-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+
+  .spotlight-controls {
+    flex-direction: column;
+  }
+
+  .spotlight-controls select,
+  .btn-create-post {
+    width: 100%;
+  }
+
+  .editor-images {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .quick-options {
+    grid-template-columns: 1fr;
+  }
+}

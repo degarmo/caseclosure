@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'rest_framework_simplejwt.token_blacklist',
     'rest_framework.authtoken',
+    'spotlight', 
 ]
 
 # Registration Settings

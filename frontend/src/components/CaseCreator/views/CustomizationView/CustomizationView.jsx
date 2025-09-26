@@ -12,7 +12,7 @@ let RichTextEditorModal = null;
 try {
   RichTextEditorModal = require('@/common/RichTextEditorModal').default;
 } catch (e) {
-  console.log('TipTap editor not available, using built-in editor');
+  
 }
 
 // Built-in Rich Text Editor Component
@@ -303,10 +303,9 @@ const SimpleImageSelector = ({ isOpen, onClose, onSave, currentValue, label, sec
     try {
       // Upload to Cloudinary and get URL
       const imageUrl = await uploadImage(file);
-      console.log('Image uploaded to Cloudinary:', imageUrl);
       setSelectedImage(imageUrl);
     } catch (error) {
-      console.error('Error uploading image:', error);
+      
       setUploadError(error.message || 'Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
@@ -324,8 +323,6 @@ const SimpleImageSelector = ({ isOpen, onClose, onSave, currentValue, label, sec
       setUploadError('Please select an image');
       return;
     }
-    
-    console.log('Saving image URL:', selectedImage);
     onSave(selectedImage, sectionId);
     onClose();
   };
@@ -655,11 +652,10 @@ const CustomizationView = ({
 
   // Add handler for page navigation with auto-save
   const handlePageNavigate = useCallback(async (page) => {
-    console.log(`Navigating from ${currentPage} to ${page}`);
+    
     
     // Save before changing pages if there are unsaved changes
     if (unsavedChanges && currentPage !== page) {
-      console.log('Auto-saving before page change...');
       await handleSave();
     }
     

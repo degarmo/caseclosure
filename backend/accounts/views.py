@@ -873,3 +873,313 @@ class PasswordResetRequestView(APIView):
             return Response({
                 'message': 'Password reset email sent if account exists'
             }, status=status.HTTP_200_OK)
+
+class AdminUsersListView(APIView):
+    """Get all users for admin dashboard"""
+    permission_classes = [IsAdminUser]
+    
+    def get(self, request):
+        users = User.objects.all().order_by('-date_joined')
+        
+        user_data = []
+        for user in users:
+            user_data.append({
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_active': user.is_active,
+                'is_staff': user.is_staff,
+                'date_joined': user.date_joined,
+                'last_login': user.last_login,
+                'case_count': user.case_set.count() if hasattr(user, 'case_set') else 0,
+            })
+        
+        return Response(user_data)
+
+
+
+class AdminUserDetailView(APIView):
+    """Admin endpoint for individual user CRUD operations"""
+    permission_classes = [IsAdminUser]
+    
+    def get(self, request, user_id):
+        """Get individual user details"""
+        try:
+            user = User.objects.get(id=user_id)
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            
+            # Build comprehensive user data
+            user_data = {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_active': user.is_active,
+                'is_staff': user.is_staff,
+                'is_superuser': user.is_superuser,
+                'date_joined': user.date_joined,
+                'last_login': user.last_login,
+                'account_type': user.account_type,
+                
+                # From CustomUser model
+                'phone': user.phone,
+                'phone_verified': user.phone_verified,
+                'city': user.city,
+                'state': user.state,
+                'country': user.country,
+                'zip_code': user.zip_code,
+                'created_at': user.created_at,
+                'updated_at': user.updated_at,
+                
+                # From UserProfile
+                'profile': {
+                    'phone': profile.phone,
+                    'organization': profile.organization,
+                    'role': profile.role,
+                    'bio': profile.bio,
+                    'location': profile.location,
+                    'preferred_contact': profile.preferred_contact,
+                    'notifications_tips': profile.notifications_tips,
+                    'notifications_updates': profile.notifications_updates,
+                    'timezone': profile.timezone,
+                    'language': profile.language,
+                    'verified': profile.verified,
+                    'identity_verified': profile.identity_verified,
+                    'can_create_cases': profile.can_create_cases,
+                    'max_cases': profile.max_cases,
+                    'current_cases': profile.current_cases,
+                    'is_flagged': profile.is_flagged,
+                    'flag_reason': profile.flag_reason,
+                },
+                
+                # Case count
+                'case_count': user.case_set.count() if hasattr(user, 'case_set') else 0,
+            }
+            
+            return Response(user_data)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error fetching user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to fetch user details'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def put(self, request, user_id):
+        """Update user details (full update)"""
+        try:
+            user = User.objects.get(id=user_id)
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            
+            # Update User model fields
+            user_fields = ['email', 'username', 'first_name', 'last_name', 
+                          'is_active', 'is_staff', 'is_superuser', 'account_type',
+                          'phone', 'city', 'state', 'country', 'zip_code']
+            
+            for field in user_fields:
+                if field in request.data:
+                    setattr(user, field, request.data[field])
+            
+            # Update profile fields if profile data is provided
+            if 'profile' in request.data:
+                profile_data = request.data['profile']
+                profile_fields = ['organization', 'role', 'bio', 'location',
+                                 'preferred_contact', 'notifications_tips', 
+                                 'notifications_updates', 'timezone', 'language',
+                                 'verified', 'can_create_cases', 'max_cases']
+                
+                for field in profile_fields:
+                    if field in profile_data:
+                        setattr(profile, field, profile_data[field])
+                
+                profile.save()
+            
+            user.save()
+            
+            logger.info(f"Admin {request.user.email} updated user {user.email}")
+            
+            # Return updated data
+            return self.get(request, user_id)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error updating user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to update user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def patch(self, request, user_id):
+        """Partial update user details"""
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Handle common quick actions
+            if 'is_active' in request.data:
+                user.is_active = request.data['is_active']
+                action = "activated" if user.is_active else "deactivated"
+                logger.info(f"Admin {request.user.email} {action} user {user.email}")
+            
+            if 'is_staff' in request.data:
+                user.is_staff = request.data['is_staff']
+            
+            if 'is_superuser' in request.data:
+                user.is_superuser = request.data['is_superuser']
+            
+            # Update any other provided fields
+            for field, value in request.data.items():
+                if hasattr(user, field) and field not in ['id', 'password']:
+                    setattr(user, field, value)
+            
+            user.save()
+            
+            # Return updated data
+            return self.get(request, user_id)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error patching user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to update user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def delete(self, request, user_id):
+        """Delete user account"""
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Prevent deleting self
+            if user.id == request.user.id:
+                return Response(
+                    {'error': 'Cannot delete your own account'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Store email for logging
+            user_email = user.email
+            
+            # Delete user (this will cascade delete profile)
+            user.delete()
+            
+            logger.info(f"Admin {request.user.email} deleted user {user_email}")
+            
+            return Response(
+                {'message': 'User deleted successfully'},
+                status=status.HTTP_204_NO_CONTENT
+            )
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error deleting user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to delete user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    # Add this method to AdminUserDetailView class:
+
+    def post(self, request, user_id):
+        """Handle special actions like password reset"""
+        try:
+            user = User.objects.get(id=user_id)
+            action = request.data.get('action')
+            
+            if action == 'reset_password':
+                # Generate temporary password
+                import random
+                import string
+                temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+                user.set_password(temp_password)
+                user.save()
+                
+                logger.info(f"Admin {request.user.email} reset password for user {user.email}")
+                
+                return Response({
+                    'message': 'Password reset successfully',
+                    'temp_password': temp_password  # Return this to show admin
+                })
+            
+            return Response(
+                {'error': 'Invalid action'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error handling action for user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Action failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )        
+
+class UserCasesView(APIView):
+    """Get all cases for a specific user"""
+    permission_classes = [IsAdminUser]
+    
+    def get(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Import your Case model - adjust this import based on your project structure
+            from cases.models import Case  # or wherever your Case model is
+            
+            # Get all cases for this user
+            cases = Case.objects.filter(user=user)
+            
+            # Serialize the case data
+            case_data = []
+            for case in cases:
+                case_data.append({
+                    'id': case.id,
+                    'name': getattr(case, 'name', f'Case #{case.id}'),
+                    'victim_name': getattr(case, 'victim_name', 'Unknown'),
+                    'incident_date': getattr(case, 'incident_date', None),
+                    'reward_amount': getattr(case, 'reward_amount', 0),
+                    'status': getattr(case, 'status', 'active'),
+                    'is_disabled': getattr(case, 'is_disabled', False),
+                    'created_at': case.created_at if hasattr(case, 'created_at') else None,
+                })
+            
+            return Response(case_data)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ImportError:
+            logger.error("Cases app not found - cannot fetch user cases")
+            return Response(
+                {'error': 'Cases module not available'},
+                status=status.HTTP_501_NOT_IMPLEMENTED
+            )
+        except Exception as e:
+            logger.error(f"Error fetching cases for user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to fetch user cases'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

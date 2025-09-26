@@ -108,13 +108,11 @@ api.interceptors.request.use(
     
     // Log the request in development
     if (import.meta.env.DEV) {
-      console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
     }
     
     return config;
   },
   (error) => {
-    console.error("Request error:", error);
     return Promise.reject(error);
   }
 );
@@ -126,7 +124,6 @@ api.interceptors.response.use(
   (response) => {
     // Log successful responses in development
     if (import.meta.env.DEV) {
-      console.log(`API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
     }
     return response;
   },
@@ -135,12 +132,10 @@ api.interceptors.response.use(
     
     // Log errors in development
     if (import.meta.env.DEV) {
-      console.error(`API Error: ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url} - ${error.response?.status}`);
     }
     
     // IMPORTANT: Don't redirect preview routes to login
     if (isPreviewRoute()) {
-      console.log('🛡️ Preview route - skipping auth redirect');
       return Promise.reject(error);
     }
     

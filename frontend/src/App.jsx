@@ -1,5 +1,5 @@
 /**
- * App.jsx - Updated with Editor/Customization routes
+ * App.jsx - Updated with Spotlight and SpotlightAdmin integration
  * Location: frontend/src/App.jsx
  */
 
@@ -14,7 +14,7 @@ import Layout from "./pages/Layout";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Pricing from "./pages/Pricing";
-import Spotlight from "./pages/Spotlight";
+import Spotlight from "./pages/Spotlight";  // Keep existing public Spotlight page
 import Contact from "./pages/Contact";
 import Discover from "./pages/Discover";
 import RequestAccount from "./pages/RequestAccount";
@@ -23,9 +23,9 @@ import RequestAccount from "./pages/RequestAccount";
 import Signup from "./pages/Signup";
 import SignIn from "./pages/SignIn";
 
-// Dashboard & Protected Pages
-import Dashboard from "./pages/Dashboard";
-import CasesList from "./components/CaseList";
+// NEW: Import unified Dashboard from the new location
+import Dashboard from "./dashboard";
+
 
 // Case Creator Components
 import CaseCreator from "./components/CaseCreator";
@@ -58,6 +58,23 @@ function RequireAuth({ children }) {
   return children;
 }
 
+// Admin auth wrapper (checks for staff/admin status)
+function RequireAdmin({ children }) {
+  const { user, isAuthenticated } = useAuth();
+  const location = useLocation();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/signin" state={{ from: location }} replace />;
+  }
+  
+  // Check if user is staff or admin
+  if (!user?.is_staff && !user?.is_admin && !user?.is_superuser) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
+}
+
 function AppContent() {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
@@ -75,7 +92,6 @@ function AppContent() {
     if (location.pathname.startsWith('/preview/')) {
       return false;
     }
-
     
     if (hostname.includes('.caseclosure.org') || hostname.includes('.caseclosure.com')) {
       const sub = hostname.split('.')[0];
@@ -83,8 +99,8 @@ function AppContent() {
     }
     
     if (hostname.includes('.localhost')) {
-    const sub = hostname.split('.')[0];
-    return sub && sub !== 'www' && sub !== 'app';
+      const sub = hostname.split('.')[0];
+      return sub && sub !== 'www' && sub !== 'app';
     }
     
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
@@ -94,12 +110,10 @@ function AppContent() {
     return !hostname.includes('caseclosure');
   }, [hostname, location.pathname]);
 
-    console.log('Debug Info:', {
-      hostname,
-      pathname: location.pathname,
-      isMemorialSite,
-      subdomain: getSubdomain()
-    });
+  // Debug logging (moved outside JSX)
+  useEffect(() => {
+
+  }, [user]);
 
   // Logout handler
   const handleLogout = () => {
@@ -159,9 +173,6 @@ function AppContent() {
     }
   };
 
-  // Determine admin status
-  const isAdmin = user?.is_staff || user?.is_superuser;
-
   // If this is a memorial site, render the template
   if (isMemorialSite) {
     return <TemplateRenderer />;
@@ -175,7 +186,7 @@ function AppContent() {
         <Route path="/preview/:caseId/:page" element={<TemplatePreviewWrapper />} />
         <Route path="/preview/:caseId" element={<TemplatePreviewWrapper />} />
 
-        {/* Editor/Customization Routes - ADDED THESE */}
+        {/* Editor/Customization Routes */}
         <Route 
           path="/editor/:caseId" 
           element={
@@ -212,24 +223,48 @@ function AppContent() {
         <Route path="/discover" element={<Layout><Discover /></Layout>} />
         <Route path="/request-account" element={<Layout><RequestAccount /></Layout>} />
 
+        
         {/* Auth Routes */}
         <Route path="/signup" element={<Signup />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/login" element={<SignIn />} />
 
-        {/* Protected Dashboard Routes */}
+        {/* Protected Dashboard Routes - Now Unified */}
         <Route
-          path="/dashboard"
+          path="/dashboard/*"
           element={
             <RequireAuth>
               <Dashboard 
                 user={user} 
                 onLogout={handleLogout}
                 onOpenCaseModal={handleOpenCaseModal}
-                onOpenProfileSettings={handleOpenProfileSettings}
               />
             </RequireAuth>
           }
+        />
+        
+        {/* Spotlight Dashboard Routes (handled by Dashboard component) */}
+        {/* These will be child routes inside the Dashboard component:
+            - /dashboard/spotlight - User feed
+            - /dashboard/spotlight/admin - Admin moderation
+        */}
+        
+        {/* Settings - redirects to dashboard */}
+        <Route
+          path="/settings/user"
+          element={<Navigate to="/dashboard" replace />}
+        />
+        
+        {/* Admin - redirects to dashboard (role-based access is handled inside Dashboard) */}
+        <Route
+          path="/admin"
+          element={<Navigate to="/dashboard" replace />}
+        />
+        
+        {/* Cases list - redirects to dashboard */}
+        <Route
+          path="/cases/list"
+          element={<Navigate to="/dashboard" replace />}
         />
         
         {/* Memorial Preview */}
@@ -237,59 +272,6 @@ function AppContent() {
           path="/memorial/:caseId/*"
           element={<TemplateRenderer />}
         />
-        
-        {/* Settings */}
-        <Route
-          path="/settings/user"
-          element={
-            <RequireAuth>
-              <Dashboard 
-                user={user} 
-                onLogout={handleLogout}
-                onOpenCaseModal={handleOpenCaseModal}
-                onOpenProfileSettings={handleOpenProfileSettings}
-                activeSection="settings"
-                showProfileSettings={true}
-              />
-            </RequireAuth>
-          }
-        />
-        
-        {/* Admin Routes */}
-        {isAdmin && (
-          <>
-            <Route
-              path="/cases/list"
-              element={
-                <RequireAuth>
-                  <Dashboard 
-                    user={user} 
-                    onLogout={handleLogout}
-                    onOpenCaseModal={handleOpenCaseModal}
-                    onOpenProfileSettings={handleOpenProfileSettings}
-                    activeSection="cases"
-                  >
-                    <CasesList />
-                  </Dashboard>
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <RequireAuth>
-                  <Dashboard 
-                    user={user} 
-                    onLogout={handleLogout}
-                    onOpenCaseModal={handleOpenCaseModal}
-                    onOpenProfileSettings={handleOpenProfileSettings}
-                    activeSection="admin"
-                  />
-                </RequireAuth>
-              }
-            />
-          </>
-        )}
         
         {/* Default Redirects */}
         <Route 

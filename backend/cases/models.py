@@ -3,6 +3,8 @@
 import uuid
 import os
 import json
+import secrets
+from datetime import timedelta
 from django.db import models
 from django.conf import settings
 from django.core.validators import RegexValidator, MinLengthValidator
@@ -21,12 +23,15 @@ def case_photo_upload_path(instance, filename):
     filename = f"{uuid.uuid4()}.{ext}"
     return os.path.join('cases', str(instance.id), 'photos', filename)
 
-
 def spotlight_photo_upload_path(instance, filename):
     """Generate unique path for spotlight post photos"""
     ext = filename.split('.')[-1]
     filename = f"{uuid.uuid4()}.{ext}"
     return os.path.join('cases', str(instance.case.id), 'spotlight', filename)
+
+def generate_leo_invite_code():
+    """Generate a unique 12-character invite code for LEO invitations"""
+    return secrets.token_hex(6).upper()
 
 
 class TemplateRegistry(models.Model):
@@ -43,76 +48,11 @@ class TemplateRegistry(models.Model):
     description = models.TextField()
     version = models.CharField(max_length=20, default='1.0.0')
     
-    # THIS IS THE KEY - Each template has its own unique schema!
     schema = models.JSONField(
         default=dict,
-        help_text="""
-        UNIQUE schema for this template. Examples:
-        
-        BEACON Template might have:
-        {
-            "global": {
-                "primaryColor": {"type": "color", "label": "Primary Color", "default": "#3B82F6"},
-                "fontFamily": {"type": "select", "label": "Font", "options": ["Inter", "Roboto"], "default": "Inter"}
-            },
-            "sections": {
-                "hero": {
-                    "title": {"type": "text", "label": "Hero Title", "default": "Help Us Find"},
-                    "subtitle": {"type": "text", "label": "Subtitle"},
-                    "backgroundImage": {"type": "image", "label": "Background Image"}
-                },
-                "timeline": {
-                    "showTimeline": {"type": "boolean", "label": "Show Timeline", "default": true},
-                    "events": {"type": "array", "label": "Timeline Events"}
-                },
-                "photoGallery": {
-                    "title": {"type": "text", "label": "Gallery Title", "default": "Photos"},
-                    "layout": {"type": "select", "options": ["grid", "carousel"], "default": "grid"}
-                }
-            }
-        }
-        
-        JUSTICE Template might have:
-        {
-            "global": {
-                "primaryColor": {"type": "color", "label": "Primary Color", "default": "#DC2626"},
-                "badgeNumber": {"type": "text", "label": "Badge Number"}
-            },
-            "sections": {
-                "caseFacts": {
-                    "title": {"type": "text", "label": "Case Facts Title"},
-                    "showCaseNumber": {"type": "boolean", "default": true}
-                },
-                "evidence": {
-                    "showEvidence": {"type": "boolean", "label": "Show Evidence Section"},
-                    "documents": {"type": "array", "label": "Evidence Documents"}
-                },
-                "lawEnforcement": {
-                    "departmentLogo": {"type": "image", "label": "Department Logo"},
-                    "contactMessage": {"type": "richtext", "label": "Contact Message"}
-                }
-            }
-        }
-        
-        LEGACY Template might have completely different sections:
-        {
-            "sections": {
-                "lifeStory": {
-                    "narrative": {"type": "richtext", "label": "Life Story"},
-                    "birthPlace": {"type": "text", "label": "Birth Place"}
-                },
-                "memorialWall": {
-                    "allowGuestPosts": {"type": "boolean", "default": true}
-                },
-                "photoAlbums": {
-                    "albums": {"type": "array", "label": "Photo Albums"}
-                }
-            }
-        }
-        """
+        help_text="UNIQUE schema for this template defining customizable sections"
     )
     
-    # Component paths for React
     components = models.JSONField(
         default=dict,
         help_text="Maps section names to React component paths"
@@ -121,7 +61,6 @@ class TemplateRegistry(models.Model):
     preview_image = models.URLField(blank=True, null=True)
     thumbnail_image = models.URLField(blank=True, null=True)
     
-    # Features this template supports
     features = models.JSONField(
         default=list,
         help_text="List of features: ['spotlight', 'guestbook', 'timeline', 'donation']"
@@ -143,9 +82,8 @@ class TemplateRegistry(models.Model):
 
 
 class Case(models.Model):
-    """
-    Main case model - each case is a website instance
-    """
+    """Main case model - each case is a website instance"""
+    
     # User relationship
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -166,28 +104,13 @@ class Case(models.Model):
         help_text='Template version for compatibility'
     )
     
-    # THE MAGIC FIELD - Stores ALL customizations specific to the chosen template
     template_data = models.JSONField(
         default=dict,
         blank=True,
-        help_text="""
-        Stores all template-specific customizations. Structure depends on the template!
-        Example:
-        {
-            "customizations": {
-                // These fields match the template's schema
-                "global": {...},
-                "sections": {...}
-            },
-            "metadata": {
-                "last_edited": "2024-01-01T00:00:00Z",
-                "editor_version": "1.0.0"
-            }
-        }
-        """
+        help_text="Stores all template-specific customizations"
     )
     
-    # Basic case information (common across all templates)
+    # Basic case information
     case_title = models.CharField(
         max_length=200, 
         help_text="Title for the case/website"
@@ -243,7 +166,6 @@ class Case(models.Model):
         default='missing'
     )
     
-    # Add crime_type as an alias for case_type for compatibility
     crime_type = models.CharField(
         max_length=50,
         blank=True,
@@ -305,7 +227,7 @@ class Case(models.Model):
         help_text="Custom domain like memorial.example.com"
     )
     
-    # Deployment Status (for Render.com)
+    # Deployment Status
     deployment_status = models.CharField(
         max_length=20,
         choices=[
@@ -336,7 +258,7 @@ class Case(models.Model):
     ssl_status = models.CharField(
         max_length=20,
         choices=[
-            ('not_needed', 'Not Needed'),  # For subdomains
+            ('not_needed', 'Not Needed'),
             ('pending', 'Pending'),
             ('active', 'Active'),
             ('failed', 'Failed')
@@ -355,7 +277,17 @@ class Case(models.Model):
         help_text="Temporarily disable the website"
     )
     
-    # Virtual slug property for compatibility with tracking middleware
+    # Archive status (soft delete)
+    archived = models.BooleanField(
+        default=False,
+        help_text="Archive case instead of deleting"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
     @property
     def slug(self):
         """Virtual slug property for compatibility with tracking middleware"""
@@ -364,10 +296,6 @@ class Case(models.Model):
         elif self.first_name and self.last_name:
             return slugify(f"{self.first_name}-{self.last_name}-{self.id}" if self.id else f"{self.first_name}-{self.last_name}")
         return f"case-{self.id}" if self.id else "case-new"
-    
-    # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
     
     def get_full_url(self):
         """Get the full URL for the deployed website"""
@@ -408,6 +336,12 @@ class Case(models.Model):
             
             self.subdomain = subdomain
         
+        # Set archived timestamp
+        if self.archived and not self.archived_at:
+            self.archived_at = timezone.now()
+        elif not self.archived:
+            self.archived_at = None
+        
         super().save(*args, **kwargs)
     
     def __str__(self):
@@ -424,10 +358,7 @@ class Case(models.Model):
 
 
 class SpotlightPost(models.Model):
-    """
-    Blog posts for the Spotlight section
-    Available on all templates that have spotlight feature enabled
-    """
+    """Blog posts for the Spotlight section"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     case = models.ForeignKey(
         Case, 
@@ -435,7 +366,6 @@ class SpotlightPost(models.Model):
         related_name='spotlight_posts'
     )
     
-    # Content
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     content = models.TextField()
@@ -445,7 +375,6 @@ class SpotlightPost(models.Model):
         help_text="Short summary for preview"
     )
     
-    # Media
     featured_image = models.ImageField(
         upload_to=spotlight_photo_upload_path, 
         blank=True, 
@@ -458,7 +387,6 @@ class SpotlightPost(models.Model):
         help_text="List of image URLs for gallery"
     )
     
-    # Publishing
     status = models.CharField(
         max_length=20,
         choices=[
@@ -473,17 +401,14 @@ class SpotlightPost(models.Model):
     published_at = models.DateTimeField(null=True, blank=True)
     scheduled_for = models.DateTimeField(null=True, blank=True)
     
-    # SEO
     meta_description = models.CharField(max_length=160, blank=True)
     
-    # Engagement
     view_count = models.IntegerField(default=0)
     is_pinned = models.BooleanField(
         default=False,
         help_text="Pin to top of spotlight feed"
     )
     
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -491,7 +416,6 @@ class SpotlightPost(models.Model):
         if not self.slug:
             self.slug = slugify(self.title)
             
-            # Ensure unique slug within case
             base_slug = self.slug
             counter = 1
             while SpotlightPost.objects.filter(
@@ -501,7 +425,6 @@ class SpotlightPost(models.Model):
                 self.slug = f"{base_slug}-{counter}"
                 counter += 1
         
-        # Auto-set published_at when publishing
         if self.status == 'published' and not self.published_at:
             self.published_at = timezone.now()
         
@@ -520,9 +443,7 @@ class SpotlightPost(models.Model):
 
 
 class CasePhoto(models.Model):
-    """
-    Additional photos for a case (gallery)
-    """
+    """Additional photos for a case (gallery)"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     case = models.ForeignKey(
         Case, 
@@ -543,10 +464,149 @@ class CasePhoto(models.Model):
         ordering = ['order', 'uploaded_at']
 
 
+class CaseAccess(models.Model):
+    """Control who can access a case and what they can see"""
+    
+    ACCESS_LEVELS = [
+        ('viewer', 'View Only'),
+        ('tips_only', 'Tips Only'),
+        ('leo', 'Law Enforcement Officer'),
+        ('private_investigator', 'Private Investigator'),
+        ('advocate', 'Victim Advocate'),
+        ('collaborator', 'Family Collaborator'),
+    ]
+    
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='access_permissions')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='case_access'
+    )
+    
+    access_level = models.CharField(max_length=30, choices=ACCESS_LEVELS, default='viewer')
+    
+    # Granular permissions
+    can_view_tips = models.BooleanField(default=True)
+    can_view_tracking = models.BooleanField(default=False)
+    can_view_personal_info = models.BooleanField(default=False)
+    can_view_evidence = models.BooleanField(default=True)
+    can_export_data = models.BooleanField(default=False)
+    can_contact_family = models.BooleanField(default=True)
+    
+    # Invitation details
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='sent_invitations'
+    )
+    invited_at = models.DateTimeField(auto_now_add=True)
+    invitation_message = models.TextField(blank=True)
+    
+    # Acceptance
+    accepted = models.BooleanField(default=False)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    
+    # Expiration
+    expires_at = models.DateTimeField(null=True, blank=True)
+    
+    # Audit
+    last_accessed = models.DateTimeField(null=True, blank=True)
+    access_count = models.IntegerField(default=0)
+    actions_log = models.JSONField(default=list)
+    
+    def log_action(self, action, request=None):
+        """Log actions for audit trail"""
+        log_entry = {
+            'action': action,
+            'timestamp': timezone.now().isoformat(),
+        }
+        if request:
+            log_entry['ip'] = request.META.get('REMOTE_ADDR', '')
+        
+        self.actions_log.append(log_entry)
+        self.access_count += 1
+        self.last_accessed = timezone.now()
+        self.save()
+    
+    def is_active(self):
+        """Check if access is still valid"""
+        if not self.accepted:
+            return False
+        if self.expires_at and self.expires_at < timezone.now():
+            return False
+        return True
+    
+    class Meta:
+        unique_together = ['case', 'user']
+        db_table = 'case_access'
+        indexes = [
+            models.Index(fields=['case', 'user']),
+            models.Index(fields=['access_level', 'accepted']),
+        ]
+
+
+class LEOInvite(models.Model):
+    """Invitation system for Law Enforcement Officers"""
+    
+    invite_code = models.CharField(
+        max_length=12, 
+        unique=True,
+        default=generate_leo_invite_code  # Fixed: using function instead of lambda
+    )
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='leo_invites')
+    
+    # Officer details
+    officer_name = models.CharField(max_length=255)
+    officer_email = models.EmailField()
+    department = models.CharField(max_length=255)
+    badge_number = models.CharField(max_length=50, blank=True)
+    
+    # Access configuration
+    access_config = models.JSONField(
+        default=dict,
+        help_text="Permissions configuration for this LEO"
+    )
+    
+    # Invite metadata
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='created_leo_invites'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    
+    # Usage tracking
+    used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+    used_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='used_leo_invite'
+    )
+    
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(days=30)
+        super().save(*args, **kwargs)
+    
+    def is_valid(self):
+        return not self.used and self.expires_at > timezone.now()
+    
+    class Meta:
+        db_table = 'leo_invites'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['invite_code']),
+            models.Index(fields=['case', '-created_at']),
+        ]
+
+
 class DeploymentLog(models.Model):
-    """
-    Track deployment history and debugging
-    """
+    """Track deployment history and debugging"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     case = models.ForeignKey(
         Case, 
@@ -577,14 +637,11 @@ class DeploymentLog(models.Model):
         ]
     )
     
-    # Render.com specific
     render_deploy_id = models.CharField(max_length=100, blank=True)
     
-    # Details and errors
     details = models.JSONField(default=dict, blank=True)
     error_message = models.TextField(blank=True)
     
-    # Timing
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     duration_seconds = models.IntegerField(null=True, blank=True)

@@ -2,13 +2,14 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from . import api_views  # ADD THIS IMPORT
 from .views import (
     CaseViewSet,
     SpotlightPostViewSet,
     TemplateRegistryViewSet,
     CasePhotoViewSet,
     DeploymentLogViewSet,
-    ImageUploadView  # Add this import
+    ImageUploadView
 )
 
 # Create router and register all viewsets
@@ -25,6 +26,12 @@ router.register(r'deployment-logs', DeploymentLogViewSet, basename='deployment-l
 urlpatterns = [
     path('images/upload/', ImageUploadView.as_view(), name='image-upload'),
     path('', include(router.urls)),
+    
+    # LEO invitation endpoints - Fixed paths (remove duplicate 'api/' prefix)
+    path('cases/<uuid:case_id>/invite-leo/', api_views.invite_leo, name='invite_leo'),
+    path('accept-invite/', api_views.accept_leo_invite, name='accept_leo_invite'),
+    path('cases/<uuid:case_id>/active-leos/', api_views.get_active_leos, name='active_leos'),
+    path('cases/<uuid:case_id>/revoke-access/<uuid:access_id>/', api_views.revoke_access, name='revoke_access'),
 ]
 
 # ================================================================
