@@ -24,3 +24,4 @@ twilio==9.4.5
 user-agents==2.2.0
 ua-parser==1.0.1
 geoip2==5.1.0
+django-storages==1.14.2
