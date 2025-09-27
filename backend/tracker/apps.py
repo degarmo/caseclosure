@@ -10,23 +10,22 @@ class TrackerConfig(AppConfig):
     
     def ready(self):
         """Initialize the detection system when Django starts"""
-        from .detection_simple import create_simple_detection_system
-        
-        # Create the simple detection system
-        self.detection_system = create_simple_detection_system()
-        
-        # Store it so views can access it
-        TrackerConfig.detection_system = self.detection_system
+        # Temporarily disabled for AWS deployment
+        pass
+        # from .detection_simple import create_simple_detection_system
+        # self.detection_system = create_simple_detection_system()
+        # TrackerConfig.detection_system = self.detection_system
 
 
 # Helper function to get the detection system
 def get_detection_system():
     """Get the initialized detection system"""
-    from django.apps import apps
-    app_config = apps.get_app_config('tracker')
-    if hasattr(app_config, 'detection_system'):
-        return app_config.detection_system
-    else:
-        # Fallback: create a new instance if not initialized
-        from .detection_simple import create_simple_detection_system
-        return create_simple_detection_system()
+    # Temporarily return None while ML is disabled
+    return None
+    # from django.apps import apps
+    # app_config = apps.get_app_config('tracker')
+    # if hasattr(app_config, 'detection_system'):
+    #     return app_config.detection_system
+    # else:
+    #     from .detection_simple import create_simple_detection_system
+    #     return create_simple_detection_system()
