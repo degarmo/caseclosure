@@ -23,11 +23,6 @@ services:
         value: False
       - key: PYTHON_VERSION
         value: 3.9.18
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: caseclosure-redis
-          property: connectionString
       - key: SITE_URL
         value: https://caseclosure.org
       - key: ALLOWED_HOSTS
