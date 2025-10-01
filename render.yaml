@@ -32,25 +32,3 @@ services:
         value: https://caseclosure.org
       - key: ALLOWED_HOSTS
         value: .caseclosure.org,caseclosure.org,www.caseclosure.org,caseclosure.onrender.com
-
-  - type: redis
-    name: caseclosure-redis
-    plan: free
-    ipAllowList: []
-
-  - type: worker
-    name: caseclosure-celery
-    runtime: python
-    plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "celery -A core worker -l info"
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: caseclosure-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: caseclosure-redis
-          property: connectionString
