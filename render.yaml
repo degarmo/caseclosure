@@ -9,7 +9,7 @@ services:
   - type: web
     name: caseclosure
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: "./build.sh"
     startCommand: "gunicorn core.wsgi:application"
     envVars:
@@ -35,13 +35,13 @@ services:
 
   - type: redis
     name: caseclosure-redis
-    plan: starter
+    plan: free
     ipAllowList: []
 
   - type: worker
     name: caseclosure-celery
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "celery -A core worker -l info"
     envVars:
