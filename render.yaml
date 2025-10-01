@@ -1,7 +1,7 @@
 # render.yaml
 databases:
   - name: caseclosure-db
-    plan: starter
+    plan: free
     databaseName: caseclosure_db
     user: caseclosure_user
 
