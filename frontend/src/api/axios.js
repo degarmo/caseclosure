@@ -12,23 +12,27 @@ const isPreviewRoute = () => {
  * Determine the correct API URL based on environment and hostname
  */
 const getAPIBaseURL = () => {
-  // In development, use the proxy (just /api without the domain)
+  // Development - uses Vite proxy
   if (import.meta.env.DEV) {
     return "/api/";  // This will use Vite's proxy from vite.config.js
   }
   
-  // Check environment variable for production
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  
-  // Production fallback
+  // Production - check hostname
   const hostname = window.location.hostname;
-  if (hostname === 'caseclosure.org') {
-    return "https://caseclosure.org/api/";  // Use HTTPS in production
+  
+  // Production domains
+  if (hostname === 'caseclosure-frontend.onrender.com' || 
+      hostname === 'caseclosure.org' ||
+      hostname === 'www.caseclosure.org') {
+    return "https://caseclosure-backend.onrender.com/api/";
   }
   
-  // Default fallback
+  // Any non-localhost domain should use production backend
+  if (!hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
+    return "https://caseclosure-backend.onrender.com/api/";
+  }
+  
+  // Default fallback for local development
   return "/api/";
 };
 
@@ -108,6 +112,7 @@ api.interceptors.request.use(
     
     // Log the request in development
     if (import.meta.env.DEV) {
+      console.log('📤 API Request:', config.method?.toUpperCase(), config.url);
     }
     
     return config;
@@ -124,6 +129,7 @@ api.interceptors.response.use(
   (response) => {
     // Log successful responses in development
     if (import.meta.env.DEV) {
+      console.log('✅ API Response:', response.config.url, response.status);
     }
     return response;
   },
@@ -132,6 +138,7 @@ api.interceptors.response.use(
     
     // Log errors in development
     if (import.meta.env.DEV) {
+      console.error('❌ API Error:', error.response?.status, error.config?.url);
     }
     
     // IMPORTANT: Don't redirect preview routes to login
