@@ -1,5 +1,6 @@
 // src/pages/Spotlight.jsx - Enhanced version with Tailwind
 import React, { useState, useEffect } from "react";
+import { apiMethods } from "../utils/axios";  // Import your configured axios
 
 export default function Spotlight() {
   const [posts, setPosts] = useState([]);
@@ -14,16 +15,12 @@ export default function Spotlight() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/spotlight/?status=published');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log('Posts loaded:', data);
-      setPosts(data);
+      const response = await apiMethods.spotlight.list({ status: 'published' });
+      console.log('Posts loaded:', response.data);
+      setPosts(response.data);
     } catch (error) {
       console.error('Error loading posts:', error);
-      setError(error.message);
+      setError(error.response?.data?.detail || error.message);
       setPosts([]);
     } finally {
       setIsLoading(false);
@@ -111,7 +108,7 @@ export default function Spotlight() {
       <div className="max-w-2xl mx-auto px-4 py-8">
         {posts.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <div className="text-6xl mb-4">📭</div>
+            <div className="text-6xl mb-4">🔭</div>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No posts yet</h3>
             <p className="text-gray-500">Check back soon for community updates</p>
           </div>
