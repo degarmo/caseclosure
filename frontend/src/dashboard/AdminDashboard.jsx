@@ -10,13 +10,14 @@ import AccountRequests from './components/AccountRequests';
 import SiteSettings from './components/SiteSettings';
 import SpotlightEditor from '@/components/spotlight/SpotlightEditor';
 import SpotlightPostsList from '@/components/spotlight/SpotlightPostsList';
+import ContactMessages from './components/ContactMessages';
 import api from '@/utils/axios';
 import { 
   Plus, Shield, Users, FileText, UserPlus, Settings, 
   Activity, RefreshCw, Filter, BarChart3, Database,
   AlertTriangle, CheckCircle, Clock, TrendingUp,
   Folder, UserCheck, AlertCircle, Eye, Archive, 
-  ExternalLink, List, Send, Megaphone
+  ExternalLink, List, Send, Megaphone, MessageSquare
 } from 'lucide-react';
 
 export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
@@ -29,7 +30,8 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
     totalTips: 0,
     suspiciousActivity: 0,
     totalSpotlightPosts: 0,
-    scheduledPosts: 0
+    scheduledPosts: 0,
+    totalMessages: 0
   });
   const [cases, setCases] = useState([]);
   const [users, setUsers] = useState([]);
@@ -131,7 +133,6 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
 
   const fetchSpotlightData = async () => {
     try {
-      // Fixed: removed extra /api/
       const response = await api.get('/spotlight/');
       const allPosts = response.data || [];
       
@@ -172,7 +173,6 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
 
   const handleCreateSpotlightPost = async (formData) => {
     try {
-      // Fixed: removed extra /api/
       const response = await api.post('/spotlight/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -254,6 +254,30 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
           icon: Clock,
           badge: stats.scheduledPosts,
           onClick: () => setActiveSection('spotlight-delayed')
+        }
+      ]
+    },
+    {
+      id: 'messages',
+      label: 'Messages',
+      icon: MessageSquare,
+      expandable: true,
+      badge: stats.totalMessages || 0,
+      subItems: [
+        {
+          id: 'messages-all',
+          label: 'All Messages',
+          onClick: () => setActiveSection('messages-all')
+        },
+        {
+          id: 'messages-inquiries',
+          label: 'Contact Inquiries',
+          onClick: () => setActiveSection('messages-inquiries')
+        },
+        {
+          id: 'messages-tips',
+          label: 'Tips',
+          onClick: () => setActiveSection('messages-tips')
         }
       ]
     },
@@ -520,6 +544,15 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
             isAdmin={true}
           />
         );
+
+      case 'messages-all':
+        return <ContactMessages onRefresh={fetchAllData} />;
+
+      case 'messages-inquiries':
+        return <ContactMessages onRefresh={fetchAllData} filterType="inquiry" />;
+
+      case 'messages-tips':
+        return <ContactMessages onRefresh={fetchAllData} filterType="tip" />;
 
       case 'cases-all':
         return <CasesList cases={cases} filter="all" onRefresh={fetchCases} />;

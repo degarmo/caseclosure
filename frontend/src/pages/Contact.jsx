@@ -1,12 +1,14 @@
+// src/pages/Contact.jsx
 import React, { useState } from "react";
-import api from "@/utils/axios";
+import { submitContactInquiry } from "@/services/contactService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Heart } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MessageSquare, Heart, AlertCircle } from "lucide-react";
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -16,24 +18,35 @@ export default function Contact() {
     inquiry_type: 'general',
     subject: '',
     message: '',
-    case_reference: ''
+    case_reference: '',
+    honeypot: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+    if (error) setError(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Honeypot spam protection
+    if (formData.honeypot) {
+      console.warn('Bot detected via honeypot');
+      return;
+    }
+
     setIsSubmitting(true);
+    setError(null);
     
     try {
-      await ContactInquiry.create(formData);
+      await submitContactInquiry(formData);
       setSubmitted(true);
       setFormData({
         name: '',
@@ -42,13 +55,15 @@ export default function Contact() {
         inquiry_type: 'general',
         subject: '',
         message: '',
-        case_reference: ''
+        case_reference: '',
+        honeypot: ''
       });
-    } catch (error) {
-      console.error('Error submitting form:', error);
+    } catch (err) {
+      setError(err.message || 'Failed to submit inquiry. Please try again.');
+      console.error('Error submitting form:', err);
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
   };
 
   if (submitted) {
@@ -95,7 +110,33 @@ export default function Contact() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {error && (
+              <Alert className="mb-6 border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Honeypot - hidden from users */}
+              <input
+                type="text"
+                name="honeypot"
+                value={formData.honeypot}
+                onChange={(e) => handleInputChange('honeypot', e.target.value)}
+                style={{ 
+                  position: 'absolute',
+                  left: '-9999px',
+                  width: '1px',
+                  height: '1px'
+                }}
+                tabIndex="-1"
+                autoComplete="off"
+                aria-hidden="true"
+              />
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name *</Label>

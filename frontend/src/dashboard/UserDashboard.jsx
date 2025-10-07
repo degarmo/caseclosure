@@ -4,6 +4,7 @@ import DashboardLayout from './components/DashboardLayout';
 import StatsGrid from './components/StatsGrid';
 import SpotlightEditor from '@/components/spotlight/SpotlightEditor';
 import SpotlightPostsList from '@/components/spotlight/SpotlightPostsList';
+import ContactMessages from './components/ContactMessages';
 import api from '@/utils/axios';
 import { 
   Plus, FileText, Eye, Edit, Clock, CheckCircle,
@@ -88,7 +89,6 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
 
   const fetchSpotlightData = async () => {
     try {
-      // Fixed: removed extra /api/
       const postsResponse = await api.get(`/spotlight/?author=${user.id}`);
       const allPosts = postsResponse.data || [];
       
@@ -121,7 +121,6 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
 
   const handleCreateSpotlightPost = async (formData) => {
     try {
-      // Fixed: removed extra /api/
       const response = await api.post('/spotlight/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -378,12 +377,18 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
                     <div className="space-y-3">
                       {tips.slice(0, 5).map((tip, index) => (
                         <div key={index} className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                          <p className="text-sm text-slate-700 dark:text-slate-300">{tip.message}</p>
+                          <p className="text-sm text-slate-700 dark:text-slate-300">{tip.tip_content || tip.message}</p>
                           <p className="text-xs text-slate-500 mt-1">
-                            {new Date(tip.created_at).toLocaleString()}
+                            {new Date(tip.submitted_at || tip.created_at).toLocaleString()}
                           </p>
                         </div>
                       ))}
+                      <button
+                        onClick={() => setActiveSection('tips')}
+                        className="w-full mt-3 px-4 py-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                      >
+                        View All Tips →
+                      </button>
                     </div>
                   ) : (
                     <div className="text-center py-8 text-slate-500">
@@ -551,27 +556,28 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
           showScheduledTime={true}
         />
       ) : activeSection === 'tips' ? (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
-          <h2 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Tips & Messages</h2>
-          {tips.length > 0 ? (
-            <div className="space-y-4">
-              {tips.map((tip, index) => (
-                <div key={index} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                  <p className="text-sm text-slate-700 dark:text-slate-300">{tip.message}</p>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Received: {new Date(tip.created_at).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
+        userCase ? (
+          <ContactMessages 
+            onRefresh={handleRefresh} 
+            filterType="tip"
+            caseId={userCase.id}
+          />
+        ) : (
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
             <div className="text-center py-12 text-slate-500">
               <MessageSquare className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-              <p className="text-lg mb-2">No tips received yet</p>
-              <p className="text-sm">Tips submitted through your memorial website will appear here</p>
+              <p className="text-lg mb-2">No memorial page created yet</p>
+              <p className="text-sm">Create a memorial page to start receiving tips</p>
+              <button
+                onClick={handleCreateCase}
+                className="mt-6 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Create Memorial Page
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )
       ) : activeSection === 'settings' ? (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
           <h2 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Settings</h2>

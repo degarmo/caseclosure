@@ -37,6 +37,7 @@ urlpatterns = [
     path('api/tracker/', include('tracker.urls')), # Tracker endpoints
     path('api/dashboard/', include('dashboard.urls')),
     path('api/', include('spotlight.urls')),  # Spotlight endpoints
+    path('api/', include('contact.urls')),
     
     # Django-allauth URLs for Google OAuth
     # This must be at the root level for OAuth callbacks to work

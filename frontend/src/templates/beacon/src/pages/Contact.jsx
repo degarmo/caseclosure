@@ -1,6 +1,4 @@
 // src/templates/beacon/src/pages/Contact.jsx
-// Clean version without API dependencies - Form only
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -10,13 +8,8 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { Alert, AlertDescription } from "../components/ui/alert";
-import { 
-  Shield, 
-  CheckCircle,
-  Lock,
-  Eye,
-  EyeOff
-} from "lucide-react";
+import { Shield, CheckCircle, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { submitTip } from "../../../services/contactService";
 
 export default function Contact({ caseData, customizations, isPreview }) {
   const [formData, setFormData] = useState({
@@ -25,35 +18,44 @@ export default function Contact({ caseData, customizations, isPreview }) {
     submitter_phone: "",
     tip_content: "",
     is_anonymous: true,
-    urgency: "medium"
+    urgency: "medium",
+    honeypot: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+    if (error) setError(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // In preview mode, just show success
+    // Honeypot spam protection
+    if (formData.honeypot) {
+      console.warn('Bot detected via honeypot');
+      return;
+    }
+    
+    // Preview mode handling
     if (isPreview) {
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
       return;
     }
     
-    // In production, this would submit to your backend
     setIsSubmitting(true);
+    setError(null);
     
     try {
-      // Handle submission without using the API entity
-      console.log('Tip submission:', formData);
+      await submitTip(formData, caseData?.id || caseData?.case_id);
+      
       setShowSuccess(true);
       setFormData({
         submitter_name: "",
@@ -61,18 +63,22 @@ export default function Contact({ caseData, customizations, isPreview }) {
         submitter_phone: "",
         tip_content: "",
         is_anonymous: true,
-        urgency: "medium"
+        urgency: "medium",
+        honeypot: ""
       });
-    } catch (error) {
-      console.error("Error submitting tip:", error);
+      
+      setTimeout(() => setShowSuccess(false), 5000);
+      
+    } catch (err) {
+      setError(err.message || 'Failed to submit tip. Please try again.');
+      console.error("Error submitting tip:", err);
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
   };
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-slate-800 mb-4">Contact & Tips</h1>
         <p className="text-xl text-slate-600">
@@ -80,7 +86,6 @@ export default function Contact({ caseData, customizations, isPreview }) {
         </p>
       </div>
 
-      {/* Tip Form */}
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -101,7 +106,33 @@ export default function Contact({ caseData, customizations, isPreview }) {
             </Alert>
           )}
 
+          {error && (
+            <Alert className="mb-6 border-red-200 bg-red-50">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800">
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Honeypot - hidden from users */}
+            <input
+              type="text"
+              name="honeypot"
+              value={formData.honeypot}
+              onChange={(e) => handleInputChange('honeypot', e.target.value)}
+              style={{ 
+                position: 'absolute',
+                left: '-9999px',
+                width: '1px',
+                height: '1px'
+              }}
+              tabIndex="-1"
+              autoComplete="off"
+              aria-hidden="true"
+            />
+
             {/* Anonymous Toggle */}
             <div className="bg-slate-50 rounded-lg p-4">
               <div className="flex items-center justify-between">
@@ -119,7 +150,7 @@ export default function Contact({ caseData, customizations, isPreview }) {
               </div>
             </div>
 
-            {/* Contact Information (only if not anonymous) */}
+            {/* Contact Information */}
             {!formData.is_anonymous && (
               <div className="space-y-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-700">

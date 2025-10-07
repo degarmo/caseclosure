@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'spotlight',
     'cloudinary_storage',
     'cloudinary',
+    'contact',
 ]
 
 # Registration Settings
