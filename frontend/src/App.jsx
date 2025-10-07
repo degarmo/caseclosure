@@ -322,6 +322,9 @@ function AppContent() {
 function App() {
   return (
     <Router>
+      <>
+        <title>Case Closure - Crowdsourcing Closure. One Case at a Time.</title>
+      </>
       <AppContent />
     </Router>
   );
