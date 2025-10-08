@@ -18,7 +18,7 @@ import Spotlight from "./pages/Spotlight";  // Keep existing public Spotlight pa
 import Contact from "./pages/Contact";
 import Discover from "./pages/Discover";
 import RequestAccount from "./pages/RequestAccount";
-
+import CaseDetails from './dashboard/components/CaseDetails';
 // Auth Pages
 import Signup from "./pages/Signup";
 import SignIn from "./pages/SignIn";
@@ -211,6 +211,7 @@ function AppContent() {
             </RequireAuth>
           } 
         />
+        <Route path="cases/:caseId" element={<CaseDetails />} />
 
         {/* Public Website Routes */}
         <Route path="/" element={<Layout><Home /></Layout>} />

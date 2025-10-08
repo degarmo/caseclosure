@@ -1,5 +1,6 @@
-// src/pages/dashboard/components/CasesList.jsx
+// src/dashboard/components/CasesList.jsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '@/api/axios';
 import { 
   Folder, Eye, Edit, Trash2, ToggleLeft, ToggleRight, 
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react';
 
 export default function CasesList({ cases = [], filter = 'all', onRefresh, onEditCase }) {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created');
   const [selectedCases, setSelectedCases] = useState([]);
@@ -16,15 +18,18 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
   const filteredCases = cases.filter(case_ => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || 
-      case_.name?.toLowerCase().includes(searchLower) ||
-      case_.victim_name?.toLowerCase().includes(searchLower) ||
+      case_.case_title?.toLowerCase().includes(searchLower) ||
+      case_.first_name?.toLowerCase().includes(searchLower) ||
+      case_.last_name?.toLowerCase().includes(searchLower) ||
       case_.id.toString().includes(searchLower);
 
     return matchesSearch;
   }).sort((a, b) => {
     switch (sortBy) {
       case 'name':
-        return (a.victim_name || a.name || '').localeCompare(b.victim_name || b.name || '');
+        const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+        const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim();
+        return nameA.localeCompare(nameB);
       case 'date':
         return new Date(b.incident_date || 0) - new Date(a.incident_date || 0);
       case 'reward':
@@ -34,22 +39,23 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
     }
   });
 
-  const handleEditInEditor = (caseId) => {
-    if (onEditCase) {
-      // Use the parent's navigation handler to go to editor
-      onEditCase(caseId);
-    } else {
-      // Fallback: detect environment and navigate
-      const isDev = window.location.hostname === 'localhost' || 
-                    window.location.port === '5173';
-      const baseUrl = isDev 
-        ? 'http://caseclosure.org:5173' 
-        : 'https://caseclosure.org';
-      window.location.href = `${baseUrl}/editor/${caseId}`;
-    }
+  const handleRowClick = (caseId) => {
+    // Navigate to case details page
+    navigate(`/dashboard/cases/${caseId}`);
   };
 
-  const toggleCaseStatus = async (caseId, isDisabled) => {
+  const handleEditInEditor = (e, caseId) => {
+    e.stopPropagation(); // Prevent row click
+    navigate(`/editor/${caseId}`);
+  };
+
+  const handleViewCase = (e, caseId) => {
+    e.stopPropagation(); // Prevent row click
+    navigate(`/dashboard/cases/${caseId}`);
+  };
+
+  const toggleCaseStatus = async (e, caseId, isDisabled) => {
+    e.stopPropagation(); // Prevent row click
     setLoading(true);
     try {
       await api.patch(`/cases/${caseId}/`, { is_disabled: !isDisabled });
@@ -61,7 +67,8 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
     setLoading(false);
   };
 
-  const deleteCase = async (caseId) => {
+  const deleteCase = async (e, caseId) => {
+    e.stopPropagation(); // Prevent row click
     if (!window.confirm('Are you sure you want to permanently delete this case? This action cannot be undone.')) {
       return;
     }
@@ -114,12 +121,14 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
   const getStatusBadge = (case_) => {
     if (case_.is_disabled) {
       return <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">Disabled</span>;
-    } else if (case_.status === 'solved') {
-      return <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-full font-medium">Solved</span>;
-    } else if (case_.status === 'active') {
-      return <span className="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-full font-medium">Active</span>;
+    } else if (case_.deployment_status === 'deployed') {
+      return <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-full font-medium">Deployed</span>;
+    } else if (case_.deployment_status === 'deploying') {
+      return <span className="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-full font-medium">Deploying</span>;
+    } else if (case_.deployment_status === 'failed') {
+      return <span className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded-full font-medium">Failed</span>;
     } else {
-      return <span className="px-2 py-1 bg-amber-100 text-amber-600 text-xs rounded-full font-medium">Started</span>;
+      return <span className="px-2 py-1 bg-amber-100 text-amber-600 text-xs rounded-full font-medium">Draft</span>;
     }
   };
 
@@ -135,7 +144,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{filterTitle}</h2>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => window.location.href = '/cases/new'}
+              onClick={() => navigate('/dashboard/cases/new')}
               className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium"
             >
               <Plus className="w-4 h-4" />
@@ -241,10 +250,14 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
             {filteredCases.length > 0 ? filteredCases.map(case_ => (
-              <tr key={case_.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 ${
-                case_.is_disabled ? 'opacity-60' : ''
-              }`}>
-                <td className="p-4">
+              <tr 
+                key={case_.id} 
+                onClick={() => handleRowClick(case_.id)}
+                className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors ${
+                  case_.is_disabled ? 'opacity-60' : ''
+                }`}
+              >
+                <td className="p-4" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedCases.includes(case_.id)}
@@ -260,10 +273,10 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                 <td className="p-4">
                   <div>
                     <p className="font-medium text-slate-900 dark:text-white">
-                      {case_.name || `Case #${case_.id}`}
+                      {case_.case_title || `Case #${case_.id}`}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      ID: {case_.id} • {case_.crime_type || 'Unknown'}
+                      ID: {case_.id} • {case_.case_type || 'Unknown'}
                     </p>
                   </div>
                 </td>
@@ -271,7 +284,9 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-slate-400" />
                     <span className="text-sm text-slate-700 dark:text-slate-300">
-                      {case_.victim_name || 'Unknown'}
+                      {case_.first_name && case_.last_name 
+                        ? `${case_.first_name} ${case_.last_name}`
+                        : 'Unknown'}
                     </span>
                   </div>
                 </td>
@@ -287,7 +302,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-slate-400" />
                     <span className="text-sm text-slate-700 dark:text-slate-300">
-                      {case_.location || case_.city || 'Unknown'}
+                      {case_.incident_location || case_.last_seen_location || 'Unknown'}
                     </span>
                   </div>
                 </td>
@@ -295,31 +310,31 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-slate-400" />
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      {case_.reward_amount ? `$${case_.reward_amount.toLocaleString()}` : 'None'}
+                      {case_.reward_amount ? `$${parseFloat(case_.reward_amount).toLocaleString()}` : 'None'}
                     </span>
                   </div>
                 </td>
                 <td className="p-4">
                   {getStatusBadge(case_)}
                 </td>
-                <td className="p-4">
+                <td className="p-4" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => window.location.href = `/cases/${case_.id}`}
+                      onClick={(e) => handleViewCase(e, case_.id)}
                       className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                      title="View Case"
+                      title="View Details"
                     >
                       <Eye className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                     </button>
                     <button
-                      onClick={() => handleEditInEditor(case_.id)}
+                      onClick={(e) => handleEditInEditor(e, case_.id)}
                       className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
-                      title="Edit in Editor"
+                      title="Customize Template"
                     >
                       <Edit className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                     </button>
                     <button
-                      onClick={() => toggleCaseStatus(case_.id, case_.is_disabled)}
+                      onClick={(e) => toggleCaseStatus(e, case_.id, case_.is_disabled)}
                       disabled={loading}
                       className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
                       title={case_.is_disabled ? 'Enable Case' : 'Disable Case'}
@@ -331,7 +346,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                       )}
                     </button>
                     <button
-                      onClick={() => deleteCase(case_.id)}
+                      onClick={(e) => deleteCase(e, case_.id)}
                       disabled={loading}
                       className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                       title="Delete Case"
@@ -347,7 +362,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                   <Folder className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                   <p>No cases found</p>
                   <button
-                    onClick={() => window.location.href = '/cases/new'}
+                    onClick={() => navigate('/dashboard/cases/new')}
                     className="mt-3 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
                   >
                     Create your first case

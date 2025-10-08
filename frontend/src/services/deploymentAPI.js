@@ -3,9 +3,9 @@ import api from '@/api/axios'; // Import your authenticated axios instance
 
 export const checkSubdomainAvailability = async (subdomain, caseId = null) => {
   try {
-    const response = await api.post('/cases/check_subdomain/', {
+    const response = await api.post('/cases/check-subdomain/', {  // ✅ FIXED: hyphen not underscore
       subdomain,
-      case_id: caseId  // Add this
+      case_id: caseId  // ✅ Already passing case_id
     });
     return response.data;
   } catch (error) {
