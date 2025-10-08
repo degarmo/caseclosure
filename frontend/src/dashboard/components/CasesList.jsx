@@ -7,7 +7,7 @@ import {
   Plus, RefreshCw, CheckCircle, XCircle, Clock
 } from 'lucide-react';
 
-export default function CasesList({ cases = [], filter = 'all', onRefresh }) {
+export default function CasesList({ cases = [], filter = 'all', onRefresh, onEditCase }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created');
   const [selectedCases, setSelectedCases] = useState([]);
@@ -33,6 +33,21 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh }) {
         return new Date(b.created_at || 0) - new Date(a.created_at || 0);
     }
   });
+
+  const handleEditInEditor = (caseId) => {
+    if (onEditCase) {
+      // Use the parent's navigation handler to go to editor
+      onEditCase(caseId);
+    } else {
+      // Fallback: detect environment and navigate
+      const isDev = window.location.hostname === 'localhost' || 
+                    window.location.port === '5173';
+      const baseUrl = isDev 
+        ? 'http://caseclosure.org:5173' 
+        : 'https://caseclosure.org';
+      window.location.href = `${baseUrl}/editor/${caseId}`;
+    }
+  };
 
   const toggleCaseStatus = async (caseId, isDisabled) => {
     setLoading(true);
@@ -292,22 +307,22 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh }) {
                     <button
                       onClick={() => window.location.href = `/cases/${case_.id}`}
                       className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                      title="View"
+                      title="View Case"
                     >
                       <Eye className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                     </button>
                     <button
-                      onClick={() => window.location.href = `/cases/${case_.id}/edit`}
-                      className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                      title="Edit"
+                      onClick={() => handleEditInEditor(case_.id)}
+                      className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                      title="Edit in Editor"
                     >
-                      <Edit className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                      <Edit className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                     </button>
                     <button
                       onClick={() => toggleCaseStatus(case_.id, case_.is_disabled)}
                       disabled={loading}
                       className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                      title={case_.is_disabled ? 'Enable' : 'Disable'}
+                      title={case_.is_disabled ? 'Enable Case' : 'Disable Case'}
                     >
                       {case_.is_disabled ? (
                         <ToggleLeft className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -319,7 +334,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh }) {
                       onClick={() => deleteCase(case_.id)}
                       disabled={loading}
                       className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      title="Delete"
+                      title="Delete Case"
                     >
                       <Trash2 className="w-4 h-4 text-red-600" />
                     </button>

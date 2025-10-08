@@ -10,7 +10,8 @@ import {
   Plus, FileText, Eye, Edit, Clock, CheckCircle,
   AlertCircle, Calendar, MapPin, DollarSign, Globe,
   RefreshCw, Settings, User, MessageSquare, TrendingUp,
-  Shield, Activity, Archive, List, Megaphone
+  Shield, Activity, Archive, List, Megaphone, Folder,
+  ToggleLeft, ToggleRight, ExternalLink
 } from 'lucide-react';
 
 export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
@@ -140,7 +141,14 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
 
   const handleEditCase = () => {
     if (userCase?.id) {
-      window.location.href = `/editor/${userCase.id}`;
+      // Detect environment
+      const isDev = window.location.hostname === 'localhost' || 
+                    window.location.port === '5173';
+      const baseUrl = isDev 
+        ? 'http://caseclosure.org:5173' 
+        : 'https://caseclosure.org';
+      
+      window.location.href = `${baseUrl}/editor/${userCase.id}`;
     }
   };
 
@@ -152,12 +160,54 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
     }
   };
 
+  const toggleCaseStatus = async () => {
+    if (!userCase) return;
+    
+    try {
+      await api.patch(`/cases/${userCase.id}/`, { 
+        is_public: !userCase.is_public 
+      });
+      await fetchUserData();
+    } catch (error) {
+      console.error('Error toggling case status:', error);
+      alert('Failed to update case status');
+    }
+  };
+
   const navItems = [
     {
       id: 'overview',
-      label: 'My Memorial',
-      icon: FileText,
+      label: 'Overview',
+      icon: Activity,
       onClick: () => setActiveSection('overview')
+    },
+    {
+      id: 'cases',
+      label: 'My Cases',
+      icon: Folder,
+      expandable: true,
+      badge: stats.hasCase ? 1 : 0,
+      subItems: stats.hasCase ? [
+        {
+          id: 'cases-view',
+          label: 'View My Case',
+          icon: FileText,
+          onClick: () => setActiveSection('cases-view')
+        },
+        {
+          id: 'cases-edit',
+          label: 'Edit in Editor',
+          icon: Edit,
+          onClick: handleEditCase
+        }
+      ] : [
+        {
+          id: 'cases-create',
+          label: 'Create Case',
+          icon: Plus,
+          onClick: handleCreateCase
+        }
+      ]
     },
     {
       id: 'spotlight',
@@ -242,33 +292,10 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
     );
   }
 
-  return (
-    <DashboardLayout
-      user={user}
-      onLogout={onLogout}
-      navItems={navItems}
-      notifications={[]}
-      title="Memorial Dashboard"
-      subtitle={userCase ? `Managing memorial for ${userCase.first_name || userCase.victim_name}` : 'Create your memorial page'}
-      isAdmin={false}
-    >
-      {/* Header Actions */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow hover:shadow-md transition-all flex items-center gap-2 text-sm font-medium"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div>
-      </div>
-
-      {/* Dynamic Content Based on Active Section */}
-      {activeSection === 'overview' ? (
-        userCase ? (
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'overview':
+        return userCase ? (
           <>
             <StatsGrid stats={userStats} isAdmin={false} />
             
@@ -539,24 +566,222 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
               </div>
             </div>
           </div>
-        )
-      ) : activeSection === 'spotlight-posts' ? (
-        <SpotlightPostsList 
-          posts={spotlightPosts}
-          onRefresh={fetchSpotlightData}
-          title="My Spotlight Posts"
-          emptyMessage="You haven't created any spotlight posts yet."
-        />
-      ) : activeSection === 'spotlight-delayed' ? (
-        <SpotlightPostsList 
-          posts={delayedPosts}
-          onRefresh={fetchSpotlightData}
-          title="Delayed Posts"
-          emptyMessage="No scheduled posts. Create a post and schedule it for later!"
-          showScheduledTime={true}
-        />
-      ) : activeSection === 'tips' ? (
-        userCase ? (
+        );
+
+      case 'cases-view':
+        return userCase ? (
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">My Case</h2>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleEditCase}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 flex items-center gap-2 font-medium"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit in Editor
+                  </button>
+                  {userCase.is_public && (
+                    <button
+                      onClick={handleViewCase}
+                      className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl hover:shadow-md transition-all flex items-center gap-2 font-medium"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View Live
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Case Details */}
+            <div className="p-6">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+                        {userCase.first_name} {userCase.last_name}
+                      </h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Case ID: {userCase.id} • {userCase.case_type || userCase.crime_type || 'Unknown'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        userCase.is_public 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      }`}>
+                        {userCase.is_public ? 'Published' : 'Draft'}
+                      </span>
+                      <button
+                        onClick={toggleCaseStatus}
+                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                        title={userCase.is_public ? 'Unpublish' : 'Publish'}
+                      >
+                        {userCase.is_public ? (
+                          <ToggleRight className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <ToggleLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {userCase.incident_date && (
+                      <div className="flex items-start gap-3">
+                        <Calendar className="w-5 h-5 text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">Incident Date</p>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {new Date(userCase.incident_date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {userCase.incident_location && (
+                      <div className="flex items-start gap-3">
+                        <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">Location</p>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {userCase.incident_location}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {userCase.reward_amount && (
+                      <div className="flex items-start gap-3">
+                        <DollarSign className="w-5 h-5 text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">Reward Amount</p>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            ${userCase.reward_amount.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-start gap-3">
+                      <Eye className="w-5 h-5 text-slate-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">Page Views</p>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {userCase.view_count || 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">Tips Received</p>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {userCase.tip_count || 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    {userCase.subdomain && (
+                      <div className="flex items-start gap-3">
+                        <Globe className="w-5 h-5 text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">Website URL</p>
+                          <a 
+                            href={`https://${userCase.subdomain}.caseclosure.com`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-indigo-600 hover:text-indigo-700"
+                          >
+                            {userCase.subdomain}.caseclosure.com
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    {userCase.updated_at && (
+                      <div className="flex items-start gap-3">
+                        <Clock className="w-5 h-5 text-slate-400 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">Last Updated</p>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {new Date(userCase.updated_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700 flex gap-3">
+                    <button
+                      onClick={handleEditCase}
+                      className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 font-medium"
+                    >
+                      <Edit className="w-5 h-5" />
+                      Edit Memorial & Website
+                    </button>
+                    
+                    {userCase.is_public && (
+                      <button
+                        onClick={handleViewCase}
+                        className="flex-1 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-center gap-2 font-medium"
+                      >
+                        <ExternalLink className="w-5 h-5" />
+                        View Live Website
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8">
+            <div className="text-center py-12 text-slate-500">
+              <Folder className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+              <p className="text-lg mb-2">No case created yet</p>
+              <p className="text-sm">Create your first memorial page to get started</p>
+              <button
+                onClick={handleCreateCase}
+                className="mt-6 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Create Memorial Page
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'spotlight-posts':
+        return (
+          <SpotlightPostsList 
+            posts={spotlightPosts}
+            onRefresh={fetchSpotlightData}
+            title="My Spotlight Posts"
+            emptyMessage="You haven't created any spotlight posts yet."
+          />
+        );
+
+      case 'spotlight-delayed':
+        return (
+          <SpotlightPostsList 
+            posts={delayedPosts}
+            onRefresh={fetchSpotlightData}
+            title="Delayed Posts"
+            emptyMessage="No scheduled posts. Create a post and schedule it for later!"
+            showScheduledTime={true}
+          />
+        );
+
+      case 'tips':
+        return userCase ? (
           <ContactMessages 
             onRefresh={handleRefresh} 
             filterType="tip"
@@ -577,13 +802,39 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
               </button>
             </div>
           </div>
-        )
-      ) : activeSection === 'settings' ? (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
-          <h2 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Settings</h2>
-          <p className="text-slate-600 dark:text-slate-400">Account settings and preferences</p>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <DashboardLayout
+      user={user}
+      onLogout={onLogout}
+      navItems={navItems}
+      notifications={[]}
+      title="Memorial Dashboard"
+      subtitle={userCase ? `Managing memorial for ${userCase.first_name || userCase.victim_name}` : 'Create your memorial page'}
+      isAdmin={false}
+    >
+      {/* Header Actions */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow hover:shadow-md transition-all flex items-center gap-2 text-sm font-medium"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
-      ) : null}
+      </div>
+
+      {/* Render Dynamic Content */}
+      {renderContent()}
 
       {/* Spotlight Editor Modal */}
       {showSpotlightEditor && (
