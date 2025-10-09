@@ -103,11 +103,7 @@ export default function HeroSection({
       {/* Hero Image */}
       <div className="relative h-[60vh] min-h-[500px] overflow-hidden">
         <div className="absolute inset-0">
-          <img
-            src={getHeroImage()}
-            alt={displayName}
-            className="w-full h-full object-cover object-center"
-          />
+          <img src={caseData.primary_photo || caseData.photos?.[0]?.image_url || customizations.hero_image} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
           
           {/* Edit Button for Image */}
