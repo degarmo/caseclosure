@@ -14,7 +14,7 @@ const isPreviewRoute = () => {
 const getAPIBaseURL = () => {
   // Development - uses Vite proxy
   if (import.meta.env.DEV) {
-    return "/api/";  // This will use Vite's proxy from vite.config.js
+    return "/";  // This will use Vite's proxy from vite.config.js
   }
   
   // Production - check hostname
@@ -33,7 +33,7 @@ const getAPIBaseURL = () => {
   }
   
   // Default fallback for local development
-  return "/api/";
+  return "/";
 };
 
 /**

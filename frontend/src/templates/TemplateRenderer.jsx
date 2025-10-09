@@ -1,9 +1,9 @@
-// src/templates/TemplateRenderer.jsx
+// src/templates/TemplateRenderer.jsx - Enhanced debugging version
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, Routes, Route } from 'react-router-dom';
 import api from '@/api/axios';
 import { getTemplate } from './registry';
-import getSubdomain from '@/utils/getSubdomain'; // Use your existing utility
+import getSubdomain from '@/utils/getSubdomain';
 
 export default function TemplateRenderer() {
   const location = useLocation();
@@ -12,6 +12,7 @@ export default function TemplateRenderer() {
   const [components, setComponents] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [debugInfo, setDebugInfo] = useState({});
 
   useEffect(() => {
     loadCase();
@@ -19,55 +20,125 @@ export default function TemplateRenderer() {
 
   const loadCase = async () => {
     try {
+      const subdomain = getSubdomain();
+      const hostname = window.location.hostname;
+      
+      // Enhanced debugging
+      const debug = {
+        hostname,
+        subdomain,
+        pathname: location.pathname,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('🔍 TemplateRenderer Debug:', debug);
+      setDebugInfo(debug);
+      
       let response;
-      const subdomain = getSubdomain(); // Use your utility function
       
       if (subdomain) {
-        // Subdomain routing - works for both local and production
-        console.log('Loading case for subdomain:', subdomain);
-        response = await api.get(`/api/cases/by-subdomain/${subdomain}/`);
+        console.log('📡 Fetching case by subdomain:', subdomain);
+        const url = `/cases/by-subdomain/${subdomain}/`;
+        console.log('🌐 API URL:', url);
+        
+        try {
+          response = await api.get(url);
+          console.log('✅ API Response:', response.data);
+        } catch (apiError) {
+          console.error('❌ API Error:', apiError);
+          console.error('Status:', apiError.response?.status);
+          console.error('Data:', apiError.response?.data);
+          throw new Error(`API Error (${apiError.response?.status}): ${apiError.response?.data?.error || apiError.message}`);
+        }
       } else {
-        // Fallback to path-based routing for development
+        // Fallback to path-based routing
         const pathParts = location.pathname.split('/');
-        const caseId = pathParts[2]; // assumes /memorial/[caseId]/...
+        const caseId = pathParts[2];
         
         if (!caseId) {
-          throw new Error('No case identifier found');
+          throw new Error('No subdomain or case ID found');
         }
         
-        console.log('Loading case by ID:', caseId);
-        response = await api.get(`/api/cases/${caseId}/`);
+        console.log('📡 Fetching case by ID:', caseId);
+        response = await api.get(`/cases/${caseId}/`);
+      }
+      
+      if (!response.data) {
+        throw new Error('No data received from API');
+      }
+      
+      console.log('📦 Case Data:', {
+        id: response.data.id,
+        subdomain: response.data.subdomain,
+        template_id: response.data.template_id,
+        is_public: response.data.is_public,
+        deployment_status: response.data.deployment_status
+      });
+      
+      // Check if case is public and deployed
+      if (!response.data.is_public) {
+        throw new Error('This case is not public');
+      }
+      
+      if (response.data.deployment_status !== 'deployed') {
+        throw new Error(`This case is not deployed (status: ${response.data.deployment_status})`);
       }
       
       setCaseData(response.data);
       
-      // Load the template configuration
-      const template = getTemplate(response.data.template || 'beacon');
+      // Load template
+      const templateId = response.data.template_id || 'beacon';
+      console.log('🎨 Loading template:', templateId);
+      
+      let template;
+      try {
+        template = getTemplate(templateId);
+        console.log('✅ Template loaded:', template);
+      } catch (templateError) {
+        console.error('❌ Template Error:', templateError);
+        throw new Error(`Template "${templateId}" not found`);
+      }
+      
+      if (!template) {
+        throw new Error(`Template "${templateId}" returned null`);
+      }
+      
       setTemplateConfig(template);
       
-      // Dynamically load all components for this template
+      // Load components
+      console.log('📥 Loading components:', Object.keys(template.components));
       const loadedComponents = {};
+      
       for (const [key, loader] of Object.entries(template.components)) {
-        const module = await loader();
-        loadedComponents[key] = module.default;
+        try {
+          const module = await loader();
+          loadedComponents[key] = module.default;
+          console.log(`✅ Loaded component: ${key}`);
+        } catch (compError) {
+          console.error(`❌ Failed to load component ${key}:`, compError);
+        }
       }
+      
+      if (!loadedComponents.layout) {
+        throw new Error('Layout component not found in template');
+      }
+      
+      console.log('✅ All components loaded:', Object.keys(loadedComponents));
       setComponents(loadedComponents);
       
     } catch (err) {
-      console.error('Failed to load case:', err);
-      setError(err.message || 'Case not found');
+      console.error('❌ Fatal Error:', err);
+      setError(err.message || 'Failed to load case');
     } finally {
       setLoading(false);
     }
   };
 
   const handleUpdate = async (path, value) => {
-    // Update template_data at specific path
     const updatedData = { ...caseData.template_data };
     const keys = path.split('.');
     let current = updatedData;
     
-    // Navigate to the parent of the target
     for (let i = 0; i < keys.length - 1; i++) {
       if (!current[keys[i]]) {
         current[keys[i]] = {};
@@ -75,12 +146,10 @@ export default function TemplateRenderer() {
       current = current[keys[i]];
     }
     
-    // Set the value
     current[keys[keys.length - 1]] = value;
     
-    // Save to backend
     try {
-      await api.patch(`/api/cases/${caseData.id}/`, {
+      await api.patch(`/cases/${caseData.id}/`, {
         template_data: updatedData
       });
       
@@ -95,10 +164,13 @@ export default function TemplateRenderer() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading memorial site...</p>
+          {debugInfo.subdomain && (
+            <p className="mt-2 text-sm text-gray-500">Subdomain: {debugInfo.subdomain}</p>
+          )}
         </div>
       </div>
     );
@@ -106,10 +178,43 @@ export default function TemplateRenderer() {
 
   if (error || !components.layout) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Site Not Found</h1>
-          <p className="text-gray-600">{error || 'This memorial page could not be found.'}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center mb-6">
+            <div className="text-6xl mb-4">🔍</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Site Not Found</h1>
+            <p className="text-lg text-gray-600">{error || 'This memorial page could not be found.'}</p>
+          </div>
+          
+          {/* Debug Information */}
+          <div className="mt-8 p-4 bg-gray-100 rounded-lg text-left">
+            <h3 className="font-semibold text-gray-700 mb-2">Debug Information:</h3>
+            <div className="text-sm text-gray-600 space-y-1 font-mono">
+              <div>Hostname: {debugInfo.hostname}</div>
+              <div>Subdomain: {debugInfo.subdomain || 'Not detected'}</div>
+              <div>Path: {debugInfo.pathname}</div>
+              <div>Time: {debugInfo.timestamp}</div>
+              {caseData && (
+                <>
+                  <div className="mt-2 pt-2 border-t border-gray-300">
+                    <div>Case ID: {caseData.id}</div>
+                    <div>Template: {caseData.template_id}</div>
+                    <div>Public: {caseData.is_public ? 'Yes' : 'No'}</div>
+                    <div>Status: {caseData.deployment_status}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          
+          <div className="mt-6 text-center">
+            <a 
+              href="https://caseclosure.org" 
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              Return to CaseClosure.org
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -118,7 +223,6 @@ export default function TemplateRenderer() {
   const Layout = components.layout;
   const isEditing = new URLSearchParams(location.search).get('edit') === 'true';
 
-  // Render the template with its layout
   return (
     <Layout 
       caseData={caseData}
