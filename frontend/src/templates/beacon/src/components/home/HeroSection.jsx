@@ -52,6 +52,11 @@ export default function HeroSection({
 
   // Get hero image with proper fallback
   const getHeroImage = () => {
+    console.log('🖼️ HERO IMAGE DEBUG:', {
+      'customizations': customizations,
+      'hero_image': customizations?.customizations?.hero_image,
+      'primaryPhotoUrl': primaryPhotoUrl
+    });
     if (customizations?.customizations?.hero_image) {
       return customizations.customizations.hero_image;
     }
@@ -196,7 +201,7 @@ export default function HeroSection({
               </div>
               <div className="flex items-center gap-4 text-sm">
                 {showReward && (
-                  <span className="bg-black-700 px-3 py-1 rounded-full">
+                  <span className="bg-slate-700 px-3 py-1 rounded-full">
                     {formatReward()} Reward Offered
                   </span>
                 )}
