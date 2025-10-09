@@ -52,8 +52,8 @@ export default function HeroSection({
 
   // Get hero image with proper fallback
   const getHeroImage = () => {
-    if (customizations?.hero?.backgroundImage) {
-      return customizations.hero.backgroundImage;
+    if (customizations?.customizations?.hero_image) {
+      return customizations.customizations.hero_image;
     }
     if (primaryPhotoUrl && primaryPhotoUrl !== 'null' && primaryPhotoUrl !== null) {
       return primaryPhotoUrl;
@@ -103,7 +103,7 @@ export default function HeroSection({
       {/* Hero Image */}
       <div className="relative h-[60vh] min-h-[500px] overflow-hidden">
         <div className="absolute inset-0">
-          <img src={caseData.primary_photo || caseData.photos?.[0]?.image_url || customizations.hero_image} />
+          <img src={getHeroImage()} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
           
           {/* Edit Button for Image */}
