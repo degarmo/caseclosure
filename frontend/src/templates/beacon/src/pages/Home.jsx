@@ -2,12 +2,13 @@
 import React from "react";
 import { MapPin, Calendar, User, AlertCircle, Heart, Share2, Phone, Search } from "lucide-react";
 import EditableSection, { EditableImage, EditableText } from '@/components/CaseCreator/views/CustomizationView/components/EditableSection';
+import HeroSection from './HeroSection';
 
 export default function Home({ 
   caseData = {}, 
   customizations = {}, 
   isEditing = false, 
-  onEditSection, // Changed from onCustomizationChange to match CustomizationView
+  onEditSection,
   onCustomizationChange 
 }) {
   
@@ -23,16 +24,13 @@ export default function Home({
 
   // Get primary photo from case data
   const getPrimaryPhotoUrl = () => {
-    // CHECK CUSTOMIZATIONS FIRST! 🎯
-    if (customizations?.customizations?.hero_image) return customizations.customizations.hero_image;
-    
     if (caseData.primary_photo_url) return caseData.primary_photo_url;
     if (caseData.victim_photo_url) return caseData.victim_photo_url;
     if (caseData.photos && caseData.photos.length > 0) {
       const primaryPhoto = caseData.photos.find(p => p.is_primary);
       return primaryPhoto ? primaryPhoto.image_url : caseData.photos[0].image_url;
     }
-    return "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=600&fit=crop";
+    return null;
   };
 
   // Format dates
@@ -58,43 +56,14 @@ export default function Home({
     return null;
   };
 
-  // Get case type label
-  const getCaseTypeLabel = () => {
-    const caseType = caseData?.crime_type || caseData?.case_type || 'missing';
-    switch(caseType.toLowerCase()) {
-      case 'missing':
-        return 'MISSING PERSON';
-      case 'homicide':
-      case 'murder':
-        return 'SEEKING JUSTICE';
-      case 'unidentified':
-        return 'UNIDENTIFIED';
-      case 'cold_case':
-        return 'COLD CASE';
-      default:
-        return 'INVESTIGATION';
+  // Get last update date
+  const getLastUpdate = () => {
+    if (caseData.updated_at) {
+      return formatDate(caseData.updated_at);
     }
+    return formatDate(new Date().toISOString());
   };
 
-  // Get urgency message based on case type
-  const getUrgencyMessage = () => {
-    const caseType = caseData?.crime_type || caseData?.case_type || 'missing';
-    const firstName = caseData?.first_name || 'this person';
-    
-    switch(caseType.toLowerCase()) {
-      case 'missing':
-        return `Help us find ${firstName} and bring them home safely`;
-      case 'homicide':
-      case 'murder':
-        return `Help us find justice for ${firstName}`;
-      case 'unidentified':
-        return `Help us identify this person and bring them home`;
-      default:
-        return `Your information could help solve this case`;
-    }
-  };
-
-  const age = calculateAge();
   const displayName = getDisplayName();
 
   // Get content helper - checks customizations first, then defaults
@@ -104,176 +73,16 @@ export default function Home({
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative hero-gradient text-white">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Text Content */}
-            <div className="space-y-6">
-              <div className="inline-block">
-                <span className="bg-yellow-400 text-slate-800 px-4 py-2 rounded-full font-bold text-sm uppercase tracking-wide">
-                  {getCaseTypeLabel()}
-                </span>
-              </div>
-              
-              <EditableText
-                sectionId="hero_title"
-                label="Hero Title"
-                isEditing={isEditing}
-                onEdit={onEditSection}
-                customizations={customizations}
-                className="space-y-2"
-                defaultContent={`<h1 class="text-5xl md:text-6xl font-bold">${displayName}</h1>`}
-              >
-                {customizations.hero_title ? (
-                  <div dangerouslySetInnerHTML={{ __html: customizations.hero_title }} />
-                ) : (
-                  <h1 className="text-5xl md:text-6xl font-bold">{displayName}</h1>
-                )}
-              </EditableText>
-
-              <EditableText
-                sectionId="hero_subtitle"
-                label="Hero Subtitle"
-                isEditing={isEditing}
-                onEdit={onEditSection}
-                customizations={customizations}
-                className="text-xl text-slate-200"
-                defaultContent={`<p>${getUrgencyMessage()}</p>`}
-              >
-                <p className="text-xl text-slate-200">
-                  {getContent('hero_subtitle', getUrgencyMessage())}
-                </p>
-              </EditableText>
-
-              {/* Key Information */}
-              <div className="space-y-3 text-lg">
-                {age && (
-                  <EditableText
-                    sectionId="hero_age"
-                    label="Age Information"
-                    isEditing={isEditing}
-                    onEdit={onEditSection}
-                    customizations={customizations}
-                    defaultContent={`Age: ${age} years old`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <User className="w-5 h-5 text-yellow-400" />
-                      <span>{getContent('hero_age', `Age: ${age} years old`)}</span>
-                    </div>
-                  </EditableText>
-                )}
-                
-                {(caseData.last_seen_date || caseData.date_missing) && (
-                  <EditableText
-                    sectionId="hero_date"
-                    label="Date Information"
-                    isEditing={isEditing}
-                    onEdit={onEditSection}
-                    customizations={customizations}
-                    defaultContent={`${caseData.case_type === 'missing' ? 'Missing since: ' : 'Date: '}${formatDate(caseData.last_seen_date || caseData.date_missing)}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-5 h-5 text-yellow-400" />
-                      <span>
-                        {getContent('hero_date', 
-                          `${caseData.case_type === 'missing' ? 'Missing since: ' : 'Date: '}${formatDate(caseData.last_seen_date || caseData.date_missing)}`
-                        )}
-                      </span>
-                    </div>
-                  </EditableText>
-                )}
-                
-                {caseData.last_seen_location && (
-                  <EditableText
-                    sectionId="hero_location"
-                    label="Location Information"
-                    isEditing={isEditing}
-                    onEdit={onEditSection}
-                    customizations={customizations}
-                    defaultContent={`Last seen: ${caseData.last_seen_location}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <MapPin className="w-5 h-5 text-yellow-400" />
-                      <span>{getContent('hero_location', `Last seen: ${caseData.last_seen_location}`)}</span>
-                    </div>
-                  </EditableText>
-                )}
-
-                {caseData.reward_amount && parseFloat(caseData.reward_amount) > 0 && (
-                  <EditableText
-                    sectionId="hero_reward"
-                    label="Reward Information"
-                    isEditing={isEditing}
-                    onEdit={onEditSection}
-                    customizations={customizations}
-                    defaultContent={`$${parseFloat(caseData.reward_amount).toLocaleString()} Reward`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 text-yellow-400" />
-                      <span className="font-bold text-yellow-400">
-                        {getContent('hero_reward', `$${parseFloat(caseData.reward_amount).toLocaleString()} Reward`)}
-                      </span>
-                    </div>
-                  </EditableText>
-                )}
-              </div>
-
-              {/* CTA Buttons */}
-              <div className="flex flex-wrap gap-4 pt-4">
-                <button 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Handle tip submission
-                  }}
-                  className="bg-yellow-400 text-slate-800 px-8 py-4 rounded-lg font-bold text-lg hover:bg-yellow-300 transition-all transform hover:scale-105 shadow-lg"
-                >
-                  <Phone className="w-5 h-5 inline mr-2" />
-                  Submit a Tip
-                </button>
-                <button 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Handle share
-                  }}
-                  className="bg-white/10 backdrop-blur text-white border-2 border-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-white hover:text-slate-800 transition-all"
-                >
-                  <Share2 className="w-5 h-5 inline mr-2" />
-                  Share This Case
-                </button>
-              </div>
-            </div>
-
-            {/* Image */}
-            <div className="relative">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                <EditableImage
-                  src={getPrimaryPhotoUrl()}
-                  alt={displayName}
-                  sectionId="hero_image"
-                  label="Hero Image"
-                  isEditing={isEditing}
-                  onEdit={onEditSection}
-                  customizations={customizations}
-                  className="w-full h-[500px] md:h-[600px] object-cover"
-                />
-                
-                {/* Overlay Badge */}
-                {caseData.case_number && (
-                  <div className="absolute top-4 right-4 bg-black/70 backdrop-blur text-white px-4 py-2 rounded-lg">
-                    <p className="text-sm font-medium">Case #{caseData.case_number}</p>
-                  </div>
-                )}
-              </div>
-              
-              {/* Decorative elements */}
-              <div className="absolute -bottom-4 -left-4 w-72 h-72 bg-yellow-400/20 rounded-full blur-3xl"></div>
-              <div className="absolute -top-4 -right-4 w-72 h-72 bg-yellow-400/10 rounded-full blur-3xl"></div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* USE THE HEROSECTION COMPONENT! 🎯 */}
+      <HeroSection
+        caseData={caseData}
+        customizations={customizations}
+        isEditing={isEditing}
+        onCustomizationChange={onCustomizationChange}
+        primaryPhotoUrl={getPrimaryPhotoUrl()}
+        displayName={displayName}
+        lastUpdate={getLastUpdate()}
+      />
 
       {/* Quick Facts Section */}
       <section className="py-16 bg-white">
