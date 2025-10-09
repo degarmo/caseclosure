@@ -196,7 +196,7 @@ export default function HeroSection({
               </div>
               <div className="flex items-center gap-4 text-sm">
                 {showReward && (
-                  <span className="bg-slate-700 px-3 py-1 rounded-full">
+                  <span className="bg-black-700 px-3 py-1 rounded-full">
                     {formatReward()} Reward Offered
                   </span>
                 )}
