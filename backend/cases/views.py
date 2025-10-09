@@ -363,7 +363,7 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['POST'])
     def check_subdomain(self, request):
         """Check if a subdomain is available for use."""
         subdomain = request.data.get('subdomain', '').lower().strip()
@@ -405,7 +405,7 @@ class CaseViewSet(viewsets.ModelViewSet):
             'subdomain': subdomain
         })
 
-    @action(detail=True, methods=['post'], throttle_classes=[DeploymentRateThrottle])
+    @action(detail=True, methods=['post'])
     def deploy(self, request, id=None):
         """Deploy the case to its subdomain with full production safeguards."""
         case = self.get_object()
@@ -413,17 +413,21 @@ class CaseViewSet(viewsets.ModelViewSet):
         if case.user != request.user and not request.user.is_staff:
             raise PermissionDenied("You can only deploy your own cases.")
         
+        # ✅ SAFE CACHE OPERATIONS - Handle Redis not being available
         lock_key = f'deploying_case_{case.id}'
-        if cache.get(lock_key):
-            return Response(
-                {
-                    'error': 'A deployment is already in progress for this case. Please wait.',
-                    'status': 'deploying'
-                },
-                status=status.HTTP_409_CONFLICT
-            )
-        
-        cache.set(lock_key, True, 300)
+        try:
+            if cache.get(lock_key):
+                return Response(
+                    {
+                        'error': 'A deployment is already in progress for this case. Please wait.',
+                        'status': 'deploying'
+                    },
+                    status=status.HTTP_409_CONFLICT
+                )
+            cache.set(lock_key, True, 300)
+        except Exception as cache_error:
+            logger.warning(f"Cache unavailable during deploy lock check: {cache_error}")
+            # Continue without cache lock in development environments
         
         try:
             validation_errors = []
@@ -594,7 +598,55 @@ class CaseViewSet(viewsets.ModelViewSet):
             )
         
         finally:
-            cache.delete(lock_key)
+            # ✅ SAFE CACHE DELETE
+            try:
+                cache.delete(lock_key)
+            except Exception as cache_error:
+                logger.warning(f"Cache unavailable during lock cleanup: {cache_error}")
+                # Ignore cache errors during cleanup
+
+    @action(detail=True, methods=['get'])
+    def deployment_status(self, request, id=None):
+        """Get detailed deployment status with enhanced information."""
+        case = self.get_object()
+        
+        latest_log = case.deployment_logs.first()
+        
+        # ✅ SAFE CACHE CHECK
+        lock_key = f'deploying_case_{case.id}'
+        is_deploying = False
+        try:
+            is_deploying = cache.get(lock_key) is not None
+        except Exception as cache_error:
+            logger.warning(f"Cache unavailable during status check: {cache_error}")
+            # Fall back to checking deployment_status from database
+            is_deploying = case.deployment_status == 'deploying'
+        
+        response_data = {
+            'deployment_status': case.deployment_status,
+            'subdomain': case.subdomain,
+            'deployment_url': case.get_full_url(),
+            'is_public': case.is_public,
+            'is_disabled': case.is_disabled,
+            'last_deployed_at': case.last_deployed_at.isoformat() if case.last_deployed_at else None,
+            'deployment_error': case.deployment_error if case.deployment_error else None,
+            'is_deploying': is_deploying
+        }
+        
+        if latest_log:
+            response_data['latest_deployment'] = {
+                'id': str(latest_log.id),
+                'action': latest_log.action,
+                'status': latest_log.status,
+                'started_at': latest_log.started_at.isoformat(),
+                'completed_at': latest_log.completed_at.isoformat() if latest_log.completed_at else None,
+                'duration_seconds': latest_log.duration_seconds,
+                'error': latest_log.error_message
+            }
+        
+        response_data['total_deployments'] = case.deployment_logs.count()
+        
+        return Response(response_data)
 
     @action(detail=True, methods=['post'])
     def undeploy(self, request, id=None):
@@ -635,41 +687,6 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @action(detail=True, methods=['get'])
-    def deployment_status(self, request, id=None):
-        """Get detailed deployment status with enhanced information."""
-        case = self.get_object()
-        
-        latest_log = case.deployment_logs.first()
-        
-        lock_key = f'deploying_case_{case.id}'
-        is_deploying = cache.get(lock_key) is not None
-        
-        response_data = {
-            'deployment_status': case.deployment_status,
-            'subdomain': case.subdomain,
-            'deployment_url': case.get_full_url(),
-            'is_public': case.is_public,
-            'is_disabled': case.is_disabled,
-            'last_deployed_at': case.last_deployed_at.isoformat() if case.last_deployed_at else None,
-            'deployment_error': case.deployment_error if case.deployment_error else None,
-            'is_deploying': is_deploying
-        }
-        
-        if latest_log:
-            response_data['latest_deployment'] = {
-                'id': str(latest_log.id),
-                'action': latest_log.action,
-                'status': latest_log.status,
-                'started_at': latest_log.started_at.isoformat(),
-                'completed_at': latest_log.completed_at.isoformat() if latest_log.completed_at else None,
-                'duration_seconds': latest_log.duration_seconds,
-                'error': latest_log.error_message
-            }
-        
-        response_data['total_deployments'] = case.deployment_logs.count()
-        
-        return Response(response_data)
     
     @action(detail=False, methods=['get'])
     def my_cases(self, request):

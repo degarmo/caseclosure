@@ -91,8 +91,11 @@ class SimpleDeploymentService:
             
             logger.info(f"Successfully deployed case {case.id} to {case.deployment_url}")
             
-            # Clear any cached errors
-            cache.delete(f'deployment_error_{case.id}')
+            # ✅ SAFE: Clear any cached errors
+            try:
+                cache.delete(f'deployment_error_{case.id}')
+            except Exception as cache_error:
+                logger.warning(f"Cache unavailable during error cleanup: {cache_error}")
             
             return {
                 'success': True,
@@ -139,8 +142,11 @@ class SimpleDeploymentService:
             deployment_log.details['error_type'] = 'runtime_error'
             deployment_log.save()
             
-            # Cache error for monitoring
-            cache.set(f'deployment_error_{case.id}', str(e), 3600)
+            # ✅ SAFE: Cache error for monitoring
+            try:
+                cache.set(f'deployment_error_{case.id}', str(e), 3600)
+            except Exception as cache_error:
+                logger.warning(f"Cache unavailable during error logging: {cache_error}")
             
             return {
                 'success': False,
@@ -226,8 +232,12 @@ class SimpleDeploymentService:
         Returns:
             Dict with deployment status information
         """
-        # Check if there's a recent deployment error cached
-        cached_error = cache.get(f'deployment_error_{case.id}')
+        # ✅ SAFE: Check if there's a recent deployment error cached
+        cached_error = None
+        try:
+            cached_error = cache.get(f'deployment_error_{case.id}')
+        except Exception as cache_error:
+            logger.warning(f"Cache unavailable during status check: {cache_error}")
         
         return {
             'deployment_status': case.deployment_status,
