@@ -232,6 +232,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.caseclosure\.org$",  # ✅ ADD THIS - Allows all subdomains
+    r"^http://.*\.caseclosure\.org:8000$",  # Local dev with proxy
+]
+
 # CORS Settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
