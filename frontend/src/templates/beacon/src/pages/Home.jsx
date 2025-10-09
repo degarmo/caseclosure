@@ -2,7 +2,7 @@
 import React from "react";
 import { MapPin, Calendar, User, AlertCircle, Heart, Share2, Phone, Search } from "lucide-react";
 import EditableSection, { EditableImage, EditableText } from '@/components/CaseCreator/views/CustomizationView/components/EditableSection';
-import HeroSection from './HeroSection';
+import HeroSection from '../components/home/HeroSection';
 
 export default function Home({ 
   caseData = {}, 
