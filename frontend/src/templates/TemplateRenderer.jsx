@@ -1,6 +1,6 @@
 // src/templates/TemplateRenderer.jsx - Enhanced debugging version
 import React, { useState, useEffect } from 'react';
-import { useParams, useLocation, Routes, Route } from 'react-router-dom';
+import { useParams, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import api from '@/api/axios';
 import { getTemplate } from './registry';
 import getSubdomain from '@/utils/getSubdomain';
@@ -231,6 +231,9 @@ export default function TemplateRenderer() {
       onCustomizationChange={handleUpdate}
     >
       <Routes>
+        {/* ADDED: Redirect /home to / */}
+        <Route path="/home" element={<Navigate to="/" replace />} />
+        
         <Route 
           path="/" 
           element={
