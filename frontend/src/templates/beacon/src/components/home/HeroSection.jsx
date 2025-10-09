@@ -104,7 +104,8 @@ export default function HeroSection({
       <div className="relative h-[60vh] min-h-[500px] overflow-hidden">
         <div className="absolute inset-0">
           <img src={getHeroImage()} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+          {/* UPDATED: Darker gradient overlay - increased opacity values */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
           
           {/* Edit Button for Image */}
           {isEditing && (

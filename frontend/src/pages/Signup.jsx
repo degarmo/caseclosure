@@ -238,11 +238,14 @@ export default function Signup() {
             <CardTitle className="text-xl">Sign Up</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Beta Notice */}
+            {/* Beta Notice - UPDATED with link */}
             <Alert className="bg-blue-50 border-blue-200">
               <Shield className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800">
-                <strong>Invite-Only Beta:</strong> You'll need an invite code from your account request approval email.
+                <strong>Invite-Only Beta:</strong> You'll need an invite code from your account request approval email.{' '}
+                <Link to="/request-account" className="font-semibold underline hover:text-blue-900">
+                  Request access here
+                </Link>
               </AlertDescription>
             </Alert>
 
@@ -421,10 +424,14 @@ export default function Signup() {
                 </p>
               </div>
 
+              {/* UPDATED BUTTON - Now matches SignIn style */}
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full accent-gradient text-slate-800 hover:shadow-lg transition-all duration-300 rounded-xl h-12 text-lg font-semibold"
+                className="w-full text-slate-800 hover:shadow-lg transition-all duration-300 rounded-xl h-12 text-lg font-semibold"
+                style={{
+                  background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)"
+                }}
               >
                 {isLoading ? (
                   <>
