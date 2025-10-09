@@ -23,6 +23,9 @@ export default function Home({
 
   // Get primary photo from case data
   const getPrimaryPhotoUrl = () => {
+    // CHECK CUSTOMIZATIONS FIRST! 🎯
+    if (customizations?.customizations?.hero_image) return customizations.customizations.hero_image;
+    
     if (caseData.primary_photo_url) return caseData.primary_photo_url;
     if (caseData.victim_photo_url) return caseData.victim_photo_url;
     if (caseData.photos && caseData.photos.length > 0) {
