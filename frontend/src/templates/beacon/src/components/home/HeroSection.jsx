@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Heart, Share2, MessageSquare, Plus } from "lucide-react";
+import { Heart, Share2, Plus } from "lucide-react";
 
 export default function HeroSection({ 
   caseData = {}, 
@@ -10,8 +10,44 @@ export default function HeroSection({
   displayName,
   lastUpdate
 }) {
-  const [showImageModal, setShowImageModal] = useState(false);
   
+  // Get hero image with proper fallback
+  const getHeroImage = () => {
+    console.log('🖼️ HERO IMAGE DEBUG:', {
+      'customizations.customizations.hero_image': customizations?.customizations?.hero_image,
+      'primaryPhotoUrl': primaryPhotoUrl,
+      'caseData.primary_photo': caseData.primary_photo
+    });
+    
+    // PRIORITY 1: Check customizations first
+    if (customizations?.customizations?.hero_image) {
+      console.log('✅ Using customizations.hero_image');
+      return customizations.customizations.hero_image;
+    }
+    
+    // PRIORITY 2: Check primaryPhotoUrl prop
+    if (primaryPhotoUrl && primaryPhotoUrl !== 'null' && primaryPhotoUrl !== null) {
+      console.log('✅ Using primaryPhotoUrl');
+      return primaryPhotoUrl;
+    }
+    
+    // PRIORITY 3: Check caseData.primary_photo
+    if (caseData.primary_photo) {
+      console.log('✅ Using caseData.primary_photo');
+      return caseData.primary_photo;
+    }
+    
+    // PRIORITY 4: Check caseData.photos array
+    if (caseData.photos && caseData.photos.length > 0) {
+      console.log('✅ Using caseData.photos[0]');
+      return caseData.photos[0].image_url;
+    }
+    
+    // FALLBACK: Gray gradient
+    console.log('⚠️ Using fallback gradient');
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' viewBox='0 0 1200 800'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%2364748b;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231e293b;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1200' height='800' fill='url(%23grad)'/%3E%3C/svg%3E";
+  };
+
   // Determine the title prefix based on case type
   const getTitlePrefix = () => {
     if (customizations?.hero?.titlePrefix) {
@@ -50,23 +86,6 @@ export default function HeroSection({
     return 'ACTIVE INVESTIGATION';
   };
 
-  // Get hero image with proper fallback
-  const getHeroImage = () => {
-    console.log('🖼️ HERO IMAGE DEBUG:', {
-      'customizations': customizations,
-      'hero_image': customizations?.customizations?.hero_image,
-      'primaryPhotoUrl': primaryPhotoUrl
-    });
-    if (customizations?.customizations?.hero_image) {
-      return customizations.customizations.hero_image;
-    }
-    if (primaryPhotoUrl && primaryPhotoUrl !== 'null' && primaryPhotoUrl !== null) {
-      return primaryPhotoUrl;
-    }
-    // Use a gradient placeholder instead of external URL
-    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' viewBox='0 0 1200 800'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%2364748b;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231e293b;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1200' height='800' fill='url(%23grad)'/%3E%3C/svg%3E";
-  };
-
   // Format case number
   const formatCaseNumber = () => {
     if (caseData.case_number) {
@@ -75,12 +94,11 @@ export default function HeroSection({
     return `Case #: ${new Date().getFullYear()}-${String(caseData.id || '000000').padStart(6, '0')}`;
   };
 
-  // Get followers count (could be from actual data or calculated)
+  // Get followers count
   const getFollowersCount = () => {
     if (caseData.followers_count) {
       return caseData.followers_count.toLocaleString();
     }
-    // Mock calculation based on view count or other metrics
     const baseFollowers = 100;
     const daysOld = caseData.created_at ? 
       Math.floor((new Date() - new Date(caseData.created_at)) / (1000 * 60 * 60 * 24)) : 
@@ -108,14 +126,22 @@ export default function HeroSection({
       {/* Hero Image */}
       <div className="relative h-[60vh] min-h-[500px] overflow-hidden">
         <div className="absolute inset-0">
-          <img src={getHeroImage()} />
-          {/* UPDATED: Darker gradient overlay - increased opacity values */}
+          <img 
+            src={getHeroImage()} 
+            alt={displayName}
+            className="w-full h-full object-cover"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
           
           {/* Edit Button for Image */}
           {isEditing && (
             <button
-              onClick={() => onCustomizationChange('hero.backgroundImage', 'OPEN_IMAGE_MODAL')}
+              onClick={() => {
+                console.log('🖼️ Image edit clicked');
+                if (onCustomizationChange) {
+                  onCustomizationChange('customizations.hero_image', 'OPEN_IMAGE_MODAL');
+                }
+              }}
               className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-gray-700 p-2 rounded-lg shadow-lg hover:bg-white transition-colors z-10"
               title="Change hero image"
             >
@@ -133,7 +159,12 @@ export default function HeroSection({
                   {getTitlePrefix()}
                   {isEditing && (
                     <button
-                      onClick={() => onCustomizationChange('hero.titlePrefix', 'OPEN_PREFIX_MODAL')}
+                      onClick={() => {
+                        const newPrefix = prompt('Enter title prefix:', getTitlePrefix());
+                        if (newPrefix !== null && onCustomizationChange) {
+                          onCustomizationChange('hero.titlePrefix', newPrefix);
+                        }
+                      }}
                       className="bg-white/20 backdrop-blur-sm text-white p-1 rounded hover:bg-white/30 transition-colors"
                       title="Edit title prefix"
                     >
@@ -149,7 +180,12 @@ export default function HeroSection({
                  `Help us find answers and bring justice to ${caseData.first_name || 'our'} family.`}
                 {isEditing && (
                   <button
-                    onClick={() => onCustomizationChange('hero.subtitle', 'OPEN_TEXT_EDITOR')}
+                    onClick={() => {
+                      const newSubtitle = prompt('Enter subtitle:', customizations?.hero?.subtitle || caseData.description?.substring(0, 150) || '');
+                      if (newSubtitle !== null && onCustomizationChange) {
+                        onCustomizationChange('hero.subtitle', newSubtitle);
+                      }
+                    }}
                     className="ml-2 bg-white/20 backdrop-blur-sm text-white p-1 rounded hover:bg-white/30 transition-colors inline-block"
                     title="Edit subtitle"
                   >
@@ -186,7 +222,12 @@ export default function HeroSection({
                     {getInvestigationStatus()}
                     {isEditing && (
                       <button
-                        onClick={() => onCustomizationChange('hero.investigationStatus', 'OPEN_STATUS_MODAL')}
+                        onClick={() => {
+                          const newStatus = prompt('Enter investigation status:', getInvestigationStatus());
+                          if (newStatus !== null && onCustomizationChange) {
+                            onCustomizationChange('hero.investigationStatus', newStatus);
+                          }
+                        }}
                         className="ml-2 bg-white/20 text-white p-1 rounded hover:bg-white/30 transition-colors inline-block"
                         title="Edit status"
                       >
