@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Heart, Share2, Plus } from "lucide-react";
 
 export default function HeroSection({ 
   caseData = {}, 
   customizations = {}, 
   isEditing = false, 
-  onEditSection,
+  onCustomizationChange,
   primaryPhotoUrl,
   displayName,
   lastUpdate
@@ -14,11 +14,12 @@ export default function HeroSection({
   // Get hero image with proper fallback
   const getHeroImage = () => {
     console.log('🖼️ HERO IMAGE DEBUG:', {
-      'customizations?.customizations?.hero_image': customizations?.customizations?.hero_image,
-      'primaryPhotoUrl': primaryPhotoUrl
+      'customizations.customizations.hero_image': customizations?.customizations?.hero_image,
+      'primaryPhotoUrl': primaryPhotoUrl,
+      'caseData.primary_photo': caseData.primary_photo
     });
     
-    // PRIORITY 1: Check customizations first (where uploads are saved)
+    // PRIORITY 1: Check customizations first
     if (customizations?.customizations?.hero_image) {
       console.log('✅ Using customizations.hero_image');
       return customizations.customizations.hero_image;
@@ -124,7 +125,7 @@ export default function HeroSection({
     <div className="relative">
       {/* Hero Image */}
       <div className="relative h-[60vh] min-h-[500px] overflow-hidden">
-        <div className="absolute inset-0 group">
+        <div className="absolute inset-0">
           <img 
             src={getHeroImage()} 
             alt={displayName}
@@ -132,17 +133,14 @@ export default function HeroSection({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
           
-          {/* Edit Button for Image - triggers EditableImage modal */}
-          {isEditing && onEditSection && (
+          {/* Edit Button for Image */}
+          {isEditing && (
             <button
               onClick={() => {
-                console.log('🖼️ Opening image editor for hero_image');
-                onEditSection({
-                  sectionId: 'hero_image',
-                  sectionType: 'image',
-                  label: 'Hero Image',
-                  currentValue: getHeroImage()
-                });
+                console.log('🖼️ Image edit clicked');
+                if (onCustomizationChange) {
+                  onCustomizationChange('customizations.hero_image', 'OPEN_IMAGE_MODAL');
+                }
               }}
               className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-gray-700 p-2 rounded-lg shadow-lg hover:bg-white transition-colors z-10"
               title="Change hero image"
@@ -159,15 +157,13 @@ export default function HeroSection({
               <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
                 <span className="inline-flex items-center gap-2">
                   {getTitlePrefix()}
-                  {isEditing && onEditSection && (
+                  {isEditing && (
                     <button
                       onClick={() => {
-                        onEditSection({
-                          sectionId: 'hero_titlePrefix',
-                          sectionType: 'text',
-                          label: 'Title Prefix',
-                          currentValue: getTitlePrefix()
-                        });
+                        const newPrefix = prompt('Enter title prefix:', getTitlePrefix());
+                        if (newPrefix !== null && onCustomizationChange) {
+                          onCustomizationChange('hero.titlePrefix', newPrefix);
+                        }
                       }}
                       className="bg-white/20 backdrop-blur-sm text-white p-1 rounded hover:bg-white/30 transition-colors"
                       title="Edit title prefix"
@@ -182,15 +178,13 @@ export default function HeroSection({
               <p className="text-xl md:text-2xl text-slate-200 mb-8 leading-relaxed">
                 {customizations?.hero?.subtitle || caseData.description?.substring(0, 150) || 
                  `Help us find answers and bring justice to ${caseData.first_name || 'our'} family.`}
-                {isEditing && onEditSection && (
+                {isEditing && (
                   <button
                     onClick={() => {
-                      onEditSection({
-                        sectionId: 'hero_subtitle',
-                        sectionType: 'text',
-                        label: 'Hero Subtitle',
-                        currentValue: customizations?.hero?.subtitle || caseData.description?.substring(0, 150) || ''
-                      });
+                      const newSubtitle = prompt('Enter subtitle:', customizations?.hero?.subtitle || caseData.description?.substring(0, 150) || '');
+                      if (newSubtitle !== null && onCustomizationChange) {
+                        onCustomizationChange('hero.subtitle', newSubtitle);
+                      }
                     }}
                     className="ml-2 bg-white/20 backdrop-blur-sm text-white p-1 rounded hover:bg-white/30 transition-colors inline-block"
                     title="Edit subtitle"
@@ -226,15 +220,13 @@ export default function HeroSection({
                   <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                   <span className="font-semibold text-yellow-400">
                     {getInvestigationStatus()}
-                    {isEditing && onEditSection && (
+                    {isEditing && (
                       <button
                         onClick={() => {
-                          onEditSection({
-                            sectionId: 'hero_investigationStatus',
-                            sectionType: 'text',
-                            label: 'Investigation Status',
-                            currentValue: getInvestigationStatus()
-                          });
+                          const newStatus = prompt('Enter investigation status:', getInvestigationStatus());
+                          if (newStatus !== null && onCustomizationChange) {
+                            onCustomizationChange('hero.investigationStatus', newStatus);
+                          }
                         }}
                         className="ml-2 bg-white/20 text-white p-1 rounded hover:bg-white/30 transition-colors inline-block"
                         title="Edit status"
