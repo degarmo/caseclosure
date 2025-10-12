@@ -46,7 +46,7 @@ export default function HeroSection({
     
     // FALLBACK: Gray silhouette placeholder
     console.log('⚠️ Using fallback image');
-    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='500' viewBox='0 0 300 500'%3E%3Crect width='300' height='500' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='20' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E";
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='300' viewBox='0 0 180 300'%3E%3Crect width='180' height='300' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='16' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E";
   };
 
   // Get first name for display
@@ -193,7 +193,7 @@ export default function HeroSection({
               </div>
             </div>
 
-            {/* RIGHT SIDE - Portrait Photo (3x5 aspect ratio) */}
+            {/* RIGHT SIDE - Portrait Photo (Even smaller with very rounded edges) */}
             <div className="flex justify-center lg:justify-end">
               <EditableImage
                 sectionId="hero_image"
@@ -204,17 +204,17 @@ export default function HeroSection({
                 defaultImage={getHeroImage()}
               >
                 <div className="relative">
-                  {/* Portrait photo with 3x5 aspect ratio and hover effect */}
-                  <div className="w-[300px] h-[500px] rounded-2xl overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-4">
+                  {/* Even smaller portrait photo with very rounded corners */}
+                  <div className="w-[180px] h-[300px] rounded-[40px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
                     <img 
                       src={getHeroImage()} 
                       alt={displayName}
-                      className="w-full h-full object-cover rounded-lg"
+                      className="w-full h-full object-cover rounded-[32px]"
                     />
                   </div>
                   
                   {/* Decorative frame effect */}
-                  <div className="absolute inset-0 rounded-2xl border-4 border-white/20 pointer-events-none"></div>
+                  <div className="absolute inset-0 rounded-[40px] border-4 border-white/20 pointer-events-none"></div>
                 </div>
               </EditableImage>
             </div>
