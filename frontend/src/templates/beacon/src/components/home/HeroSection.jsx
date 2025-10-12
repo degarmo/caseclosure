@@ -1,11 +1,13 @@
 import React from "react";
-import { Heart, Share2, Plus } from "lucide-react";
+import { Heart, Share2 } from "lucide-react";
+import { EditableImage } from '@/components/CaseCreator/views/CustomizationView/components/EditableSection';
 
 export default function HeroSection({ 
   caseData = {}, 
   customizations = {}, 
   isEditing = false, 
   onEditSection,
+  onCustomizationChange,
   primaryPhotoUrl,
   displayName,
   lastUpdate
@@ -14,14 +16,14 @@ export default function HeroSection({
   // Get hero image with proper fallback
   const getHeroImage = () => {
     console.log('🖼️ HERO IMAGE DEBUG:', {
-      'customizations?.customizations?.hero_image': customizations?.customizations?.hero_image,
+      'customizations?.hero_image': customizations?.hero_image,
       'primaryPhotoUrl': primaryPhotoUrl
     });
     
     // PRIORITY 1: Check customizations first (where uploads are saved)
-    if (customizations?.customizations?.hero_image) {
+    if (customizations?.hero_image) {
       console.log('✅ Using customizations.hero_image');
-      return customizations.customizations.hero_image;
+      return customizations.hero_image;
     }
     
     // PRIORITY 2: Check primaryPhotoUrl prop
@@ -156,36 +158,26 @@ export default function HeroSection({
     <div className="relative">
       {/* Hero Image */}
       <div className="relative h-[60vh] min-h-[500px] overflow-hidden">
-        <div className="absolute inset-0 group">
-          <img 
-            src={getHeroImage()} 
-            alt={displayName}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
-          
-          {/* Edit Button for Image ONLY - Opens image upload modal */}
-          {isEditing && onEditSection && (
-            <button
-              onClick={() => {
-                console.log('🖼️ Opening image editor for hero_image');
-                onEditSection({
-                  sectionId: 'hero_image',
-                  sectionType: 'image',
-                  label: 'Hero Image',
-                  currentValue: getHeroImage()
-                });
-              }}
-              className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-gray-700 p-2 rounded-lg shadow-lg hover:bg-white transition-colors z-10"
-              title="Change hero image"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          )}
-        </div>
+        <EditableImage
+          sectionId="hero_image"
+          label="Hero Image"
+          isEditing={isEditing}
+          onEdit={onEditSection}
+          customizations={customizations}
+          defaultImage={getHeroImage()}
+        >
+          <div className="absolute inset-0 group">
+            <img 
+              src={getHeroImage()} 
+              alt={displayName}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
+          </div>
+        </EditableImage>
         
         {/* Hero Content */}
-        <div className="absolute inset-0 flex items-end">
+        <div className="absolute inset-0 flex items-end pointer-events-none">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
             <div className="max-w-3xl">
               <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
@@ -198,7 +190,7 @@ export default function HeroSection({
               </p>
               
               {/* Call to Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 pointer-events-auto">
                 <button className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-slate-800 font-semibold rounded-lg hover:shadow-xl transition-all duration-300">
                   <Heart className="w-5 h-5" />
                   Share a Tip
