@@ -44,9 +44,9 @@ export default function HeroSection({
       return caseData.photos[0].image_url;
     }
     
-    // FALLBACK: Gray gradient
-    console.log('⚠️ Using fallback gradient');
-    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' viewBox='0 0 1200 800'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%2364748b;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231e293b;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1200' height='800' fill='url(%23grad)'/%3E%3C/svg%3E";
+    // FALLBACK: Gray silhouette placeholder
+    console.log('⚠️ Using fallback image');
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='500' viewBox='0 0 300 500'%3E%3Crect width='300' height='500' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='20' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E";
   };
 
   // Get first name for display
@@ -156,58 +156,76 @@ export default function HeroSection({
 
   return (
     <div className="relative">
-      {/* Hero Image */}
-      <div className="relative h-[60vh] min-h-[500px] overflow-hidden">
-        <EditableImage
-          sectionId="hero_image"
-          label="Hero Image"
-          isEditing={isEditing}
-          onEdit={onEditSection}
-          customizations={customizations}
-          defaultImage={getHeroImage()}
-        >
-          <div className="absolute inset-0 group">
-            <img 
-              src={getHeroImage()} 
-              alt={displayName}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
-          </div>
-        </EditableImage>
-        
-        {/* Hero Content */}
-        <div className="absolute inset-0 flex items-end pointer-events-none">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
-            <div className="max-w-3xl">
-              <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-                <span className="block">{getTitlePrefix()}</span>
+      {/* Hero Section with gradient background */}
+      <div className="relative min-h-[600px] bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 overflow-hidden">
+        {/* Decorative background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px'
+          }}></div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            
+            {/* LEFT SIDE - Text Content */}
+            <div className="space-y-8">
+              <h1 className="text-4xl md:text-6xl font-bold text-white">
+                <span className="block mb-2">{getTitlePrefix()}</span>
                 <span className="block text-yellow-400">{getTitleName()}</span>
               </h1>
               
-              <p className="text-xl md:text-2xl text-slate-200 mb-8 leading-relaxed">
+              <p className="text-xl md:text-2xl text-slate-200 leading-relaxed">
                 {getSubtitle()}
               </p>
               
               {/* Call to Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 pointer-events-auto">
-                <button className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-slate-800 font-semibold rounded-lg hover:shadow-xl transition-all duration-300">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-slate-800 font-semibold rounded-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                   <Heart className="w-5 h-5" />
                   Share a Tip
                 </button>
-                <button className="flex items-center justify-center gap-2 px-8 py-3 bg-white/10 backdrop-blur-sm border border-white/30 text-white font-semibold rounded-lg hover:bg-white/20 transition-all duration-300">
+                <button className="flex items-center justify-center gap-2 px-8 py-3 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white font-semibold rounded-lg hover:bg-white/20 transition-all duration-300">
                   <Share2 className="w-5 h-5" />
                   Share Story
                 </button>
               </div>
             </div>
+
+            {/* RIGHT SIDE - Portrait Photo (3x5 aspect ratio) */}
+            <div className="flex justify-center lg:justify-end">
+              <EditableImage
+                sectionId="hero_image"
+                label="Hero Portrait Photo"
+                isEditing={isEditing}
+                onEdit={onEditSection}
+                customizations={customizations}
+                defaultImage={getHeroImage()}
+              >
+                <div className="relative">
+                  {/* Portrait photo with 3x5 aspect ratio and hover effect */}
+                  <div className="w-[300px] h-[500px] rounded-2xl overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-4">
+                    <img 
+                      src={getHeroImage()} 
+                      alt={displayName}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
+                  
+                  {/* Decorative frame effect */}
+                  <div className="absolute inset-0 rounded-2xl border-4 border-white/20 pointer-events-none"></div>
+                </div>
+              </EditableImage>
+            </div>
+
           </div>
         </div>
       </div>
 
       {/* Case Status Banner */}
       {showStatus && (
-        <div className="bg-slate-800 text-white py-6">
+        <div className="bg-slate-800 text-white py-6 border-t border-slate-700">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-6">
