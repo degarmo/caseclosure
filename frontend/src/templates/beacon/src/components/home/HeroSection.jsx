@@ -205,7 +205,7 @@ export default function HeroSection({
               >
                 <div className="relative">
                   {/* Even smaller portrait photo with very rounded corners */}
-                  <div className="w-[180px] h-[300px] rounded-[40px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
+                  <div className="w-[120px] h-[260px] rounded-[40px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
                     <img 
                       src={getHeroImage()} 
                       alt={displayName}
