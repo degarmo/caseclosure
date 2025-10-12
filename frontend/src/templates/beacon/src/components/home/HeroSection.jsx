@@ -47,16 +47,17 @@ export default function HeroSection({
     return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800' viewBox='0 0 1200 800'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%2364748b;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231e293b;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1200' height='800' fill='url(%23grad)'/%3E%3C/svg%3E";
   };
 
-  // Determine the title prefix based on case type
+  // Get first name for display
+  const getFirstName = () => {
+    return caseData.first_name || displayName.split(' ')[0] || 'them';
+  };
+
+  // Determine the title prefix based on case type (STATIC - NO CUSTOMIZATION)
   const getTitlePrefix = () => {
-    if (customizations?.hero?.titlePrefix) {
-      return customizations.hero.titlePrefix;
-    }
-    
     const caseType = caseData.crime_type || caseData.case_type || 'missing';
     
-    if (caseType === 'homicide') {
-      return 'Justice for';
+    if (caseType === 'homicide' || caseType === 'murder') {
+      return 'Justice For';
     } else if (caseType === 'missing') {
       return 'Help Find';
     } else if (caseType === 'unidentified') {
@@ -64,15 +65,44 @@ export default function HeroSection({
     } else if (caseType === 'cold_case') {
       return 'Seeking Answers for';
     }
-    return 'Remember';
+    return 'Help Find';
   };
 
-  // Get investigation status
-  const getInvestigationStatus = () => {
-    if (customizations?.hero?.investigationStatus) {
-      return customizations.hero.investigationStatus;
+  // Get the display name with optional nickname for title (STATIC)
+  const getTitleName = () => {
+    const firstName = getFirstName();
+    const nickname = caseData.nickname;
+    
+    const caseType = caseData.crime_type || caseData.case_type || 'missing';
+    
+    // For homicide cases, show nickname if available
+    if ((caseType === 'homicide' || caseType === 'murder') && nickname) {
+      return `${firstName} "${nickname}"`;
     }
     
+    return firstName;
+  };
+
+  // Get subtitle based on case type (STATIC - NO CUSTOMIZATION)
+  const getSubtitle = () => {
+    const firstName = getFirstName();
+    const caseType = caseData.crime_type || caseData.case_type || 'missing';
+    
+    if (caseType === 'homicide' || caseType === 'murder') {
+      return `Help us bring justice and closure to ${firstName}'s family`;
+    } else if (caseType === 'missing') {
+      return `Help us find ${firstName} and bring closure to our family`;
+    } else if (caseType === 'unidentified') {
+      return `Help us identify this person and bring closure to their family`;
+    } else if (caseType === 'cold_case') {
+      return `Help us find answers and bring justice to ${firstName}'s family`;
+    }
+    
+    return `Help us find ${firstName} and bring closure to our family`;
+  };
+
+  // Get investigation status (STATIC - NO CUSTOMIZATION)
+  const getInvestigationStatus = () => {
     const caseType = caseData.crime_type || caseData.case_type || 'missing';
     
     if (caseData.deployment_status === 'deployed' && !caseData.is_public) {
@@ -81,6 +111,8 @@ export default function HeroSection({
       return 'COLD CASE';
     } else if (caseType === 'missing') {
       return 'MISSING PERSON';
+    } else if (caseType === 'homicide' || caseType === 'murder') {
+      return 'HOMICIDE INVESTIGATION';
     }
     return 'ACTIVE INVESTIGATION';
   };
@@ -117,8 +149,8 @@ export default function HeroSection({
     return null;
   };
 
-  const showReward = customizations?.hero?.showReward !== false && formatReward();
-  const showStatus = customizations?.hero?.showStatus !== false;
+  const showReward = formatReward();
+  const showStatus = true;
 
   return (
     <div className="relative">
@@ -132,7 +164,7 @@ export default function HeroSection({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
           
-          {/* Edit Button for Image - Opens image upload modal */}
+          {/* Edit Button for Image ONLY - Opens image upload modal */}
           {isEditing && onEditSection && (
             <button
               onClick={() => {
@@ -157,49 +189,12 @@ export default function HeroSection({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
             <div className="max-w-3xl">
               <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-                <span className="inline-flex items-center gap-2">
-                  {getTitlePrefix()}
-                  {isEditing && onEditSection && (
-                    <button
-                      onClick={() => {
-                        console.log('✏️ Opening text editor for hero_titlePrefix');
-                        onEditSection({
-                          sectionId: 'hero_titlePrefix',
-                          sectionType: 'text',
-                          label: 'Title Prefix',
-                          currentValue: getTitlePrefix()
-                        });
-                      }}
-                      className="bg-white/20 backdrop-blur-sm text-white p-1 rounded hover:bg-white/30 transition-colors"
-                      title="Edit title prefix"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  )}
-                </span>
-                <span className="block text-yellow-400">{displayName}</span>
+                <span className="block">{getTitlePrefix()}</span>
+                <span className="block text-yellow-400">{getTitleName()}</span>
               </h1>
               
               <p className="text-xl md:text-2xl text-slate-200 mb-8 leading-relaxed">
-                {customizations?.hero?.subtitle || caseData.description?.substring(0, 150) || 
-                 `Help us find answers and bring justice to ${caseData.first_name || 'our'} family.`}
-                {isEditing && onEditSection && (
-                  <button
-                    onClick={() => {
-                      console.log('✏️ Opening text editor for hero_subtitle');
-                      onEditSection({
-                        sectionId: 'hero_subtitle',
-                        sectionType: 'text',
-                        label: 'Hero Subtitle',
-                        currentValue: customizations?.hero?.subtitle || caseData.description?.substring(0, 150) || ''
-                      });
-                    }}
-                    className="ml-2 bg-white/20 backdrop-blur-sm text-white p-1 rounded hover:bg-white/30 transition-colors inline-block"
-                    title="Edit subtitle"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-                )}
+                {getSubtitle()}
               </p>
               
               {/* Call to Action Buttons */}
@@ -228,23 +223,6 @@ export default function HeroSection({
                   <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                   <span className="font-semibold text-yellow-400">
                     {getInvestigationStatus()}
-                    {isEditing && onEditSection && (
-                      <button
-                        onClick={() => {
-                          console.log('✏️ Opening text editor for hero_investigationStatus');
-                          onEditSection({
-                            sectionId: 'hero_investigationStatus',
-                            sectionType: 'text',
-                            label: 'Investigation Status',
-                            currentValue: getInvestigationStatus()
-                          });
-                        }}
-                        className="ml-2 bg-white/20 text-white p-1 rounded hover:bg-white/30 transition-colors inline-block"
-                        title="Edit status"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    )}
                   </span>
                 </div>
                 <div className="text-slate-300">
