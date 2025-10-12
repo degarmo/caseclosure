@@ -193,7 +193,7 @@ export default function HeroSection({
               </div>
             </div>
 
-            {/* RIGHT SIDE - Portrait Photo (Even smaller with very rounded edges) */}
+            {/* RIGHT SIDE - Portrait Photo (Smaller with very rounded edges) */}
             <div className="flex justify-center lg:justify-end">
               <EditableImage
                 sectionId="hero_image"
@@ -204,17 +204,17 @@ export default function HeroSection({
                 defaultImage={getHeroImage()}
               >
                 <div className="relative">
-                  {/* Even smaller portrait photo with very rounded corners */}
-                  <div className="w-[180px] h-[300px] rounded-[40px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
+                  {/* Smaller portrait photo with very rounded corners */}
+                  <div className="w-[150px] h-[250px] rounded-[33px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
                     <img 
                       src={getHeroImage()} 
                       alt={displayName}
-                      className="w-full h-full object-cover rounded-[32px]"
+                      className="w-full h-full object-cover rounded-[26px]"
                     />
                   </div>
                   
                   {/* Decorative frame effect */}
-                  <div className="absolute inset-0 rounded-[40px] border-4 border-white/20 pointer-events-none"></div>
+                  <div className="absolute inset-0 rounded-[33px] border-4 border-white/20 pointer-events-none"></div>
                 </div>
               </EditableImage>
             </div>
