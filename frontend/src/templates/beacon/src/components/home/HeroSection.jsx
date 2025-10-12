@@ -46,7 +46,7 @@ export default function HeroSection({
     
     // FALLBACK: Gray silhouette placeholder
     console.log('⚠️ Using fallback image');
-    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='300' viewBox='0 0 180 300'%3E%3Crect width='180' height='300' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='16' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E";
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='260' viewBox='0 0 120 260'%3E%3Crect width='120' height='260' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='14' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E";
   };
 
   // Get first name for display
@@ -193,30 +193,31 @@ export default function HeroSection({
               </div>
             </div>
 
-            {/* RIGHT SIDE - Portrait Photo (Even smaller with very rounded edges) */}
+            {/* RIGHT SIDE - Portrait Photo */}
             <div className="flex justify-center lg:justify-end">
-              <EditableImage
-                sectionId="hero_image"
-                label="Hero Portrait Photo"
-                isEditing={isEditing}
-                onEdit={onEditSection}
-                customizations={customizations}
-                defaultImage={getHeroImage()}
-              >
-                <div className="relative">
-                  {/* Even smaller portrait photo with very rounded corners */}
-                  <div className="w-[120px] h-[260px] rounded-[40px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
+              {/* SIZE CONTROL WRAPPER - Change w-[] and h-[] values here to resize photo */}
+              <div className="relative w-[120px] h-[260px]">
+                <EditableImage
+                  sectionId="hero_image"
+                  label="Hero Portrait Photo"
+                  isEditing={isEditing}
+                  onEdit={onEditSection}
+                  customizations={customizations}
+                  defaultImage={getHeroImage()}
+                >
+                  {/* Photo container with rounded corners */}
+                  <div className="w-full h-full rounded-[40px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
                     <img 
                       src={getHeroImage()} 
                       alt={displayName}
                       className="w-full h-full object-cover rounded-[32px]"
                     />
                   </div>
-                  
-                  {/* Decorative frame effect */}
-                  <div className="absolute inset-0 rounded-[40px] border-4 border-white/20 pointer-events-none"></div>
-                </div>
-              </EditableImage>
+                </EditableImage>
+                
+                {/* Decorative frame effect */}
+                <div className="absolute inset-0 rounded-[40px] border-4 border-white/20 pointer-events-none"></div>
+              </div>
             </div>
 
           </div>
