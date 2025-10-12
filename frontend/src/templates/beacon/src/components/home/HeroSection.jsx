@@ -195,8 +195,7 @@ export default function HeroSection({
 
             {/* RIGHT SIDE - Portrait Photo */}
             <div className="flex justify-center lg:justify-end">
-              {/* SIZE CONTROL WRAPPER - Change w-[] and h-[] values here to resize photo */}
-              <div className="relative w-[120px] h-[260px]">
+              <div className="relative">
                 <EditableImage
                   sectionId="hero_image"
                   label="Hero Portrait Photo"
@@ -205,8 +204,8 @@ export default function HeroSection({
                   customizations={customizations}
                   defaultImage={getHeroImage()}
                 >
-                  {/* Photo container with rounded corners */}
-                  <div className="w-full h-full rounded-[40px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
+                  {/* Photo container - SIZE IS CONTROLLED HERE */}
+                  <div className="w-[180px] h-[300px] rounded-[40px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
                     <img 
                       src={getHeroImage()} 
                       alt={displayName}
@@ -214,6 +213,8 @@ export default function HeroSection({
                     />
                   </div>
                 </EditableImage>
+              </div>
+            </div>
                 
                 {/* Decorative frame effect */}
                 <div className="absolute inset-0 rounded-[40px] border-4 border-white/20 pointer-events-none"></div>
