@@ -240,7 +240,7 @@ export default function TemplateRenderer() {
             components.home ? (
               <components.home 
                 caseData={caseData}
-                customizations={caseData.template_data?.pages?.home || {}}
+                customizations={caseData.template_data || {}}
                 isEditing={isEditing}
                 onCustomizationChange={(field, value) => handleUpdate(`pages.home.${field}`, value)}
               />
