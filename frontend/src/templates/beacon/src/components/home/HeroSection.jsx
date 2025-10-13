@@ -201,6 +201,7 @@ export default function HeroSection({
                 onEdit={onEditSection}
                 customizations={customizations}
                 defaultImage={getHeroImage()}
+                fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='250' viewBox='0 0 150 250'%3E%3Crect width='150' height='250' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='16' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E"
               >
                 <div className="relative">
                   {/* Smaller portrait photo with very rounded corners */}
