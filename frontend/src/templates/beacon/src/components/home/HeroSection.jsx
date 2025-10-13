@@ -15,38 +15,32 @@ export default function HeroSection({
   
   // Get hero image with proper fallback
   const getHeroImage = () => {
-    console.log('🎯 NESTED CUSTOMIZATIONS:', caseData.template_data.customizations);
     console.log('🖼️ HERO IMAGE DEBUG:', {
       'customizations?.hero_image': customizations?.hero_image,
       'primaryPhotoUrl': primaryPhotoUrl
     });
     
     // PRIORITY 1: Check customizations first (where uploads are saved)
-    if (customizations?.hero_image) {
-      console.log('✅ Using customizations.hero_image');
+    if (customizations?.customizations?.hero_image) {
       return customizations.hero_image;
     }
     
     // PRIORITY 2: Check primaryPhotoUrl prop
     if (primaryPhotoUrl && primaryPhotoUrl !== 'null' && primaryPhotoUrl !== null) {
-      console.log('✅ Using primaryPhotoUrl');
       return primaryPhotoUrl;
     }
     
     // PRIORITY 3: Check caseData.primary_photo
     if (caseData.primary_photo) {
-      console.log('✅ Using caseData.primary_photo');
       return caseData.primary_photo;
     }
     
     // PRIORITY 4: Check caseData.photos array
     if (caseData.photos && caseData.photos.length > 0) {
-      console.log('✅ Using caseData.photos[0]');
       return caseData.photos[0].image_url;
     }
     
     // FALLBACK: Gray silhouette placeholder
-    console.log('⚠️ Using fallback image');
     return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='300' viewBox='0 0 180 300'%3E%3Crect width='180' height='300' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='16' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E";
   };
 
