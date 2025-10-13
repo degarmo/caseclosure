@@ -15,6 +15,9 @@ export default function HeroSection({
   
   // Get hero image with proper fallback
   const getHeroImage = () => {
+    console.log('🔍 FULL CUSTOMIZATIONS OBJECT:', customizations);
+    console.log('🔍 FULL CUSTOMIZATIONS KEYS:', Object.keys(customizations));
+    console.log('🔍 FULL CASE DATA:', caseData);
     console.log('🖼️ HERO IMAGE DEBUG:', {
       'customizations?.hero_image': customizations?.hero_image,
       'primaryPhotoUrl': primaryPhotoUrl
