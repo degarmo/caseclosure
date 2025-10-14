@@ -221,20 +221,19 @@ export default function About({
     return parts.join(' ') || 'Unknown';
   };
 
-  // Get primary photo - check customizations first
   const getPrimaryPhotoUrl = () => {
     console.log('📸 About Main Image Debug:', {
-      'customizations.about_main_image': customizations.about_main_image,
+      'customizations?.customizations?.about_main_image': customizations?.customizations?.about_main_image,
       'all customizations keys': Object.keys(customizations)
     });
     
-    // Check customizations first for about_main_image
-    if (customizations.about_main_image) {
-      console.log('✅ Using customizations.about_main_image');
-      return customizations.about_main_image;
+    // PRIORITY 1: Check template_data.customizations (where uploads are saved)
+    if (customizations?.customizations?.about_main_image) {
+      console.log('✅ Using customizations.customizations.about_main_image');
+      return customizations.customizations.about_main_image;
     }
     
-    // Then check case data
+    // Then check case data fallbacks...
     if (caseData.primary_photo_url) return caseData.primary_photo_url;
     if (caseData.victim_photo_url) return caseData.victim_photo_url;
     if (caseData.photos && caseData.photos.length > 0) {
@@ -243,7 +242,7 @@ export default function About({
     }
     
     console.log('⚠️ Using fallback image');
-    return "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=600&fit=crop";
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='500' viewBox='0 0 400 500'%3E%3Crect width='400' height='500' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='20' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E";
   };
 
   // Format dates
