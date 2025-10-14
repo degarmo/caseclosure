@@ -255,9 +255,16 @@ export default function TemplateRenderer() {
             element={
               <components.about 
                 caseData={caseData}
-                customizations={caseData.template_data?.pages?.about || {}}
+                customizations={caseData.template_data || {}}  // CHANGED: now gets full template_data
                 isEditing={isEditing}
-                onCustomizationChange={(field, value) => handleUpdate(`pages.about.${field}`, value)}
+                onCustomizationChange={(field, value) => {
+                  // Smart routing: images go to customizations, text goes to pages.about
+                  if (field === 'about_main_image' || field.startsWith('gallery_')) {
+                    handleUpdate(`customizations.${field}`, value);
+                  } else {
+                    handleUpdate(`pages.about.${field}`, value);
+                  }
+                }}
               />
             } 
           />
