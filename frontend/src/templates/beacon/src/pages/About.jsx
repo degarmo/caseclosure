@@ -3,7 +3,7 @@ import React from "react";
 import { Heart, GraduationCap, Users, MapPin, Calendar, User, Phone, Mail, Camera, Plus, X } from "lucide-react";
 import EditableSection, { EditableImage, EditableText } from '@/components/CaseCreator/views/CustomizationView/components/EditableSection';
 
-// Gallery Manager Component - FIXED VERSION
+// Gallery Manager Component
 const GalleryManager = ({ customizations, onCustomizationChange, isEditing, onEditSection }) => {
   // Get current gallery images from customizations
   const getGalleryImages = () => {
@@ -38,7 +38,7 @@ const GalleryManager = ({ customizations, onCustomizationChange, isEditing, onEd
     });
   };
 
-  // Remove image - FIXED VERSION
+  // Remove image
   const handleRemoveImage = (indexToRemove) => {
     console.log(`Removing gallery image at index ${indexToRemove}`);
     
@@ -64,7 +64,6 @@ const GalleryManager = ({ customizations, onCustomizationChange, isEditing, onEd
     }
     
     // Clear the parent's customizations and set new ones
-    // This ensures we don't have leftover keys
     if (onCustomizationChange) {
       // First, explicitly remove the old last item keys
       const lastIndex = totalImages - 1;
@@ -141,7 +140,7 @@ const GalleryManager = ({ customizations, onCustomizationChange, isEditing, onEd
                 {isEditing && (
                   <button
                     onClick={() => handleRemoveImage(index)}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600"
+                    className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-30"
                     title="Remove image"
                   >
                     <X className="w-4 h-4" />
@@ -220,10 +219,18 @@ export default function About({
     return parts.join(' ') || 'Unknown';
   };
 
-  // Get primary photo
+  // Get primary photo - check customizations first
   const getPrimaryPhotoUrl = () => {
+    console.log('📸 About Main Image Debug:', {
+      'customizations.about_main_image': customizations.about_main_image,
+      'all customizations keys': Object.keys(customizations)
+    });
+    
     // Check customizations first for about_main_image
-    if (customizations.about_main_image) return customizations.about_main_image;
+    if (customizations.about_main_image) {
+      console.log('✅ Using customizations.about_main_image');
+      return customizations.about_main_image;
+    }
     
     // Then check case data
     if (caseData.primary_photo_url) return caseData.primary_photo_url;
@@ -232,6 +239,8 @@ export default function About({
       const primaryPhoto = caseData.photos.find(p => p.is_primary);
       return primaryPhoto ? primaryPhoto.image_url : caseData.photos[0].image_url;
     }
+    
+    console.log('⚠️ Using fallback image');
     return "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=600&fit=crop";
   };
 
@@ -346,6 +355,7 @@ export default function About({
                 onEdit={onEditSection}
                 customizations={customizations}
                 className="w-full h-96 lg:h-[500px] object-cover rounded-lg shadow-md"
+                fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='500' viewBox='0 0 400 500'%3E%3Crect width='400' height='500' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='20' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E"
               />
             </div>
             <div className="lg:w-1/2 space-y-6">
@@ -437,31 +447,35 @@ export default function About({
         </div>
       </div>
 
-      {/* Family Message - Always show in edit mode, conditional in preview */}
-      {(isEditing || customizations.family_message) && (
-        <EditableSection
-          sectionId="family_message"
-          sectionType="content"
-          label="Family Message"
-          isEditing={isEditing}
-          onEdit={onEditSection}
-          customizations={customizations}
-          className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl shadow-lg mb-12 border border-yellow-200"
-        >
-          <div className="p-8">
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-slate-800">
-                A Message from {caseData.first_name ? `${caseData.first_name}'s` : 'Our'} Family
-              </h3>
-            </div>
-            <blockquote className="text-lg text-slate-600 italic leading-relaxed text-center">
-              "{getContent('family_message', 
-                'Your loved one will always be remembered. We appreciate all the support from our community during this difficult time.')}"
-            </blockquote>
-            <p className="text-center text-slate-500 mt-6">- The {caseData.last_name || 'Family'} Family</p>
+      {/* MOVED: Family Message Section - Now directly after Main Photo/Bio */}
+      <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl shadow-lg mb-12 border border-yellow-200">
+        <div className="p-8">
+          <div className="text-center mb-6">
+            <h3 className="text-2xl font-bold text-slate-800">
+              A Message from {caseData.first_name ? `${caseData.first_name}'s` : 'Our'} Family
+            </h3>
           </div>
-        </EditableSection>
-      )}
+          
+          <EditableText
+            sectionId="family_message"
+            label="Family Message"
+            isEditing={isEditing}
+            onEdit={onEditSection}
+            customizations={customizations}
+            defaultContent={`We miss ${caseData.first_name || 'our loved one'} every day. Your support means everything to us as we seek justice and closure. If you have any information, please come forward.`}
+          >
+            <blockquote className="text-lg text-slate-600 italic leading-relaxed text-center">
+              {customizations.family_message ? (
+                <div dangerouslySetInnerHTML={{ __html: `"${customizations.family_message}"` }} />
+              ) : (
+                <p>"{`We miss ${caseData.first_name || 'our loved one'} every day. Your support means everything to us as we seek justice and closure. If you have any information, please come forward.`}"</p>
+              )}
+            </blockquote>
+          </EditableText>
+          
+          <p className="text-center text-slate-500 mt-6">- The {caseData.last_name || 'Family'} Family</p>
+        </div>
+      </div>
 
       {/* Photo Gallery Section */}
       <GalleryManager
