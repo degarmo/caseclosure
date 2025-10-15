@@ -15,9 +15,10 @@ def api_root(request):
         "endpoints": {
             "auth": "/api/auth/",
             "cases": "/api/cases/",
+            "case-spotlight": "/api/case-spotlight/",  # ✅ ADDED: New case-specific spotlight
             "images": "/api/images/upload/",
             "tracker": "/api/tracker/",
-            "spotlight": "/api/spotlight/",  # Added spotlight endpoint
+            "spotlight": "/api/spotlight/",  # OLD: Main site spotlight (still exists)
             "dashboard": "/api/dashboard/",
             "admin": "/admin/",
         }
@@ -33,14 +34,13 @@ urlpatterns = [
     
     # API Endpoints - Consolidated to avoid duplication
     path('api/auth/', include('accounts.urls')),  # Authentication endpoints
-    path('api/', include('cases.urls')),  # Cases endpoints (includes images/upload/) - REMOVED DUPLICATE
+    path('api/', include('cases.urls')),  # Cases endpoints (includes case-spotlight!)
     path('api/tracker/', include('tracker.urls')), # Tracker endpoints
     path('api/dashboard/', include('dashboard.urls')),
-    path('api/', include('spotlight.urls')),  # Spotlight endpoints
+    path('api/', include('spotlight.urls')),  # OLD: Main site spotlight
     path('api/', include('contact.urls')),
     
     # Django-allauth URLs for Google OAuth
-    # This must be at the root level for OAuth callbacks to work
     path('accounts/', include('allauth.urls')),
     
     # Google OAuth redirect endpoints (handled by accounts app)

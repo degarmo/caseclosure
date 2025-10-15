@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.throttling import UserRateThrottle
-from django.db.models import Q
+from django.db.models import Q, F
 from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
@@ -810,36 +810,120 @@ class CaseViewSet(viewsets.ModelViewSet):
         super().perform_destroy(instance)
 
 
+# cases/views.py
+# Find your existing SpotlightPostViewSet class and REPLACE it with this entire class
+
 class SpotlightPostViewSet(viewsets.ModelViewSet):
-    """ViewSet for Spotlight blog posts."""
+    """ViewSet for case-specific Spotlight blog posts with permissions."""
     serializer_class = SpotlightPostSerializer
-    permission_classes = [IsAuthenticated]
+    
+    def get_permissions(self):
+        """Public can view, authenticated can create/edit their own posts."""
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsAuthenticated()]
     
     def get_queryset(self):
-        """Filter posts based on case ownership."""
-        user = self.request.user
+        """Filter posts based on permissions and filters."""
+        queryset = SpotlightPost.objects.select_related('case').all()
+        
+        # Filter by case_id if provided
         case_id = self.request.query_params.get('case_id')
-        
         if case_id:
-            return SpotlightPost.objects.filter(
-                case__id=case_id,
-                case__user=user
-            ).order_by('-created_at')
+            queryset = queryset.filter(case__id=case_id)
         
-        return SpotlightPost.objects.filter(
-            case__user=user
-        ).order_by('-created_at')
+        # Filter by case subdomain (for public template pages)
+        subdomain = self.request.query_params.get('subdomain')
+        if subdomain:
+            queryset = queryset.filter(case__subdomain=subdomain)
+        
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        
+        # Handle permissions
+        if self.request.user.is_authenticated:
+            if self.request.user.is_staff or self.request.user.is_superuser:
+                # Admin can see all posts
+                if status_filter:
+                    queryset = queryset.filter(status=status_filter)
+            else:
+                # Users can see their own posts (any status) or published posts from others
+                queryset = queryset.filter(
+                    Q(case__user=self.request.user) |
+                    Q(status='published', published_at__lte=timezone.now())
+                )
+                if status_filter:
+                    queryset = queryset.filter(
+                        case__user=self.request.user,
+                        status=status_filter
+                    )
+        else:
+            # Public can only see published posts
+            queryset = queryset.filter(
+                status='published',
+                published_at__lte=timezone.now()
+            )
+        
+        return queryset.order_by('-is_pinned', '-published_at', '-created_at')
     
     def perform_create(self, serializer):
-        """Create a new spotlight post."""
-        case_id = self.request.data.get('case_id')
+        """Create a new spotlight post with validation."""
+        case_id = self.request.data.get('case')
+        
+        if not case_id:
+            raise ValidationError("case is required")
         
         try:
-            case = Case.objects.get(id=case_id, user=self.request.user)
+            case = Case.objects.get(id=case_id)
         except Case.DoesNotExist:
-            raise ValidationError("Case not found or you don't have permission.")
+            raise ValidationError("Case not found")
+        
+        # Permission check: User must own the case OR be admin
+        if not (case.user == self.request.user or 
+                self.request.user.is_staff or 
+                self.request.user.is_superuser):
+            raise PermissionDenied("You can only create posts for your own cases")
+        
+        # Set published_at if status is published
+        if serializer.validated_data.get('status') == 'published':
+            if not serializer.validated_data.get('published_at'):
+                serializer.validated_data['published_at'] = timezone.now()
         
         serializer.save(case=case)
+    
+    def perform_update(self, serializer):
+        """Update existing post with permission check."""
+        instance = self.get_object()
+        
+        # Permission check
+        if not (instance.case.user == self.request.user or 
+                self.request.user.is_staff or 
+                self.request.user.is_superuser):
+            raise PermissionDenied("You can only edit posts for your own cases")
+        
+        # Handle status changes
+        if serializer.validated_data.get('status') == 'published' and not instance.published_at:
+            serializer.validated_data['published_at'] = timezone.now()
+        
+        serializer.save()
+    
+    def perform_destroy(self, instance):
+        """Delete post with permission check."""
+        if not (instance.case.user == self.request.user or 
+                self.request.user.is_staff or 
+                self.request.user.is_superuser):
+            raise PermissionDenied("You can only delete posts for your own cases")
+        
+        instance.delete()
+    
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
+    def increment_view(self, request, pk=None):
+        """Increment view count for a post."""
+        post = self.get_object()
+        post.view_count = F('view_count') + 1
+        post.save(update_fields=['view_count'])
+        post.refresh_from_db()
+        return Response({'view_count': post.view_count})
 
 
 class TemplateRegistryViewSet(viewsets.ReadOnlyModelViewSet):
