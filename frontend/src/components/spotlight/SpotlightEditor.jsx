@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import RichTextEditor from '@/common/RichTextEditor';
 import SpotlightScheduler from './SpotlightScheduler';
 
-const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseName = null }) => {
+const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseId = null, caseName = null, cases = [] }) => {
+  const [selectedCase, setSelectedCase] = useState(caseId || initialData?.case || '');
   const [title, setTitle] = useState(initialData?.title || '');
   const [content, setContent] = useState(initialData?.content || '');
   const [postType, setPostType] = useState(initialData?.post_type || 'update');
@@ -58,30 +59,40 @@ const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseName = nu
   };
 
   const handleSubmit = async () => {
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('content', content);
-    formData.append('post_type', postType);
-    formData.append('priority', priority);
-    formData.append('is_sensitive', isSensitive);
-    formData.append('case_name', caseName || 'General');
-    
-    // Convert tags string to array
-    const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
-    formData.append('tags', JSON.stringify(tagsArray));
-    
-    if (scheduledDate) {
-      formData.append('scheduled_for', scheduledDate.toISOString());
-      formData.append('status', 'scheduled');
-    } else {
-      formData.append('status', status);
+    // Validate case selection
+    if (!selectedCase && !caseId) {
+      alert('Please select a case');
+      return;
     }
-    
-    images.forEach(img => {
-      formData.append('media_files', img.file);
-    });
 
-    await onSubmit(formData);
+    // Prepare post data
+    const postData = {
+      case: selectedCase || caseId,  // ✅ IMPORTANT: Include case ID
+      title,
+      content,
+      status: scheduledDate ? 'scheduled' : status,
+      post_type: postType,
+      priority,
+      is_sensitive: isSensitive,
+    };
+
+    // Add tags
+    const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+    if (tagsArray.length > 0) {
+      postData.tags = tagsArray;
+    }
+
+    // Add scheduled date if set
+    if (scheduledDate) {
+      postData.scheduled_for = scheduledDate.toISOString();
+    }
+
+    // Add first image as featured_image if exists
+    if (images.length > 0) {
+      postData.featured_image = images[0].file;
+    }
+
+    await onSubmit(postData);
   };
 
   const isContentEmpty = () => {
@@ -124,6 +135,23 @@ const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseName = nu
         </div>
 
         <div className="p-6 space-y-4">
+          {!caseId && cases.length > 0 && (
+            <div>
+              <Label>Select Case *</Label>
+              <Select value={selectedCase} onValueChange={setSelectedCase}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose which case this post is for" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cases.map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.case_title || `${c.first_name} ${c.last_name}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {/* Post Type and Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -279,7 +307,7 @@ const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseName = nu
               
               <Button
                 onClick={handleSubmit}
-                disabled={isContentEmpty()}
+                disabled={isContentEmpty() || (!selectedCase && !caseId)}
                 className="bg-slate-800 hover:bg-slate-700 text-white"
               >
                 {scheduledDate ? 'Schedule' : status === 'draft' ? 'Save' : 'Post'}

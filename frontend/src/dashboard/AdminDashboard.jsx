@@ -69,11 +69,16 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
   const fetchCases = async () => {
     try {
       const response = await api.get('/cases/');
-      setCases(response.data);
+      // Handle both array and paginated responses
+      const casesData = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data?.results || []);
+      
+      setCases(casesData);
       setStats(prev => ({
         ...prev,
-        totalCases: response.data.length,
-        activeCases: response.data.filter(c => !c.is_disabled && c.status === 'active').length
+        totalCases: casesData.length,
+        activeCases: casesData.filter(c => !c.is_disabled && c.status === 'active').length
       }));
     } catch (error) {
       console.error('Error fetching cases:', error);
@@ -134,7 +139,10 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
   const fetchSpotlightData = async () => {
     try {
       const response = await api.get('/spotlight/');
-      const allPosts = response.data || [];
+      // Handle both array and paginated responses
+      const allPosts = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data?.results || []);
       
       const now = new Date();
       const published = allPosts.filter(post => 
