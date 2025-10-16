@@ -41,15 +41,16 @@ class SpotlightPostSerializer(serializers.ModelSerializer):
     is_liked = serializers.SerializerMethodField()
     comments = SpotlightCommentSerializer(many=True, read_only=True)
     is_bookmarked = serializers.SerializerMethodField()
+    case_title = serializers.SerializerMethodField()  # ✅ NEW
     
     class Meta:
         model = SpotlightPost
-        fields = ['id', 'title', 'content', 'content_text', 'status', 
+        fields = ['id', 'case', 'case_title', 'title', 'content', 'content_text', 'status',  # ✅ UPDATED: Added case, case_title
                   'scheduled_for', 'published_at', 'author', 'author_name', 
                   'author_username', 'views_count', 'likes_count', 'comments_count',
                   'media', 'is_liked', 'is_bookmarked', 'comments', 'slug', 
                   'is_featured', 'created_at', 'updated_at', 'tags', 'case_name',
-                  'is_flagged', 'post_type', 'priority']
+                  'is_flagged', 'post_type', 'priority', 'featured_image']  # ✅ UPDATED: Added featured_image
     
     def get_is_liked(self, obj):
         request = self.context.get('request')
@@ -60,6 +61,12 @@ class SpotlightPostSerializer(serializers.ModelSerializer):
     def get_is_bookmarked(self, obj):
         # Implement bookmark logic if you have a bookmark model
         return False
+    
+    def get_case_title(self, obj):  # ✅ NEW METHOD
+        """Get the case title if case exists"""
+        if obj.case:
+            return obj.case.case_title or f"{obj.case.first_name} {obj.case.last_name}"
+        return None
 
 class SpotlightPostCreateSerializer(serializers.ModelSerializer):
     media_files = serializers.ListField(
@@ -70,8 +77,25 @@ class SpotlightPostCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = SpotlightPost
-        fields = ['title', 'content', 'content_text', 'status', 
-                  'scheduled_for', 'media_files', 'tags', 'case_name']
+        fields = ['case', 'title', 'content', 'content_text', 'status',  # ✅ UPDATED: Added case
+                  'scheduled_for', 'media_files', 'tags', 'case_name',
+                  'post_type', 'priority', 'is_sensitive', 'featured_image']  # ✅ UPDATED: Added post_type, priority, is_sensitive, featured_image
+    
+    def validate(self, data):
+        """Validate case permissions"""
+        request = self.context.get('request')
+        case = data.get('case')
+        
+        if case and request:
+            # Staff can post to any case
+            if not request.user.is_staff:
+                # Regular users can only post to their own cases
+                if case.user != request.user:
+                    raise serializers.ValidationError(
+                        "You don't have permission to post to this case"
+                    )
+        
+        return data
     
     def create(self, validated_data):
         media_files = validated_data.pop('media_files', [])
@@ -104,13 +128,19 @@ class ModerationQueueSerializer(serializers.ModelSerializer):
     flags = SpotlightFlagSerializer(many=True, read_only=True)
     flags_count = serializers.IntegerField(read_only=True)
     media = SpotlightMediaSerializer(many=True, read_only=True)
+    case_title = serializers.SerializerMethodField()  # ✅ NEW
     
     class Meta:
         model = SpotlightPost
-        fields = ['id', 'title', 'content', 'content_text', 'author_name', 
+        fields = ['id', 'case', 'case_title', 'title', 'content', 'content_text', 'author_name',  # ✅ UPDATED: Added case, case_title
                   'author_username', 'case_name', 'created_at', 'published_at',
                   'flags', 'flags_count', 'media', 'status', 'tags', 
                   'views_count', 'likes_count', 'comments_count']
+    
+    def get_case_title(self, obj):  # ✅ NEW METHOD
+        if obj.case:
+            return obj.case.case_title or f"{obj.case.first_name} {obj.case.last_name}"
+        return None
 
 class UserViolationSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)

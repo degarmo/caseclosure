@@ -49,6 +49,16 @@ class SpotlightPostViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = SpotlightPost.objects.all()
         
+        # ✅ NEW: Case filtering
+        case_id = self.request.query_params.get('case_id')
+        if case_id:
+            if case_id.lower() in ['none', 'null', 'main']:
+                # Main site posts only
+                queryset = queryset.filter(case__isnull=True)
+            else:
+                # Specific case posts
+                queryset = queryset.filter(case_id=case_id)
+        
         # Check if user is authenticated
         if self.request.user.is_authenticated:
             if self.request.user.is_staff:
@@ -85,7 +95,7 @@ class SpotlightPostViewSet(viewsets.ModelViewSet):
         if tag_filter:
             queryset = queryset.filter(tags__contains=[tag_filter])
         
-        return queryset.select_related('author').prefetch_related('media', 'likes', 'comments', 'flags')
+        return queryset.select_related('author', 'case').prefetch_related('media', 'likes', 'comments', 'flags')
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -182,6 +192,11 @@ class SpotlightPostViewSet(viewsets.ModelViewSet):
         post.views_count += 1
         post.save()
         return Response({'views_count': post.views_count})
+    
+    @action(detail=True, methods=['post'])
+    def increment_view(self, request, pk=None):
+        """Alias for view action for compatibility"""
+        return self.view(request, pk)
     
     @action(detail=False, methods=['get'])
     def scheduled(self, request):

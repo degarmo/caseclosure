@@ -26,6 +26,17 @@ class SpotlightPost(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # ✅ NEW: Proper Case relationship
+    case = models.ForeignKey(
+        'cases.Case',
+        on_delete=models.CASCADE,
+        null=True,  # ✅ Optional - null = main site post
+        blank=True,
+        related_name='spotlight_posts_main',  # Avoid conflict with cases/models.py
+        help_text="If null, this is a main site spotlight post. Otherwise, it's a case-specific post."
+    )
+    
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE, 
@@ -57,11 +68,14 @@ class SpotlightPost(models.Model):
     is_featured = models.BooleanField(default=False)
     
     # Additional fields
-    case_name = models.CharField(max_length=255, blank=True)
+    case_name = models.CharField(max_length=255, blank=True)  # Keep for backward compatibility
     post_type = models.CharField(max_length=50, default='update')
     priority = models.CharField(max_length=20, default='medium')
     is_sensitive = models.BooleanField(default=False)
     tags = models.JSONField(default=list, blank=True)
+    
+    # ✅ NEW: Media field for image uploads
+    featured_image = models.ImageField(upload_to='spotlight/%Y/%m/%d/', null=True, blank=True)
     
     # Moderation fields
     is_flagged = models.BooleanField(default=False)
@@ -72,6 +86,7 @@ class SpotlightPost(models.Model):
         indexes = [
             models.Index(fields=['status', 'scheduled_for']),
             models.Index(fields=['author', 'status']),
+            models.Index(fields=['case', 'status', '-published_at']),  # ✅ NEW: Case filter index
             models.Index(fields=['is_flagged', 'status']),
             models.Index(fields=['recurring_yearly', 'last_recurring_post']),
         ]
@@ -105,13 +120,8 @@ class SpotlightPost(models.Model):
         if not self.recurring_yearly or not self.scheduled_for:
             return False
         
-        from datetime import timedelta
         now = timezone.now()
-        
-        # Check if we haven't created a recurring post this year yet
         current_year = now.year
-        scheduled_month = self.scheduled_for.month
-        scheduled_day = self.scheduled_for.day
         
         try:
             # Get this year's date for the recurring post
@@ -123,8 +133,7 @@ class SpotlightPost(models.Model):
                     return True
         except ValueError:
             # Handle February 29 on non-leap years
-            if scheduled_month == 2 and scheduled_day == 29:
-                # Use February 28 for non-leap years
+            if self.scheduled_for.month == 2 and self.scheduled_for.day == 29:
                 this_years_date = self.scheduled_for.replace(year=current_year, day=28)
                 if now >= this_years_date:
                     if not self.last_recurring_post or self.last_recurring_post.year < current_year:
@@ -137,7 +146,6 @@ class SpotlightPost(models.Model):
         if not self.recurring_yearly:
             return None
         
-        from datetime import datetime
         current_year = timezone.now().year
         
         try:
@@ -149,6 +157,7 @@ class SpotlightPost(models.Model):
         # Create a copy of this post
         new_post = SpotlightPost.objects.create(
             author=self.author,
+            case=self.case,  # ✅ NEW: Copy case relationship
             title=self.title,
             content=self.content,
             content_text=self.content_text,
@@ -157,7 +166,7 @@ class SpotlightPost(models.Model):
             published_at=timezone.now() if new_scheduled_date <= timezone.now() else None,
             event_type=self.event_type,
             recurring_yearly=False,  # The copy is not recurring
-            parent_post=self,  # Reference to the original recurring post
+            parent_post=self,
             case_name=self.case_name,
             post_type=self.post_type,
             priority=self.priority,
@@ -181,6 +190,7 @@ class SpotlightPost(models.Model):
         
         return new_post
 
+
 class SpotlightMedia(models.Model):
     MEDIA_TYPES = [
         ('image', 'Image'),
@@ -203,6 +213,7 @@ class SpotlightMedia(models.Model):
     class Meta:
         ordering = ['order', 'uploaded_at']
 
+
 class SpotlightLike(models.Model):
     post = models.ForeignKey(SpotlightPost, on_delete=models.CASCADE, related_name='likes')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -210,6 +221,7 @@ class SpotlightLike(models.Model):
     
     class Meta:
         unique_together = ['post', 'user']
+
 
 class SpotlightComment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -223,6 +235,7 @@ class SpotlightComment(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
 
 class SpotlightFlag(models.Model):
     REASON_CHOICES = [
@@ -260,6 +273,7 @@ class SpotlightFlag(models.Model):
     class Meta:
         unique_together = ['post', 'reported_by']
         ordering = ['-created_at']
+
 
 class UserViolation(models.Model):
     VIOLATION_TYPES = [
@@ -306,6 +320,7 @@ class UserViolation(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
 
 class SpotlightSettings(models.Model):
     """Singleton model for Spotlight settings"""

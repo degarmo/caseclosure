@@ -422,3 +422,11 @@ TRACKING_RATE_LIMITS = {
     'api': (1000, 60),
     'auth': (5, 300),
 }
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'publish-scheduled-spotlight-posts': {
+        'task': 'spotlight.tasks.publish_scheduled_posts',
+        'schedule': crontab(minute='*/5'),  # Every 5 minutes
+    },
+}
