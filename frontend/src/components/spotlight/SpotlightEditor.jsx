@@ -11,7 +11,15 @@ import { Switch } from '@/components/ui/switch';
 import RichTextEditor from '@/common/RichTextEditor';
 import SpotlightScheduler from './SpotlightScheduler';
 
-const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseId = null, caseName = null, cases = [] }) => {
+const SpotlightEditor = ({ 
+  onSubmit, 
+  onCancel, 
+  initialData = null, 
+  caseId = null,      // For users - auto-set their case
+  caseName = null,
+  cases = []          // For admin - list of all cases to choose from
+}) => {
+  // Initialize selectedCase - if caseId provided, use it, otherwise empty
   const [selectedCase, setSelectedCase] = useState(caseId || initialData?.case || '');
   const [title, setTitle] = useState(initialData?.title || '');
   const [content, setContent] = useState(initialData?.content || '');
@@ -59,15 +67,17 @@ const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseId = null
   };
 
   const handleSubmit = async () => {
-    // Validate case selection
-    if (!selectedCase && !caseId) {
-      alert('Please select a case');
+    // Determine which case to use
+    const finalCaseId = selectedCase || caseId;
+    
+    // Validate case selection (only required if cases array exists and not main-website)
+    if (cases.length > 0 && !finalCaseId) {
+      alert('Please select a case to post to');
       return;
     }
 
     // Prepare post data
     const postData = {
-      case: selectedCase || caseId,  // ✅ IMPORTANT: Include case ID
       title,
       content,
       status: scheduledDate ? 'scheduled' : status,
@@ -75,6 +85,11 @@ const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseId = null
       priority,
       is_sensitive: isSensitive,
     };
+
+    // Only add case if one is selected AND it's not "main-website"
+    if (finalCaseId && finalCaseId !== 'main-website') {
+      postData.case = finalCaseId;
+    }
 
     // Add tags
     const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
@@ -135,23 +150,51 @@ const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseId = null
         </div>
 
         <div className="p-6 space-y-4">
-          {!caseId && cases.length > 0 && (
+          {/* Case Selector - Show if admin has multiple cases OR no caseId provided */}
+          {cases.length > 0 && (
             <div>
               <Label>Select Case *</Label>
-              <Select value={selectedCase} onValueChange={setSelectedCase}>
+              <Select 
+                value={selectedCase} 
+                onValueChange={setSelectedCase}
+                disabled={!!caseId}  // Disable if caseId is provided (user mode)
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose which case this post is for" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="main-website">
+                    ðŸŒ Main Website (Site-wide Post)
+                  </SelectItem>
                   {cases.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
+                    <SelectItem key={c.id} value={String(c.id)}>
                       {c.case_title || `${c.first_name} ${c.last_name}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {caseId && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Posting to: {caseName}
+                </p>
+              )}
+              {selectedCase === 'main-website' && (
+                <p className="text-xs text-blue-600 mt-1">
+                  This post will appear on the main website spotlight feed
+                </p>
+              )}
             </div>
           )}
+
+          {/* If no cases array and no caseId, show info message */}
+          {!cases.length && !caseId && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                ðŸ'¡ This will be a site-wide spotlight post (not tied to a specific case)
+              </p>
+            </div>
+          )}
+
           {/* Post Type and Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -307,7 +350,7 @@ const SpotlightEditor = ({ onSubmit, onCancel, initialData = null, caseId = null
               
               <Button
                 onClick={handleSubmit}
-                disabled={isContentEmpty() || (!selectedCase && !caseId)}
+                disabled={isContentEmpty() || (cases.length > 0 && !selectedCase && !caseId)}
                 className="bg-slate-800 hover:bg-slate-700 text-white"
               >
                 {scheduledDate ? 'Schedule' : status === 'draft' ? 'Save' : 'Post'}

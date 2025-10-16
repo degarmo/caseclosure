@@ -13,21 +13,6 @@ export default function Dashboard({
   activeSection,
   showProfileSettings 
 }) {
-  // Debug: Log what props we're receiving
-  useEffect(() => {
-    console.log('=== Dashboard Wrapper Debug ===');
-    console.log('Received props:', {
-      hasUser: !!user,
-      hasOnLogout: !!onLogout,
-      hasOnOpenCaseModal: !!onOpenCaseModal,
-      onOpenCaseModalType: typeof onOpenCaseModal,
-      hasOnOpenProfileSettings: !!onOpenProfileSettings,
-      userIsAdmin: user?.is_staff || user?.is_superuser
-    });
-    console.log('onOpenCaseModal function:', onOpenCaseModal);
-    console.log('===============================');
-  }, [user, onOpenCaseModal]);
-  
   // Check if user is admin
   const isAdmin = user?.is_staff || user?.is_superuser;
   
@@ -38,7 +23,6 @@ export default function Dashboard({
   });
   
   if (isAdmin) {
-    console.log('Rendering AdminDashboard with onOpenCaseModal:', !!handleOpenCaseModal);
     return (
       <AdminDashboard 
         user={user} 
@@ -49,9 +33,6 @@ export default function Dashboard({
   }
   
   // For regular users
-  console.log('Rendering UserDashboard with onOpenCaseModal:', !!handleOpenCaseModal);
-  
-  // Check if UserDashboard exists, if not show a simple fallback
   try {
     return (
       <UserDashboard 

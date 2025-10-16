@@ -837,11 +837,13 @@ export default function UserDashboard({ user, onLogout, onOpenCaseModal }) {
       {renderContent()}
 
       {/* Spotlight Editor Modal */}
-      {showSpotlightEditor && (
+      {showSpotlightEditor && userCase && (
         <SpotlightEditor
           onSubmit={handleCreateSpotlightPost}
           onCancel={() => setShowSpotlightEditor(false)}
-          caseName={userCase?.first_name}
+          caseId={userCase.id}  // ✅ User's case is auto-set
+          caseName={`${userCase.first_name} ${userCase.last_name}`}
+          // ❌ DON'T pass cases array for users - they only have one case
         />
       )}
     </DashboardLayout>

@@ -46,8 +46,12 @@ export function useSpotlight(options = {}) {
         ...(subdomain && { subdomain })
       };
 
-      const response = await api.get('/case-spotlight/', { params });
-      const allPosts = response.data || [];
+      const response = await api.get('/spotlight/', { params });
+      
+      // Handle both array and paginated responses
+      const allPosts = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data?.results || []);
       
       // Categorize posts
       const now = new Date();
@@ -125,7 +129,7 @@ export function useSpotlight(options = {}) {
         formData.append('featured_image', postData.featured_image);
       }
       
-      const response = await api.post('/case-spotlight/', formData, {
+      const response = await api.post('/spotlight/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
@@ -166,7 +170,7 @@ export function useSpotlight(options = {}) {
         }
       });
       
-      const response = await api.patch(`/case-spotlight/${postId}/`, formData, {
+      const response = await api.patch(`/spotlight/${postId}/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
@@ -191,7 +195,7 @@ export function useSpotlight(options = {}) {
     setError(null);
     
     try {
-      await api.delete(`/case-spotlight/${postId}/`);
+      await api.delete(`/spotlight/${postId}/`);
       await fetchPosts();
       return { success: true };
     } catch (err) {
@@ -209,7 +213,7 @@ export function useSpotlight(options = {}) {
    */
   const incrementViewCount = useCallback(async (postId) => {
     try {
-      await api.post(`/case-spotlight/${postId}/increment_view/`);
+      await api.post(`/spotlight/${postId}/increment_view/`);
     } catch (err) {
       console.error('Error incrementing view count:', err);
     }

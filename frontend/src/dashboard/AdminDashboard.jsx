@@ -10,7 +10,9 @@ import AccountRequests from './components/AccountRequests';
 import SiteSettings from './components/SiteSettings';
 import SpotlightEditor from '@/components/spotlight/SpotlightEditor';
 import SpotlightPostsList from '@/components/spotlight/SpotlightPostsList';
+import DeleteConfirmationModal from '@/components/spotlight/DeleteConfirmationModal';
 import ContactMessages from './components/ContactMessages';
+import { useSpotlight } from '@/hooks/useSpotlight';
 import api from '@/utils/axios';
 import { 
   Plus, Shield, Users, FileText, UserPlus, Settings, 
@@ -33,6 +35,10 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
     scheduledPosts: 0,
     totalMessages: 0
   });
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    postId: null
+  });
   const [cases, setCases] = useState([]);
   const [users, setUsers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -41,13 +47,29 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
   const [selectedPeriod, setSelectedPeriod] = useState('7d');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingPost, setEditingPost] = useState(null);
+
+  // Spotlight state
   const [showSpotlightEditor, setShowSpotlightEditor] = useState(false);
-  const [spotlightPosts, setSpotlightPosts] = useState([]);
-  const [delayedPosts, setDelayedPosts] = useState([]);
+  const [selectedCaseForSpotlight, setSelectedCaseForSpotlight] = useState(null);
+  
+  // Use spotlight hook
+  const spotlight = useSpotlight({
+    caseId: selectedCaseForSpotlight?.id || null,
+    autoFetch: true
+  });
 
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  useEffect(() => {
+    setStats(prev => ({
+      ...prev,
+      totalSpotlightPosts: spotlight.stats.published + spotlight.stats.drafts,
+      scheduledPosts: spotlight.stats.scheduled
+    }));
+  }, [spotlight.stats]);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -57,8 +79,7 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
         fetchUsers(),
         fetchAccountRequests(),
         fetchActivityFeed(),
-        fetchStats(),
-        fetchSpotlightData()
+        fetchStats()
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -69,7 +90,7 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
   const fetchCases = async () => {
     try {
       const response = await api.get('/cases/');
-      // Handle both array and paginated responses
+      
       const casesData = Array.isArray(response.data) 
         ? response.data 
         : (response.data?.results || []);
@@ -78,10 +99,11 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
       setStats(prev => ({
         ...prev,
         totalCases: casesData.length,
-        activeCases: casesData.filter(c => !c.is_disabled && c.status === 'active').length
+        activeCases: casesData.filter(c => !c.is_disabled).length
       }));
     } catch (error) {
       console.error('Error fetching cases:', error);
+      setCases([]);
     }
   };
 
@@ -114,9 +136,7 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
 
   const fetchActivityFeed = async () => {
     try {
-      const response = await api.get('/activity/feed/');
-      const activities = Array.isArray(response.data) ? response.data : (response.data.results || []);
-      setActivityFeed(activities.slice(0, 20));
+      setActivityFeed([]);
     } catch (error) {
       console.error('Error fetching activity feed:', error);
       setActivityFeed([]);
@@ -136,38 +156,10 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
     }
   };
 
-  const fetchSpotlightData = async () => {
-    try {
-      const response = await api.get('/spotlight/');
-      // Handle both array and paginated responses
-      const allPosts = Array.isArray(response.data) 
-        ? response.data 
-        : (response.data?.results || []);
-      
-      const now = new Date();
-      const published = allPosts.filter(post => 
-        post.status === 'published' || post.status === 'draft'
-      );
-      const delayed = allPosts.filter(post => 
-        post.status === 'scheduled' && new Date(post.scheduled_for) > now
-      );
-      
-      setSpotlightPosts(published);
-      setDelayedPosts(delayed);
-      
-      setStats(prev => ({
-        ...prev,
-        totalSpotlightPosts: published.length,
-        scheduledPosts: delayed.length
-      }));
-    } catch (error) {
-      console.error('Error fetching spotlight stats:', error);
-    }
-  };
-
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchAllData();
+    await spotlight.refresh();
     setTimeout(() => setRefreshing(false), 500);
   };
 
@@ -179,17 +171,56 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
     }
   };
 
-  const handleCreateSpotlightPost = async (formData) => {
-    try {
-      const response = await api.post('/spotlight/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      await fetchSpotlightData();
-      setShowSpotlightEditor(false);
-    } catch (error) {
-      console.error('Error creating spotlight post:', error);
+  // Spotlight handlers
+  const handleOpenSpotlightEditor = async (caseToPost = null) => {
+    if (cases.length === 0 && !loading) {
+      await fetchCases();
     }
+    
+    if (caseToPost) {
+      setSelectedCaseForSpotlight(caseToPost);
+    } else if (cases.length === 1) {
+      setSelectedCaseForSpotlight(cases[0]);
+    }
+    
+    setShowSpotlightEditor(true);
+  };
+
+  const handleCreateSpotlightPost = async (postData) => {
+    let result;
+    if (editingPost) {
+      // Update existing post
+      result = await spotlight.updatePost(editingPost.id, postData);
+    } else {
+      // Create new post
+      result = await spotlight.createPost(postData);
+    }
+    
+    if (result.success) {
+      setShowSpotlightEditor(false);
+      setEditingPost(null);
+      setSelectedCaseForSpotlight(null);
+      await spotlight.refresh();
+    } else {
+      alert(`Error: ${result.error}`);
+    }
+  };
+
+  const handleEditPost = (post) => {
+    setEditingPost(post);
+    setShowSpotlightEditor(true);
+  };
+
+  const handleDeletePost = (postId) => {
+    setDeleteConfirm({ isOpen: true, postId });
+  };
+
+  const confirmDelete = async () => {
+    const result = await spotlight.deletePost(deleteConfirm.postId);
+    if (result.success) {
+      await spotlight.refresh();
+    }
+    setDeleteConfirm({ isOpen: false, postId: null });
   };
 
   const handleViewUser = (userId) => {
@@ -247,7 +278,7 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
           id: 'spotlight-create',
           label: 'Create Post',
           icon: Plus,
-          onClick: () => setShowSpotlightEditor(true)
+          onClick: () => handleOpenSpotlightEditor()
         },
         {
           id: 'spotlight-posts',
@@ -258,7 +289,7 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
         },
         {
           id: 'spotlight-delayed',
-          label: 'Delayed Posts',
+          label: 'Scheduled Posts',
           icon: Clock,
           badge: stats.scheduledPosts,
           onClick: () => setActiveSection('spotlight-delayed')
@@ -532,25 +563,87 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
 
       case 'spotlight-posts':
         return (
-          <SpotlightPostsList 
-            posts={spotlightPosts}
-            onRefresh={fetchSpotlightData}
-            title="All Spotlight Posts"
-            emptyMessage="No spotlight posts have been created yet."
-            isAdmin={true}
-          />
+          <div>
+            {cases.length > 1 && (
+              <div className="mb-4 flex items-center gap-3">
+                <label className="text-sm font-medium">Filter by Case:</label>
+                <select
+                  value={selectedCaseForSpotlight?.id || 'all'}
+                  onChange={(e) => {
+                    const caseId = e.target.value;
+                    if (caseId === 'all') {
+                      setSelectedCaseForSpotlight(null);
+                    } else {
+                      const foundCase = cases.find(c => c.id === caseId);
+                      setSelectedCaseForSpotlight(foundCase);
+                    }
+                  }}
+                  className="px-3 py-2 border rounded-lg"
+                >
+                  <option value="all">All Cases</option>
+                  {cases.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.case_title || `${c.first_name} ${c.last_name}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <SpotlightPostsList 
+              posts={spotlight.publishedPosts.concat(spotlight.draftPosts)}
+              onRefresh={spotlight.refresh}
+              onEdit={handleEditPost}
+              onDelete={handleDeletePost}
+              loading={spotlight.loading}
+              title="All Spotlight Posts"
+              emptyMessage="No spotlight posts have been created yet."
+              isAdmin={true}
+            />
+          </div>
         );
 
       case 'spotlight-delayed':
         return (
-          <SpotlightPostsList 
-            posts={delayedPosts}
-            onRefresh={fetchSpotlightData}
-            title="Delayed Posts"
-            emptyMessage="No scheduled posts."
-            showScheduledTime={true}
-            isAdmin={true}
-          />
+          <div>
+            {cases.length > 1 && (
+              <div className="mb-4 flex items-center gap-3">
+                <label className="text-sm font-medium">Filter by Case:</label>
+                <select
+                  value={selectedCaseForSpotlight?.id || 'all'}
+                  onChange={(e) => {
+                    const caseId = e.target.value;
+                    if (caseId === 'all') {
+                      setSelectedCaseForSpotlight(null);
+                    } else {
+                      const foundCase = cases.find(c => c.id === caseId);
+                      setSelectedCaseForSpotlight(foundCase);
+                    }
+                  }}
+                  className="px-3 py-2 border rounded-lg"
+                >
+                  <option value="all">All Cases</option>
+                  {cases.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.case_title || `${c.first_name} ${c.last_name}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <SpotlightPostsList 
+              posts={spotlight.scheduledPosts}
+              onRefresh={spotlight.refresh}
+              onEdit={handleEditPost}
+              onDelete={handleDeletePost}
+              loading={spotlight.loading}
+              title="Scheduled Posts"
+              emptyMessage="No scheduled posts."
+              showScheduledTime={true}
+              isAdmin={true}
+            />
+          </div>
         );
 
       case 'messages-all':
@@ -567,7 +660,7 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
 
       case 'cases-active':
         return <CasesList 
-          cases={cases.filter(c => !c.is_disabled && c.status === 'active')} 
+          cases={cases.filter(c => !c.is_disabled)} 
           filter="active" 
           onRefresh={fetchCases} 
         />;
@@ -650,7 +743,6 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
       subtitle="System administration and monitoring"
       isAdmin={true}
     >
-      {/* Header Actions */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <button
@@ -686,17 +778,28 @@ export default function AdminDashboard({ user, onLogout, onOpenCaseModal }) {
         </div>
       </div>
 
-      {/* Render Dynamic Content */}
       {renderContent()}
 
-      {/* Spotlight Editor Modal */}
       {showSpotlightEditor && (
         <SpotlightEditor
           onSubmit={handleCreateSpotlightPost}
-          onCancel={() => setShowSpotlightEditor(false)}
-          caseName="Admin Post"
+          onCancel={() => {
+            setShowSpotlightEditor(false);
+            setEditingPost(null);
+          }}
+          initialData={editingPost}
+          cases={cases}
         />
       )}
+
+      <DeleteConfirmationModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Spotlight Post"
+        message="Are you sure you want to delete this post? This action cannot be undone."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, postId: null })}
+        isLoading={spotlight.loading}
+      />
     </DashboardLayout>
   );
 }

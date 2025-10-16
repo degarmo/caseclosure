@@ -8,9 +8,12 @@ import { Badge } from '@/components/ui/badge';
 export default function SpotlightPostsList({ 
   posts, 
   onRefresh, 
+  onEdit,
+  onDelete,
   title, 
   emptyMessage,
-  showScheduledTime = false 
+  showScheduledTime = false,
+  loading = false
 }) {
   const getStatusBadge = (status) => {
     const colors = {
@@ -90,10 +93,21 @@ export default function SpotlightPostsList({
                 </div>
                 
                 <div className="flex items-center gap-2 ml-4">
-                  <Button variant="ghost" size="sm">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => onEdit && onEdit(post)}
+                    disabled={loading}
+                  >
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-red-600 hover:text-red-700"
+                    onClick={() => onDelete(post.id)}
+                    disabled={loading}
+                  >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
