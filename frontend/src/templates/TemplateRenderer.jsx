@@ -1,4 +1,4 @@
-// src/templates/TemplateRenderer.jsx
+// src/templates/TemplateRenderer.jsx - Enhanced debugging version
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import api from '@/api/axios';
@@ -13,16 +13,28 @@ export default function TemplateRenderer() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
+  const [spotlightPosts, setSpotlightPosts] = useState([]);
 
   useEffect(() => {
     loadCase();
   }, []);
+
+  useEffect(() => {
+    console.log('🔄 Spotlight Effect Running - caseData:', caseData?.id);
+    if (caseData?.id) {
+      console.log('✅ Calling fetchSpotlightPosts for case:', caseData.id);
+      fetchSpotlightPosts();
+    } else {
+      console.log('❌ No caseData.id available yet');
+    }
+  }, [caseData?.id]);
 
   const loadCase = async () => {
     try {
       const subdomain = getSubdomain();
       const hostname = window.location.hostname;
       
+      // Enhanced debugging
       const debug = {
         hostname,
         subdomain,
@@ -30,17 +42,23 @@ export default function TemplateRenderer() {
         timestamp: new Date().toISOString()
       };
       
+      console.log('🔍 TemplateRenderer Debug:', debug);
       setDebugInfo(debug);
       
       let response;
       
       if (subdomain) {
+        console.log('🔡 Fetching case by subdomain:', subdomain);
         const url = `/cases/by-subdomain/${subdomain}/`;
+        console.log('🌐 API URL:', url);
         
         try {
           response = await api.get(url);
+          console.log('✅ API Response:', response.data);
         } catch (apiError) {
-          console.error('API Error:', apiError);
+          console.error('❌ API Error:', apiError);
+          console.error('Status:', apiError.response?.status);
+          console.error('Data:', apiError.response?.data);
           throw new Error(`API Error (${apiError.response?.status}): ${apiError.response?.data?.error || apiError.message}`);
         }
       } else {
@@ -52,12 +70,21 @@ export default function TemplateRenderer() {
           throw new Error('No subdomain or case ID found');
         }
         
+        console.log('🔡 Fetching case by ID:', caseId);
         response = await api.get(`/cases/${caseId}/`);
       }
       
       if (!response.data) {
         throw new Error('No data received from API');
       }
+      
+      console.log('📦 Case Data:', {
+        id: response.data.id,
+        subdomain: response.data.subdomain,
+        template_id: response.data.template_id,
+        is_public: response.data.is_public,
+        deployment_status: response.data.deployment_status
+      });
       
       // Check if case is public and deployed
       if (!response.data.is_public) {
@@ -72,12 +99,14 @@ export default function TemplateRenderer() {
       
       // Load template
       const templateId = response.data.template_id || 'beacon';
+      console.log('🎨 Loading template:', templateId);
       
       let template;
       try {
         template = getTemplate(templateId);
+        console.log('✅ Template loaded:', template);
       } catch (templateError) {
-        console.error('Template Error:', templateError);
+        console.error('❌ Template Error:', templateError);
         throw new Error(`Template "${templateId}" not found`);
       }
       
@@ -88,14 +117,16 @@ export default function TemplateRenderer() {
       setTemplateConfig(template);
       
       // Load components
+      console.log('📥 Loading components:', Object.keys(template.components));
       const loadedComponents = {};
       
       for (const [key, loader] of Object.entries(template.components)) {
         try {
           const module = await loader();
           loadedComponents[key] = module.default;
+          console.log(`✅ Loaded component: ${key}`);
         } catch (compError) {
-          console.error(`Failed to load component ${key}:`, compError);
+          console.error(`❌ Failed to load component ${key}:`, compError);
         }
       }
       
@@ -103,13 +134,32 @@ export default function TemplateRenderer() {
         throw new Error('Layout component not found in template');
       }
       
+      console.log('✅ All components loaded:', Object.keys(loadedComponents));
       setComponents(loadedComponents);
       
     } catch (err) {
-      console.error('Fatal Error:', err);
+      console.error('❌ Fatal Error:', err);
       setError(err.message || 'Failed to load case');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSpotlightPosts = async () => {
+    try {
+      console.log('📝 fetchSpotlightPosts called');
+      console.log('📝 caseData.id:', caseData?.id);
+      const url = `/spotlight/?case_id=${caseData.id}&status=published`;
+      console.log('📝 Fetching from URL:', url);
+      const response = await api.get(url);
+      console.log('📝 Response received:', response.data);
+      setSpotlightPosts(Array.isArray(response.data) ? response.data : response.data.results || []);
+      console.log('✅ Spotlight posts loaded successfully');
+    } catch (err) {
+      console.error('❌ Error fetching spotlight posts:', err);
+      console.error('❌ Error message:', err.message);
+      console.error('❌ Response status:', err.response?.status);
+      console.error('❌ Response data:', err.response?.data);
     }
   };
 
@@ -160,7 +210,7 @@ export default function TemplateRenderer() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-6">
-            <div className="text-6xl mb-4">📍</div>
+            <div className="text-6xl mb-4">🔍</div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Site Not Found</h1>
             <p className="text-lg text-gray-600">{error || 'This memorial page could not be found.'}</p>
           </div>
@@ -210,7 +260,7 @@ export default function TemplateRenderer() {
       onCustomizationChange={handleUpdate}
     >
       <Routes>
-        {/* Redirect /home to / */}
+        {/* ADDED: Redirect /home to / */}
         <Route path="/home" element={<Navigate to="/" replace />} />
         
         <Route 
@@ -237,7 +287,6 @@ export default function TemplateRenderer() {
                 customizations={caseData.template_data || {}}
                 isEditing={isEditing}
                 onCustomizationChange={(field, value) => {
-                  // Smart routing: images go to customizations, text goes to pages.about
                   if (field === 'about_main_image' || field.startsWith('gallery_')) {
                     handleUpdate(`customizations.${field}`, value);
                   } else {
@@ -254,7 +303,7 @@ export default function TemplateRenderer() {
             path="/spotlight" 
             element={
               <components.spotlight 
-                caseData={caseData}
+                caseData={{ ...caseData, spotlight_posts: spotlightPosts }}
                 customizations={caseData.template_data?.pages?.spotlight || {}}
                 isEditing={isEditing}
                 onCustomizationChange={(field, value) => handleUpdate(`pages.spotlight.${field}`, value)}
