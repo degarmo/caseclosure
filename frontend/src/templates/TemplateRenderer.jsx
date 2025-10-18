@@ -1,6 +1,8 @@
-// src/templates/TemplateRenderer.jsx - Enhanced debugging version
+// src/templates/TemplateRenderer.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, Routes, Route, Navigate } from 'react-router-dom';
+import { Ring } from 'ldrs/react';
+import 'ldrs/react/Ring.css';
 import api from '@/api/axios';
 import { getTemplate } from './registry';
 import getSubdomain from '@/utils/getSubdomain';
@@ -20,12 +22,8 @@ export default function TemplateRenderer() {
   }, []);
 
   useEffect(() => {
-    console.log('🔄 Spotlight Effect Running - caseData:', caseData?.id);
     if (caseData?.id) {
-      console.log('✅ Calling fetchSpotlightPosts for case:', caseData.id);
       fetchSpotlightPosts();
-    } else {
-      console.log('❌ No caseData.id available yet');
     }
   }, [caseData?.id]);
 
@@ -34,7 +32,6 @@ export default function TemplateRenderer() {
       const subdomain = getSubdomain();
       const hostname = window.location.hostname;
       
-      // Enhanced debugging
       const debug = {
         hostname,
         subdomain,
@@ -42,27 +39,20 @@ export default function TemplateRenderer() {
         timestamp: new Date().toISOString()
       };
       
-      console.log('🔍 TemplateRenderer Debug:', debug);
       setDebugInfo(debug);
       
       let response;
       
       if (subdomain) {
-        console.log('🔡 Fetching case by subdomain:', subdomain);
         const url = `/cases/by-subdomain/${subdomain}/`;
-        console.log('🌐 API URL:', url);
         
         try {
           response = await api.get(url);
-          console.log('✅ API Response:', response.data);
         } catch (apiError) {
-          console.error('❌ API Error:', apiError);
-          console.error('Status:', apiError.response?.status);
-          console.error('Data:', apiError.response?.data);
+          console.error('API Error:', apiError);
           throw new Error(`API Error (${apiError.response?.status}): ${apiError.response?.data?.error || apiError.message}`);
         }
       } else {
-        // Fallback to path-based routing
         const pathParts = location.pathname.split('/');
         const caseId = pathParts[2];
         
@@ -70,7 +60,6 @@ export default function TemplateRenderer() {
           throw new Error('No subdomain or case ID found');
         }
         
-        console.log('🔡 Fetching case by ID:', caseId);
         response = await api.get(`/cases/${caseId}/`);
       }
       
@@ -78,15 +67,6 @@ export default function TemplateRenderer() {
         throw new Error('No data received from API');
       }
       
-      console.log('📦 Case Data:', {
-        id: response.data.id,
-        subdomain: response.data.subdomain,
-        template_id: response.data.template_id,
-        is_public: response.data.is_public,
-        deployment_status: response.data.deployment_status
-      });
-      
-      // Check if case is public and deployed
       if (!response.data.is_public) {
         throw new Error('This case is not public');
       }
@@ -97,16 +77,13 @@ export default function TemplateRenderer() {
       
       setCaseData(response.data);
       
-      // Load template
       const templateId = response.data.template_id || 'beacon';
-      console.log('🎨 Loading template:', templateId);
       
       let template;
       try {
         template = getTemplate(templateId);
-        console.log('✅ Template loaded:', template);
       } catch (templateError) {
-        console.error('❌ Template Error:', templateError);
+        console.error('Template Error:', templateError);
         throw new Error(`Template "${templateId}" not found`);
       }
       
@@ -116,17 +93,14 @@ export default function TemplateRenderer() {
       
       setTemplateConfig(template);
       
-      // Load components
-      console.log('📥 Loading components:', Object.keys(template.components));
       const loadedComponents = {};
       
       for (const [key, loader] of Object.entries(template.components)) {
         try {
           const module = await loader();
           loadedComponents[key] = module.default;
-          console.log(`✅ Loaded component: ${key}`);
         } catch (compError) {
-          console.error(`❌ Failed to load component ${key}:`, compError);
+          console.error(`Failed to load component ${key}:`, compError);
         }
       }
       
@@ -134,11 +108,10 @@ export default function TemplateRenderer() {
         throw new Error('Layout component not found in template');
       }
       
-      console.log('✅ All components loaded:', Object.keys(loadedComponents));
       setComponents(loadedComponents);
       
     } catch (err) {
-      console.error('❌ Fatal Error:', err);
+      console.error('Fatal Error:', err);
       setError(err.message || 'Failed to load case');
     } finally {
       setLoading(false);
@@ -147,19 +120,11 @@ export default function TemplateRenderer() {
 
   const fetchSpotlightPosts = async () => {
     try {
-      console.log('📝 fetchSpotlightPosts called');
-      console.log('📝 caseData.id:', caseData?.id);
       const url = `/spotlight/?case_id=${caseData.id}&status=published`;
-      console.log('📝 Fetching from URL:', url);
       const response = await api.get(url);
-      console.log('📝 Response received:', response.data);
       setSpotlightPosts(Array.isArray(response.data) ? response.data : response.data.results || []);
-      console.log('✅ Spotlight posts loaded successfully');
     } catch (err) {
-      console.error('❌ Error fetching spotlight posts:', err);
-      console.error('❌ Error message:', err.message);
-      console.error('❌ Response status:', err.response?.status);
-      console.error('❌ Response data:', err.response?.data);
+      console.error('Error fetching spotlight posts:', err);
     }
   };
 
@@ -195,7 +160,7 @@ export default function TemplateRenderer() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <Ring size="40" stroke="5" bgOpacity="0" speed="2" color="black" />
           <p className="mt-4 text-gray-600">Loading memorial site...</p>
           {debugInfo.subdomain && (
             <p className="mt-2 text-sm text-gray-500">Subdomain: {debugInfo.subdomain}</p>
@@ -210,7 +175,7 @@ export default function TemplateRenderer() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-6">
-            <div className="text-6xl mb-4">🔍</div>
+            <div className="text-6xl mb-4">📍</div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Site Not Found</h1>
             <p className="text-lg text-gray-600">{error || 'This memorial page could not be found.'}</p>
           </div>
@@ -260,7 +225,6 @@ export default function TemplateRenderer() {
       onCustomizationChange={handleUpdate}
     >
       <Routes>
-        {/* ADDED: Redirect /home to / */}
         <Route path="/home" element={<Navigate to="/" replace />} />
         
         <Route 

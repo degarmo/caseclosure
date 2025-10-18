@@ -30,6 +30,14 @@ export default function SpotlightPostsList({
     );
   };
 
+  const stripHtml = (html) => {
+    const tmp = document.createElement('DIV');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
+
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
@@ -59,7 +67,7 @@ export default function SpotlightPostsList({
                   </div>
                   
                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">
-                    {post.content_text || post.content}
+                    {stripHtml(post.content_text || post.content)}
                   </p>
                   
                   <div className="flex items-center gap-6 text-sm text-slate-500">
