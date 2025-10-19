@@ -1,60 +1,176 @@
+// src/components/discover/CaseCard.jsx
 import React from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { MapPin, Clock } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { MapPin, Calendar, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-const statusColors = {
-  active: "accent-gradient text-slate-800 font-semibold",
-  solved: "bg-green-500 hover:bg-green-600 text-white",
-  cold_case: "bg-blue-500 hover:bg-blue-600 text-white",
-  memorial: "bg-purple-500 hover:bg-purple-600 text-white",
-};
+const CaseCard = ({ caseData }) => {
+  const [imageError, setImageError] = React.useState(false);
+  
+  // Format the location string
+  const getLocation = () => {
+    // First check if we have the formatted location passed from Discover
+    if (caseData.location) {
+      return caseData.location;
+    }
+    
+    // Otherwise, build it from city and state
+    const parts = [];
+    if (caseData.incident_city) parts.push(caseData.incident_city);
+    if (caseData.incident_state) parts.push(caseData.incident_state);
+    
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+    
+    // Try other location fields
+    if (caseData.full_incident_location) {
+      return caseData.full_incident_location;
+    }
+    
+    if (caseData.incident_location) {
+      return caseData.incident_location;
+    }
+    
+    return 'Unknown location';
+  };
 
-export default function CaseCard({ caseData }) {
+  // Format the date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown date';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Get the appropriate date based on case type
+  const getIncidentDate = () => {
+    if (caseData.incident_date) {
+      return formatDate(caseData.incident_date);
+    }
+    if (caseData.date_of_death) {
+      return formatDate(caseData.date_of_death);
+    }
+    if (caseData.last_seen_date) {
+      return formatDate(caseData.last_seen_date);
+    }
+    return 'Date unknown';
+  };
+
+  // Get case type label with proper formatting
+  const getCaseTypeLabel = () => {
+    const type = caseData.case_type || caseData.crime_type || 'unknown';
+    return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
+  };
+
+  // Get case type color
+  const getCaseTypeColor = () => {
+    const type = caseData.case_type || caseData.crime_type;
+    switch(type) {
+      case 'missing':
+        return 'bg-amber-500';
+      case 'homicide':
+        return 'bg-red-500';
+      case 'unidentified':
+        return 'bg-purple-500';
+      case 'cold_case':
+        return 'bg-blue-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  // Handle view case click
+  const handleViewCase = () => {
+    if (caseData.deployment_url) {
+      window.open(caseData.deployment_url, '_blank');
+    } else if (caseData.subdomain) {
+      window.open(`https://${caseData.subdomain}.caseclosure.org`, '_blank');
+    } else {
+      // Fallback to a case details page
+      window.location.href = `/cases/${caseData.id}`;
+    }
+  };
+
+  // Get victim photo URL or use placeholder
+  const getPhotoUrl = () => {
+    if (imageError) {
+      return 'https://ui-avatars.com/api/?name=' + 
+             encodeURIComponent(`${caseData.first_name || 'Unknown'} ${caseData.last_name || 'Case'}`) + 
+             '&size=300&background=e2e8f0&color=475569';
+    }
+    return caseData.victim_photo_url || 
+           caseData.primary_photo_url || 
+           'https://ui-avatars.com/api/?name=' + 
+           encodeURIComponent(`${caseData.first_name || 'Unknown'} ${caseData.last_name || 'Case'}`) + 
+           '&size=300&background=e2e8f0&color=475569';
+  };
+
+  const handleImageError = (e) => {
+    if (!imageError) {
+      setImageError(true);
+    }
+  };
+
   return (
-    <Card className="floating-card bg-white/80 backdrop-blur-sm border-0 shadow-lg overflow-hidden h-full flex flex-col">
-      <div className="relative">
+    <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2">
+      {/* Image Section */}
+      <div className="relative h-64 bg-gradient-to-br from-slate-100 to-slate-200">
         <img 
-          src={caseData.cover_image_url}
-          alt={caseData.person_name}
-          className="w-full h-64 object-cover"
+          src={getPhotoUrl()}
+          alt={`${caseData.first_name} ${caseData.last_name}`}
+          className="w-full h-full object-cover"
+          onError={handleImageError}
         />
         <div className="absolute top-4 left-4">
-          <Badge className={statusColors[caseData.status]}>
-            {caseData.status.replace('_', ' ')}
-          </Badge>
+          <span className={`${getCaseTypeColor()} text-white px-3 py-1 rounded-full text-sm font-semibold`}>
+            {getCaseTypeLabel()}
+          </span>
         </div>
-        {caseData.reward_amount > 0 && (
-          <div className="absolute top-4 right-4">
-            <Badge className="bg-red-500 hover:bg-red-600 text-white font-semibold">
-              Reward: ${caseData.reward_amount.toLocaleString()}
-            </Badge>
-          </div>
-        )}
       </div>
-      
-      <CardContent className="p-6 space-y-4 flex-grow flex flex-col justify-between">
-        <div>
-          <h3 className="text-xl font-bold text-slate-800 mb-1">{caseData.person_name}</h3>
-          <div className="flex items-center gap-4 text-sm text-slate-500 mb-4">
-            <div className="flex items-center gap-1.5">
-              <MapPin className="w-4 h-4" />
-              {caseData.location}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-4 h-4" />
-              {formatDistanceToNow(new Date(caseData.last_seen_date), { addSuffix: true })}
-            </div>
-          </div>
-          <p className="text-slate-600 leading-relaxed line-clamp-3">
-            {caseData.summary}
-          </p>
+
+      {/* Content Section */}
+      <div className="p-6">
+        {/* Name */}
+        <h3 className="text-xl font-bold text-gray-900 mb-3">
+          {caseData.first_name} {caseData.last_name}
+        </h3>
+
+        {/* Location */}
+        <div className="flex items-center gap-2 text-gray-600 mb-2">
+          <MapPin className="w-4 h-4" />
+          <span className="text-sm">{getLocation()}</span>
         </div>
-        <button className="w-full text-center mt-4 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors">
+
+        {/* Date */}
+        <div className="flex items-center gap-2 text-gray-600 mb-4">
+          <Calendar className="w-4 h-4" />
+          <span className="text-sm">{getIncidentDate()}</span>
+        </div>
+
+        {/* Case Title */}
+        {caseData.case_title && (
+          <p className="text-gray-700 mb-4 line-clamp-2">
+            {caseData.case_title}
+          </p>
+        )}
+
+        {/* View Button */}
+        <Button 
+          onClick={handleViewCase}
+          className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+        >
           View Case Details →
-        </button>
-      </CardContent>
-    </Card>
+        </Button>
+      </div>
+    </div>
   );
-}
+};
+
+export default CaseCard;

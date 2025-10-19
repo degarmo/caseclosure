@@ -1,4 +1,4 @@
-# cases/serializers.py - Updated to match new models and functionality
+# cases/serializers.py - Updated with City and State fields
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
@@ -48,7 +48,7 @@ class CasePhotoSerializer(serializers.ModelSerializer):
             'image',
             'image_url',
             'caption',
-            'is_primary',  # Added is_primary field
+            'is_primary',
             'is_public',
             'order',
             'uploaded_at'
@@ -139,12 +139,13 @@ class DeploymentLogSerializer(serializers.ModelSerializer):
 
 class CaseSerializer(serializers.ModelSerializer):
     """
-    Main serializer for Case model - FIXED VERSION with proper photo handling
+    Main serializer for Case model - Updated with City and State fields
     """
     # Read-only computed fields
     user_email = serializers.EmailField(source='user.email', read_only=True)
     display_name = serializers.CharField(source='get_display_name', read_only=True)
     full_url = serializers.CharField(source='get_full_url', read_only=True)
+    full_incident_location = serializers.CharField(source='get_full_incident_location', read_only=True)
     
     # Related serializers
     photos = CasePhotoSerializer(many=True, read_only=True)
@@ -201,18 +202,21 @@ class CaseSerializer(serializers.ModelSerializer):
             'eye_color',
             'distinguishing_features',
             
-            # Photos - updated to use relationship
-            'photos',  # All photos
-            'primary_photo',  # Primary photo object
-            'primary_photo_url',  # Direct URL for primary photo
-            'victim_photo_url',  # Alias for primary_photo_url
+            # Photos
+            'photos',
+            'primary_photo',
+            'primary_photo_url',
+            'victim_photo_url',
             
             # Case details
             'description',
             'case_number',
             'case_type',
-            'crime_type',  # Added crime_type field
+            'crime_type',
             'incident_location',
+            'incident_city',  # NEW FIELD
+            'incident_state',  # NEW FIELD
+            'full_incident_location',  # NEW COMPUTED FIELD
             'last_seen_location',
             'last_seen_date',
             'last_seen_time',
@@ -265,6 +269,7 @@ class CaseSerializer(serializers.ModelSerializer):
             'last_deployed_at',
             'deployment_error',
             'full_url',
+            'full_incident_location',
             'display_name',
             'user_email',
             'spotlight_posts_count',
@@ -380,6 +385,18 @@ class CaseSerializer(serializers.ModelSerializer):
         if value and not isinstance(value, dict):
             raise serializers.ValidationError("Template data must be a JSON object.")
         return value
+    
+    def validate_incident_state(self, value):
+        """Validate state field - could add state abbreviation validation here"""
+        if value and len(value) > 50:
+            raise serializers.ValidationError("State name is too long.")
+        return value
+    
+    def validate_incident_city(self, value):
+        """Validate city field"""
+        if value and len(value) > 100:
+            raise serializers.ValidationError("City name is too long.")
+        return value
 
 
 class CaseListSerializer(serializers.ModelSerializer):
@@ -389,6 +406,7 @@ class CaseListSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='get_display_name', read_only=True)
     full_url = serializers.CharField(source='get_full_url', read_only=True)
     primary_photo_url = serializers.SerializerMethodField()
+    full_incident_location = serializers.CharField(source='get_full_incident_location', read_only=True)
     
     class Meta:
         model = Case
@@ -404,10 +422,13 @@ class CaseListSerializer(serializers.ModelSerializer):
             'full_url',
             'is_public',
             'primary_photo_url',
+            'incident_city',  # NEW FIELD
+            'incident_state',  # NEW FIELD
+            'full_incident_location',  # NEW COMPUTED FIELD
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'primary_photo_url']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'primary_photo_url', 'full_incident_location']
     
     def get_primary_photo_url(self, obj):
         """Get the primary photo URL for list view"""

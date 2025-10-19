@@ -47,6 +47,8 @@ export const prepareCasePayload = (caseData, selectedTemplate, customizations, e
   console.log('Input caseData:', caseData);
   console.log('crime_type from form:', caseData.crime_type);
   console.log('case_type from form:', caseData.case_type);
+  console.log('incident_city from form:', caseData.incident_city);
+  console.log('incident_state from form:', caseData.incident_state);
   
   // Determine the correct case type - prioritize crime_type from the form
   let determinedCaseType = null;
@@ -128,7 +130,12 @@ export const prepareCasePayload = (caseData, selectedTemplate, customizations, e
     detective_name: caseData.detective_name,
     detective_phone: caseData.detective_phone,
     detective_email: caseData.detective_email,
+    
+    // LOCATION FIELDS - ADDED CITY AND STATE
     incident_location: caseData.incident_location,
+    incident_city: caseData.incident_city,      // NEW: City field
+    incident_state: caseData.incident_state,    // NEW: State field
+    
     last_seen_location: caseData.last_seen_location || caseData.last_seen_wearing,
     last_seen_date: caseData.last_seen_date,
     last_seen_time: caseData.last_seen_time,
@@ -158,6 +165,8 @@ export const prepareCasePayload = (caseData, selectedTemplate, customizations, e
   console.log('=== FINAL PAYLOAD ===');
   console.log('Payload case_type:', payload.case_type);
   console.log('Payload crime_type:', payload.crime_type);
+  console.log('Payload incident_city:', payload.incident_city);
+  console.log('Payload incident_state:', payload.incident_state);
   console.log('Full payload:', JSON.stringify(payload, null, 2));
   console.log('=== END PAYLOAD PREPARATION ===');
   
@@ -207,6 +216,10 @@ export const createCase = async (caseData, selectedTemplate, customizations) => 
     const payload = prepareCasePayload(caseData, selectedTemplate, customizations, true);
     
     console.log('[caseAPI] Creating case with case_type:', payload.case_type);
+    console.log('[caseAPI] Creating case with location:', {
+      city: payload.incident_city,
+      state: payload.incident_state
+    });
     console.log('[caseAPI] Full payload being sent:', payload);
     
     const response = await api.post('cases/', payload);
@@ -216,6 +229,8 @@ export const createCase = async (caseData, selectedTemplate, customizations) => 
       data: response.data,
       case_type_in_response: response.data?.case_type,
       crime_type_in_response: response.data?.crime_type,
+      incident_city_in_response: response.data?.incident_city,
+      incident_state_in_response: response.data?.incident_state,
       headers: response.headers
     });
     
@@ -229,6 +244,14 @@ export const createCase = async (caseData, selectedTemplate, customizations) => 
         console.error('This indicates a backend issue - the backend is not saving the case type correctly');
       } else {
         console.log('✅ Case type saved correctly as:', savedCaseType);
+      }
+      
+      // Verify location fields were saved
+      if (payload.incident_city && !response.data.incident_city) {
+        console.error('⚠️ WARNING: City was not saved!');
+      }
+      if (payload.incident_state && !response.data.incident_state) {
+        console.error('⚠️ WARNING: State was not saved!');
       }
     }
     
@@ -275,6 +298,12 @@ export const createCase = async (caseData, selectedTemplate, customizations) => 
       if (error.response.data.crime_type) {
         console.error('Backend error for crime_type field:', error.response.data.crime_type);
       }
+      if (error.response.data.incident_city) {
+        console.error('Backend error for incident_city field:', error.response.data.incident_city);
+      }
+      if (error.response.data.incident_state) {
+        console.error('Backend error for incident_state field:', error.response.data.incident_state);
+      }
     }
     
     throw error;
@@ -312,6 +341,9 @@ export const createDraftCase = async (caseData, selectedTemplate) => {
     case_type: draftCaseType,
     crime_type: draftCaseType,
     type: draftCaseType,
+    // Include location fields
+    incident_city: caseData.incident_city || '',
+    incident_state: caseData.incident_state || '',
     is_public: false,
     is_disabled: false,
     is_draft: true  // Flag for backend to skip validation
@@ -362,6 +394,10 @@ export const updateCase = async (caseId, caseData, selectedTemplate, customizati
     
     console.log('[caseAPI] Updating case:', caseId);
     console.log('[caseAPI] Update payload case_type:', payload.case_type);
+    console.log('[caseAPI] Update payload location:', {
+      city: payload.incident_city,
+      state: payload.incident_state
+    });
     console.log('[caseAPI] Full update payload:', payload);
     
     const response = await api.patch(`cases/${caseId}/`, payload);
@@ -378,6 +414,12 @@ export const updateCase = async (caseId, caseData, selectedTemplate, customizati
       } else {
         console.log('✅ Case type updated correctly to:', savedCaseType);
       }
+      
+      // Verify location fields were updated
+      console.log('✅ Location updated:', {
+        city: response.data.incident_city,
+        state: response.data.incident_state
+      });
     }
     
     const updatedCase = response.data;
@@ -413,22 +455,27 @@ export const updateCase = async (caseId, caseData, selectedTemplate, customizati
 /**
  * Save case (create or update) - Main entry point WITH image support
  */
-export const saveCase = async ({ caseId, caseData, selectedTemplate, customizations, isDraft = false }) => {
+export const saveCase = async ({ caseId, caseData, selectedTemplate, customizations, isDraft = false, isEdit = false }) => {
   console.log('[caseAPI] saveCase called:', {
     hasCaseId: !!caseId,
     hasImage: !!caseData.victim_photo,
     imageType: caseData.victim_photo?.type,
     caseId,
     isDraft,
+    isEdit,
     templateId: selectedTemplate?.id,
     caseType: caseData.crime_type || caseData.case_type,
+    location: {
+      city: caseData.incident_city,
+      state: caseData.incident_state
+    },
     rawCaseData: caseData
   });
 
   try {
     let result;
     
-    if (caseId) {
+    if (caseId || isEdit) {
       result = await updateCase(caseId, caseData, selectedTemplate, customizations);
     } else if (isDraft) {
       result = await createDraftCase(caseData, selectedTemplate);
@@ -438,6 +485,10 @@ export const saveCase = async ({ caseId, caseData, selectedTemplate, customizati
     
     console.log('[caseAPI] saveCase result:', result);
     console.log('[caseAPI] Saved case type:', result?.case_type || result?.crime_type);
+    console.log('[caseAPI] Saved location:', {
+      city: result?.incident_city,
+      state: result?.incident_state
+    });
     
     if (!result || !result.id) {
       throw new Error('Save operation did not return a valid case ID');
@@ -533,6 +584,10 @@ export const getCaseById = async (caseId) => {
     const response = await api.get(`cases/${caseId}/`);
     console.log('[caseAPI] Fetched case:', response.data);
     console.log('[caseAPI] Fetched case type:', response.data?.case_type || response.data?.crime_type);
+    console.log('[caseAPI] Fetched location:', {
+      city: response.data?.incident_city,
+      state: response.data?.incident_state
+    });
     return response.data;
   } catch (error) {
     console.error('[caseAPI] Error fetching case:', error.response?.data || error);

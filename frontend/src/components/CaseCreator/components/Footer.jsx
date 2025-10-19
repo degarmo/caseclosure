@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { 
-  Save, ChevronRight, Eye, Rocket, Loader2, Check, ChevronLeft
+  Save, ChevronRight, Eye, Rocket, Loader2, Check, ChevronLeft, Edit
 } from 'lucide-react';
 
 /**
@@ -18,6 +18,7 @@ import {
  * @param {function} onNavigate - Navigation callback
  * @param {function} onDeploy - Deploy callback
  * @param {function} validateSection - Validation function
+ * @param {boolean} isEditMode - Whether in edit mode
  */
 const Footer = ({ 
   activeView,
@@ -28,7 +29,8 @@ const Footer = ({
   onSave,
   onNavigate,
   onDeploy,
-  validateSection
+  validateSection,
+  isEditMode = false
 }) => {
 
   
@@ -38,10 +40,11 @@ const Footer = ({
     
     if (direction === 'next') {
       if (currentIndex < views.length - 1) {
-        if (activeView === 'form' && validateSection()) {
-          onSave().then(() => {
-            onNavigate(views[currentIndex + 1]);
-          });
+        if (activeView === 'form') {
+          // In edit mode, validate and navigate to template (which will redirect to editor)
+          if (validateSection()) {
+            onNavigate('template');
+          }
         } else if (activeView === 'template' && selectedTemplate) {
           onNavigate('customize');
         } else if (activeView === 'customize') {
@@ -53,7 +56,7 @@ const Footer = ({
     }
   };
   
-  const handleCustomizeClick = (e) => {  // FIXED: Added 'e' parameter
+  const handleCustomizeClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -65,6 +68,35 @@ const Footer = ({
   };
   
   const renderActions = () => {
+    // Edit mode - only show form view actions
+    if (isEditMode) {
+      if (activeView === 'form') {
+        return (
+          <button
+            type='button'
+            onClick={() => handleNavigation('next')}
+            disabled={saving}
+            className="px-6 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              <>
+                Update Website
+                <Edit className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        );
+      }
+      // Don't show other views in edit mode
+      return null;
+    }
+    
+    // Create mode - existing logic
     switch (activeView) {
       case 'form':
         return (
@@ -142,7 +174,7 @@ const Footer = ({
   return (
     <div className="border-t border-gray-200 px-6 py-4 bg-white">
       <div className="flex items-center justify-between">
-        {/* Left side - Save button */}
+        {/* Left side - Save button and status */}
         <div className="flex items-center gap-2">
           <button
             type='button'
@@ -158,7 +190,7 @@ const Footer = ({
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                <span>Save</span>
+                <span>{isEditMode ? 'Save Changes' : 'Save'}</span>
               </>
             )}
           </button>
@@ -166,14 +198,22 @@ const Footer = ({
           {caseId && !saving && (
             <>
               <Check className="w-4 h-4 text-green-600" />
-              <span className="text-sm text-gray-600">Saved</span>
+              <span className="text-sm text-gray-600">
+                {isEditMode ? 'Changes Saved' : 'Saved'}
+              </span>
             </>
+          )}
+          
+          {isEditMode && caseId && (
+            <span className="text-sm text-gray-500 ml-2">
+              Editing Case ID: {caseId}
+            </span>
           )}
         </div>
         
         {/* Right side - Navigation */}
         <div className="flex items-center gap-3">
-          {activeView !== 'form' && (
+          {activeView !== 'form' && !isEditMode && (
             <button
               type='button'
               onClick={() => handleNavigation('back')}

@@ -5,7 +5,7 @@ import api from '@/api/axios';
 import { 
   Folder, Eye, Edit, Trash2, ToggleLeft, ToggleRight, 
   Calendar, DollarSign, MapPin, User, Search, Filter,
-  Plus, RefreshCw, CheckCircle, XCircle, Clock
+  Plus, RefreshCw, CheckCircle, XCircle, Clock, Palette
 } from 'lucide-react';
 
 export default function CasesList({ cases = [], filter = 'all', onRefresh, onEditCase }) {
@@ -21,7 +21,9 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
       case_.case_title?.toLowerCase().includes(searchLower) ||
       case_.first_name?.toLowerCase().includes(searchLower) ||
       case_.last_name?.toLowerCase().includes(searchLower) ||
-      case_.id.toString().includes(searchLower);
+      case_.id.toString().includes(searchLower) ||
+      case_.incident_city?.toLowerCase().includes(searchLower) ||
+      case_.incident_state?.toLowerCase().includes(searchLower);
 
     return matchesSearch;
   }).sort((a, b) => {
@@ -44,8 +46,15 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
     navigate(`/dashboard/cases/${caseId}`);
   };
 
-  const handleEditInEditor = (e, caseId) => {
+  const handleEditCase = (e, caseId) => {
     e.stopPropagation(); // Prevent row click
+    // Navigate to the case edit form (same form used for creation)
+    navigate(`/dashboard/cases/edit/${caseId}`);
+  };
+
+  const handleCustomizeTemplate = (e, caseId) => {
+    e.stopPropagation(); // Prevent row click
+    // Navigate to template editor for visual customization
     navigate(`/editor/${caseId}`);
   };
 
@@ -132,6 +141,14 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
     }
   };
 
+  const formatLocation = (case_) => {
+    const parts = [];
+    if (case_.incident_city) parts.push(case_.incident_city);
+    if (case_.incident_state) parts.push(case_.incident_state);
+    if (parts.length > 0) return parts.join(', ');
+    return case_.incident_location || case_.last_seen_location || 'Unknown';
+  };
+
   const filterTitle = filter === 'all' ? 'All Cases' : 
                      filter === 'active' ? 'Active Cases' :
                      filter === 'disabled' ? 'Disabled Cases' : 'Cases';
@@ -169,7 +186,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by case name, victim, or ID..."
+              placeholder="Search by case name, victim, ID, city, or state..."
               className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -302,7 +319,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-slate-400" />
                     <span className="text-sm text-slate-700 dark:text-slate-300">
-                      {case_.incident_location || case_.last_seen_location || 'Unknown'}
+                      {formatLocation(case_)}
                     </span>
                   </div>
                 </td>
@@ -318,7 +335,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                   {getStatusBadge(case_)}
                 </td>
                 <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={(e) => handleViewCase(e, case_.id)}
                       className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
@@ -327,11 +344,18 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                       <Eye className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                     </button>
                     <button
-                      onClick={(e) => handleEditInEditor(e, case_.id)}
-                      className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
-                      title="Customize Template"
+                      onClick={(e) => handleEditCase(e, case_.id)}
+                      className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                      title="Edit Case Information"
                     >
-                      <Edit className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <Edit className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </button>
+                    <button
+                      onClick={(e) => handleCustomizeTemplate(e, case_.id)}
+                      className="p-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+                      title="Customize Website Template"
+                    >
+                      <Palette className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     </button>
                     <button
                       onClick={(e) => toggleCaseStatus(e, case_.id, case_.is_disabled)}

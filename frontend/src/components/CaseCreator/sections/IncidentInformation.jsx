@@ -1,18 +1,79 @@
 // src/components/CaseCreator/sections/IncidentInformation.jsx
 
 import React from 'react';
-import { Shield, AlertCircle, Car } from 'lucide-react';
+import { Shield, AlertCircle, Car, MapPin } from 'lucide-react';
 // Direct imports
 import SectionWrapper from '../components/SectionWrapper';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
 import TextareaField from '../components/TextareaField';
 import FileUpload from '../components/FileUpload';
-import { CRIME_TYPES } from '../constants';
+
+// Crime type options
+const CRIME_TYPES = [
+  { value: 'missing', label: 'Missing Person' },
+  { value: 'homicide', label: 'Homicide' },
+];
+
+// US States for dropdown
+const US_STATES = [
+  { value: 'AL', label: 'Alabama' },
+  { value: 'AK', label: 'Alaska' },
+  { value: 'AZ', label: 'Arizona' },
+  { value: 'AR', label: 'Arkansas' },
+  { value: 'CA', label: 'California' },
+  { value: 'CO', label: 'Colorado' },
+  { value: 'CT', label: 'Connecticut' },
+  { value: 'DE', label: 'Delaware' },
+  { value: 'DC', label: 'District of Columbia' },
+  { value: 'FL', label: 'Florida' },
+  { value: 'GA', label: 'Georgia' },
+  { value: 'HI', label: 'Hawaii' },
+  { value: 'ID', label: 'Idaho' },
+  { value: 'IL', label: 'Illinois' },
+  { value: 'IN', label: 'Indiana' },
+  { value: 'IA', label: 'Iowa' },
+  { value: 'KS', label: 'Kansas' },
+  { value: 'KY', label: 'Kentucky' },
+  { value: 'LA', label: 'Louisiana' },
+  { value: 'ME', label: 'Maine' },
+  { value: 'MD', label: 'Maryland' },
+  { value: 'MA', label: 'Massachusetts' },
+  { value: 'MI', label: 'Michigan' },
+  { value: 'MN', label: 'Minnesota' },
+  { value: 'MS', label: 'Mississippi' },
+  { value: 'MO', label: 'Missouri' },
+  { value: 'MT', label: 'Montana' },
+  { value: 'NE', label: 'Nebraska' },
+  { value: 'NV', label: 'Nevada' },
+  { value: 'NH', label: 'New Hampshire' },
+  { value: 'NJ', label: 'New Jersey' },
+  { value: 'NM', label: 'New Mexico' },
+  { value: 'NY', label: 'New York' },
+  { value: 'NC', label: 'North Carolina' },
+  { value: 'ND', label: 'North Dakota' },
+  { value: 'OH', label: 'Ohio' },
+  { value: 'OK', label: 'Oklahoma' },
+  { value: 'OR', label: 'Oregon' },
+  { value: 'PA', label: 'Pennsylvania' },
+  { value: 'RI', label: 'Rhode Island' },
+  { value: 'SC', label: 'South Carolina' },
+  { value: 'SD', label: 'South Dakota' },
+  { value: 'TN', label: 'Tennessee' },
+  { value: 'TX', label: 'Texas' },
+  { value: 'UT', label: 'Utah' },
+  { value: 'VT', label: 'Vermont' },
+  { value: 'VA', label: 'Virginia' },
+  { value: 'WA', label: 'Washington' },
+  { value: 'WV', label: 'West Virginia' },
+  { value: 'WI', label: 'Wisconsin' },
+  { value: 'WY', label: 'Wyoming' }
+];
 
 /**
  * IncidentInformation Section Component
  * Handles incident/crime specific information with conditional fields
+ * Now includes City and State fields for incident location
  * 
  * @param {Object} caseData - Current case data
  * @param {Object} errors - Field validation errors
@@ -139,13 +200,6 @@ const IncidentInformation = ({
               />
             </div>
             
-            <InputField
-              label="Incident Location"
-              value={caseData.incident_location}
-              onChange={(value) => onChange('incident_location', value)}
-              placeholder="Address or location description..."
-            />
-            
             <TextareaField
               label="Incident Description"
               value={caseData.incident_description}
@@ -156,16 +210,42 @@ const IncidentInformation = ({
           </div>
         )}
         
-        {/* General incident location for other crime types */}
-        {caseData.crime_type && 
-         caseData.crime_type !== 'missing' && 
-         caseData.crime_type !== 'homicide' && (
-          <InputField
-            label="Incident Location"
-            value={caseData.incident_location}
-            onChange={(value) => onChange('incident_location', value)}
-            placeholder="Address or location description..."
-          />
+        {/* INCIDENT LOCATION SECTION - Shows for ALL crime types */}
+        {caseData.crime_type && (
+          <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="font-medium text-gray-900 flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              Incident Location Details
+            </h4>
+            
+            <InputField
+              label="Street Address / Location Description"
+              value={caseData.incident_location}
+              onChange={(value) => onChange('incident_location', value)}
+              placeholder="Street address or specific location description..."
+            />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField
+                label="City"
+                value={caseData.incident_city || ''}
+                onChange={(value) => onChange('incident_city', value)}
+                placeholder="Enter city name..."
+                required={caseData.crime_type === 'homicide'}
+                error={errors.incident_city}
+              />
+              
+              <SelectField
+                label="State"
+                value={caseData.incident_state || ''}
+                onChange={(value) => onChange('incident_state', value)}
+                options={US_STATES}
+                placeholder="Select state..."
+                required={caseData.crime_type === 'homicide'}
+                error={errors.incident_state}
+              />
+            </div>
+          </div>
         )}
       </div>
     </SectionWrapper>

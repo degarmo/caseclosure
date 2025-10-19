@@ -85,6 +85,7 @@ function AppContent() {
   const [showCaseCreator, setShowCaseCreator] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [currentCase, setCurrentCase] = useState(null);
+  const [editingCaseId, setEditingCaseId] = useState(null);
 
   // Determine if this is a memorial site
   const hostname = window.location.hostname;
@@ -127,22 +128,28 @@ function AppContent() {
     window.location.href = "/signin";
   };
 
-  // Modal handlers
-  const handleOpenCaseModal = () => {
+  // Modal handlers - Updated to handle editing
+  const handleOpenCaseModal = (caseId = null) => {
+    setEditingCaseId(caseId);
     setShowCaseCreator(true);
   };
 
   const handleCloseCaseModal = () => {
     setShowCaseCreator(false);
+    setEditingCaseId(null);
   };
 
   const handleCaseComplete = (caseData) => {
     setCurrentCase(caseData);
     setShowCaseCreator(false);
+    setEditingCaseId(null);
     
-    if (caseData.id) {
-      // Navigate to editor after case creation
+    if (caseData.id && !editingCaseId) {
+      // Only navigate to editor for new cases, not edits
       navigate(`/editor/${caseData.id}`);
+    } else if (editingCaseId) {
+      // For edits, refresh the dashboard
+      window.location.reload();
     }
   };
 
@@ -150,6 +157,7 @@ function AppContent() {
   const handleNavigateFromModal = (path) => {
     // Close the modal first
     setShowCaseCreator(false);
+    setEditingCaseId(null);
     // Then navigate
     setTimeout(() => {
       navigate(path);
@@ -212,6 +220,49 @@ function AppContent() {
           } 
         />
         <Route path="cases/:caseId" element={<CaseDetails />} />
+
+        {/* NEW: Edit Case Route - This needs to be BEFORE the dashboard/* route */}
+        <Route 
+          path="/dashboard/cases/edit/:id" 
+          element={
+            <RequireAuth>
+              <CaseCreator 
+                mode="edit"
+                onClose={() => navigate('/dashboard')}
+                onComplete={(caseData) => {
+                  // Don't navigate here - let the CaseCreator handle it
+                  console.log('Case edit completed:', caseData);
+                }}
+                onNavigate={(path) => {
+                  // Don't navigate if going to template in edit mode - handled internally
+                  if (path !== 'template') {
+                    navigate(path);
+                  }
+                }}
+              />
+            </RequireAuth>
+          } 
+        />
+
+        {/* NEW: Create Case Route */}
+        <Route 
+          path="/dashboard/cases/new" 
+          element={
+            <RequireAuth>
+              <CaseCreator 
+                mode="create"
+                onClose={() => navigate('/dashboard')}
+                onComplete={(caseData) => {
+                  // After successful creation, navigate to editor
+                  if (caseData.id) {
+                    navigate(`/editor/${caseData.id}`);
+                  }
+                }}
+                onNavigate={(path) => navigate(path)}
+              />
+            </RequireAuth>
+          } 
+        />
 
         {/* Public Website Routes */}
         <Route path="/" element={<Layout><Home /></Layout>} />
@@ -285,10 +336,12 @@ function AppContent() {
         />
       </Routes>
 
-      {/* Modals - Outside Router context */}
+      {/* Modals - Outside Router context - Updated to handle edit mode */}
       {showCaseCreator && (
         <div className="fixed inset-0 z-[60]">
           <CaseCreator
+            mode={editingCaseId ? 'edit' : 'create'}
+            caseId={editingCaseId}
             onClose={handleCloseCaseModal}
             onComplete={handleCaseComplete}
             onNavigate={handleNavigateFromModal}

@@ -20,21 +20,54 @@ export default function Discover() {
 
   useEffect(() => {
     const lowercasedTerm = searchTerm.toLowerCase();
-    const filtered = allCases.filter(c => 
-      c.person_name.toLowerCase().includes(lowercasedTerm) ||
-      c.location.toLowerCase().includes(lowercasedTerm) ||
-      c.summary.toLowerCase().includes(lowercasedTerm) ||
-      (c.tags && c.tags.some(tag => tag.toLowerCase().includes(lowercasedTerm)))
-    );
+    const filtered = allCases.filter(c => {
+      // Search in name
+      const fullName = `${c.first_name || ''} ${c.last_name || ''}`.toLowerCase();
+      const nameMatch = fullName.includes(lowercasedTerm);
+      
+      // Search in case title
+      const titleMatch = c.case_title && c.case_title.toLowerCase().includes(lowercasedTerm);
+      
+      // Search in location - using correct field names
+      const cityMatch = c.incident_city && c.incident_city.toLowerCase().includes(lowercasedTerm);
+      const stateMatch = c.incident_state && c.incident_state.toLowerCase().includes(lowercasedTerm);
+      
+      // Also check the combined location field if available
+      const locationMatch = c.full_incident_location && c.full_incident_location.toLowerCase().includes(lowercasedTerm);
+      
+      // Check case type
+      const caseTypeMatch = c.case_type && c.case_type.toLowerCase().includes(lowercasedTerm);
+      
+      return nameMatch || titleMatch || cityMatch || stateMatch || locationMatch || caseTypeMatch;
+    });
+    
     setFilteredCases(filtered);
-    setCurrentPage(1); // Reset to first page on new search
+    setCurrentPage(1);
   }, [searchTerm, allCases]);
 
   const loadCases = async () => {
     setIsLoading(true);
-    const fetchedCases = await Case.list('-last_seen_date');
-    setAllCases(fetchedCases);
-    setFilteredCases(fetchedCases);
+    try {
+      const response = await api.get('/cases/?is_public=true');
+      const cases = Array.isArray(response.data) ? response.data : response.data.results || [];
+      
+      // Log to see what fields are actually available
+      if (cases.length > 0) {
+        console.log('Sample case data:', cases[0]);
+        console.log('Available location fields:', {
+          incident_city: cases[0].incident_city,
+          incident_state: cases[0].incident_state,
+          full_incident_location: cases[0].full_incident_location
+        });
+      }
+      
+      setAllCases(cases);
+      setFilteredCases(cases);
+    } catch (error) {
+      console.error('Failed to load cases:', error);
+      setAllCases([]);
+      setFilteredCases([]);
+    }
     setIsLoading(false);
   };
 
@@ -50,12 +83,26 @@ export default function Discover() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Helper function to format location for display
+  const formatLocation = (caseData) => {
+    const parts = [];
+    if (caseData.incident_city) parts.push(caseData.incident_city);
+    if (caseData.incident_state) parts.push(caseData.incident_state);
+    
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+    
+    // Fallback to full_incident_location or incident_location
+    return caseData.full_incident_location || caseData.incident_location || '';
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
       <div className="text-center mb-12">
         <div className="flex items-center justify-center gap-3 mb-4">
           <Compass className="w-8 h-8 text-blue-500" />
-          <h1 className="text-4xl lg:text-5xl font-bold gradient-text">Discover Cases</h1>
+          <h1 className="text-4xl lg:text-5xl font-bold">Discover Cases</h1>
         </div>
         <p className="text-xl text-slate-600 max-w-3xl mx-auto">
           Search for active and past cases. Your awareness can make a difference.
@@ -67,7 +114,7 @@ export default function Discover() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input 
             type="text"
-            placeholder="Search by name, location, or keyword..."
+            placeholder="Search by name, city, state, or case type..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-12 pr-4 py-6 rounded-full text-lg shadow-lg border-2 border-transparent focus:border-orange-200"
@@ -92,12 +139,23 @@ export default function Discover() {
             <div className="text-center py-20">
               <Search className="w-16 h-16 text-slate-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-slate-600 mb-2">No cases found</h3>
-              <p className="text-slate-500">Try adjusting your search terms.</p>
+              <p className="text-slate-500">
+                {searchTerm 
+                  ? "Try adjusting your search terms." 
+                  : "No public cases are currently available."}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {currentCases.map((caseData) => (
-                <CaseCard key={caseData.id} caseData={caseData} />
+                <CaseCard 
+                  key={caseData.id} 
+                  caseData={{
+                    ...caseData,
+                    // Ensure CaseCard gets location in a format it expects
+                    location: formatLocation(caseData)
+                  }} 
+                />
               ))}
             </div>
           )}
@@ -118,8 +176,18 @@ export default function Discover() {
           
           <div className="flex items-center gap-2">
             {[...Array(Math.min(5, totalPages))].map((_, i) => {
-              const pageNum = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
-              if (pageNum > totalPages) return null;
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              if (pageNum < 1 || pageNum > totalPages) return null;
               
               return (
                 <Button
@@ -146,10 +214,9 @@ export default function Discover() {
         </div>
       )}
 
-      {/* Results summary */}
       <div className="text-center mt-8 text-slate-500">
         Showing {currentCases.length} of {filteredCases.length} cases
-        {searchTerm && ` for "${searchTerm}"`}
+        {searchTerm && ` matching "${searchTerm}"`}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-# cases/models.py - Complete model file
+# cases/models.py - Complete model file with City and State fields added
 
 import uuid
 import os
@@ -174,6 +174,19 @@ class Case(models.Model):
     
     incident_date = models.DateField(blank=True, null=True)
     incident_location = models.CharField(max_length=255, blank=True)
+    
+    # NEW FIELDS: City and State for incident location
+    incident_city = models.CharField(
+        max_length=100, 
+        blank=True,
+        help_text="City where the incident occurred"
+    )
+    incident_state = models.CharField(
+        max_length=50, 
+        blank=True,
+        help_text="State/Province where the incident occurred"
+    )
+    
     last_seen_location = models.CharField(max_length=255, blank=True)
     last_seen_date = models.DateField(blank=True, null=True)
     last_seen_time = models.TimeField(blank=True, null=True)
@@ -319,6 +332,17 @@ class Case(models.Model):
             name += f' "{self.nickname}"'
         return name
     
+    def get_full_incident_location(self):
+        """Get formatted incident location with city and state"""
+        parts = []
+        if self.incident_location:
+            parts.append(self.incident_location)
+        if self.incident_city:
+            parts.append(self.incident_city)
+        if self.incident_state:
+            parts.append(self.incident_state)
+        return ', '.join(parts) if parts else ''
+    
     def save(self, *args, **kwargs):
         # Auto-sync crime_type with case_type
         if not self.crime_type:
@@ -357,6 +381,7 @@ class Case(models.Model):
         ]
 
 
+# Rest of the models remain the same...
 class SpotlightPost(models.Model):
     """Blog posts for the Spotlight section"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -552,7 +577,7 @@ class LEOInvite(models.Model):
     invite_code = models.CharField(
         max_length=12, 
         unique=True,
-        default=generate_leo_invite_code  # Fixed: using function instead of lambda
+        default=generate_leo_invite_code
     )
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='leo_invites')
     
