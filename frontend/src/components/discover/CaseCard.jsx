@@ -6,6 +6,14 @@ import { Button } from '@/components/ui/button';
 const CaseCard = ({ caseData }) => {
   const [imageError, setImageError] = React.useState(false);
   
+  // Debug: Log the case data to see what we're working with
+  React.useEffect(() => {
+    console.log('CaseCard received data:', caseData);
+    console.log('Photos array:', caseData.photos);
+    console.log('Primary photo URL:', caseData.primary_photo_url);
+    console.log('Victim photo URL:', caseData.victim_photo_url);
+  }, [caseData]);
+  
   // Format the location string
   const getLocation = () => {
     // First check if we have the formatted location passed from Discover
@@ -98,22 +106,56 @@ const CaseCard = ({ caseData }) => {
     }
   };
 
-  // Get victim photo URL from the photos array or use initials
+  // Get victim photo URL from template data or use initials
   const getPhotoUrl = () => {
-    // First check if there's a photos array with a primary photo
+    // Check template_data for the hero/victim image
+    if (caseData.template_data) {
+      // Try to find the image in customizations
+      if (caseData.template_data.customizations) {
+        // Check common locations where the image might be stored
+        const customizations = caseData.template_data.customizations;
+        
+        // Check hero section
+        if (customizations.hero?.victimImage) {
+          return customizations.hero.victimImage;
+        }
+        if (customizations.hero?.backgroundImage) {
+          return customizations.hero.backgroundImage;
+        }
+        
+        // Check victim section
+        if (customizations.victim?.image) {
+          return customizations.victim.image;
+        }
+        if (customizations.victim?.photo) {
+          return customizations.victim.photo;
+        }
+        
+        // Check general images
+        if (customizations.images?.victim) {
+          return customizations.images.victim;
+        }
+        if (customizations.images?.hero) {
+          return customizations.images.hero;
+        }
+        if (customizations.images?.primary) {
+          return customizations.images.primary;
+        }
+      }
+    }
+    
+    // Fallback to photos array
     if (caseData.photos && caseData.photos.length > 0) {
-      // Find the primary photo
       const primaryPhoto = caseData.photos.find(photo => photo.is_primary);
       if (primaryPhoto && primaryPhoto.image_url) {
         return primaryPhoto.image_url;
       }
-      // If no primary photo marked, use the first photo
       if (caseData.photos[0] && caseData.photos[0].image_url) {
         return caseData.photos[0].image_url;
       }
     }
     
-    // Check for direct photo URLs (backward compatibility)
+    // Check direct photo URLs
     if (caseData.victim_photo_url) {
       return caseData.victim_photo_url;
     }
@@ -122,7 +164,7 @@ const CaseCard = ({ caseData }) => {
       return caseData.primary_photo_url;
     }
     
-    // If no photo exists, return null to trigger initials display
+    // If no photo exists, return null
     return null;
   };
 
