@@ -98,18 +98,32 @@ const CaseCard = ({ caseData }) => {
     }
   };
 
-  // Get victim photo URL or use placeholder
+  // Get victim photo URL from the photos array or use initials
   const getPhotoUrl = () => {
-    if (imageError) {
-      return 'https://ui-avatars.com/api/?name=' + 
-             encodeURIComponent(`${caseData.first_name || 'Unknown'} ${caseData.last_name || 'Case'}`) + 
-             '&size=300&background=e2e8f0&color=475569';
+    // First check if there's a photos array with a primary photo
+    if (caseData.photos && caseData.photos.length > 0) {
+      // Find the primary photo
+      const primaryPhoto = caseData.photos.find(photo => photo.is_primary);
+      if (primaryPhoto && primaryPhoto.image_url) {
+        return primaryPhoto.image_url;
+      }
+      // If no primary photo marked, use the first photo
+      if (caseData.photos[0] && caseData.photos[0].image_url) {
+        return caseData.photos[0].image_url;
+      }
     }
-    return caseData.victim_photo_url || 
-           caseData.primary_photo_url || 
-           'https://ui-avatars.com/api/?name=' + 
-           encodeURIComponent(`${caseData.first_name || 'Unknown'} ${caseData.last_name || 'Case'}`) + 
-           '&size=300&background=e2e8f0&color=475569';
+    
+    // Check for direct photo URLs (backward compatibility)
+    if (caseData.victim_photo_url) {
+      return caseData.victim_photo_url;
+    }
+    
+    if (caseData.primary_photo_url) {
+      return caseData.primary_photo_url;
+    }
+    
+    // If no photo exists, return null to trigger initials display
+    return null;
   };
 
   const handleImageError = (e) => {
@@ -117,17 +131,32 @@ const CaseCard = ({ caseData }) => {
       setImageError(true);
     }
   };
+  
+  // Generate initials for placeholder
+  const getInitials = () => {
+    const firstName = caseData.first_name || '';
+    const lastName = caseData.last_name || '';
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || 'UN';
+  };
 
   return (
     <div className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2">
       {/* Image Section */}
       <div className="relative h-64 bg-gradient-to-br from-slate-100 to-slate-200">
-        <img 
-          src={getPhotoUrl()}
-          alt={`${caseData.first_name} ${caseData.last_name}`}
-          className="w-full h-full object-cover"
-          onError={handleImageError}
-        />
+        {getPhotoUrl() && !imageError ? (
+          <img 
+            src={getPhotoUrl()}
+            alt={`${caseData.first_name} ${caseData.last_name}`}
+            className="w-full h-full object-cover"
+            onError={handleImageError}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
+            <span className="text-5xl font-bold text-white">
+              {getInitials()}
+            </span>
+          </div>
+        )}
         <div className="absolute top-4 left-4">
           <span className={`${getCaseTypeColor()} text-white px-3 py-1 rounded-full text-sm font-semibold`}>
             {getCaseTypeLabel()}
