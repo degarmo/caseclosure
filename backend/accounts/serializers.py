@@ -1,4 +1,6 @@
 # accounts/serializers.py
+# UPDATED VERSION WITH CASE INVITATION CODE SUPPORT
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import UserProfile, InviteCode
@@ -38,34 +40,54 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return instance
 
 class RegisterSerializer(serializers.ModelSerializer):
+    """
+    Registration serializer supporting TWO types of codes:
+    1. invite_code (admin invite) - Normal registration flow
+    2. invitation_code (case invitation UUID) - Direct case access
+    """
     invite_code = serializers.CharField(write_only=True, required=False)
+    invitation_code = serializers.CharField(write_only=True, required=False)  # NEW FIELD
     
     class Meta:
         model = User
-        fields = ('id', 'password', 'email', 'first_name', 'last_name', 'invite_code')
+        fields = ('id', 'password', 'email', 'first_name', 'last_name', 'invite_code', 'invitation_code')
         extra_kwargs = {
             'password': {'write_only': True},
-            'email': {'required': True}
+            'email': {'required': True},
+            'first_name': {'required': False},  # Allow blank for flexibility
+            'last_name': {'required': False},   # Allow blank for flexibility
         }
 
     def validate(self, attrs):
-        # Extract invite_code for later use
+        """
+        Extract invite codes for later use in the view.
+        Note: The actual validation logic is in the RegisterView.create() method
+        """
+        # Extract both types of codes
         self.invite_code = attrs.pop('invite_code', None)
+        self.invitation_code = attrs.pop('invitation_code', None)  # NEW
+        
         return attrs
 
     def create(self, validated_data):
-        # Create user with account_type set on the User model
+        """
+        Create user with account_type set on the User model.
+        
+        Note: When using invitation_code, the account_type is set by
+        RegisterView._handle_case_invitation_signup() instead of here.
+        This create method is only used for normal registration flow.
+        """
         user = User.objects.create_user(
             email=validated_data['email'],
             password=validated_data['password'],
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
-            account_type='verified',  # Set on User model, not UserProfile
+            account_type='verified',  # Default for normal registration
             is_staff=False,
             is_superuser=False,
         )
         
-        # Create or get the UserProfile (without account_type since it doesn't have that field)
+        # Create or get the UserProfile
         profile, created = UserProfile.objects.get_or_create(
             user=user,
             defaults={

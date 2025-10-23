@@ -117,7 +117,7 @@ class CustomUser(AbstractUser):
         return self.email
 
 
-# ============ SITE SETTINGS MODEL (NEW) ============
+# ============ SITE SETTINGS MODEL ============
 class SiteSettings(models.Model):
     """Global site settings - singleton model"""
     REGISTRATION_MODES = [
@@ -125,7 +125,10 @@ class SiteSettings(models.Model):
         ('open', 'Open Registration'),
         ('closed', 'Registration Closed'),
     ]
-    
+    invite_only_mode = models.BooleanField(
+        default=True,
+        help_text="Require invite codes for registration"
+    )
     registration_mode = models.CharField(
         max_length=20,
         choices=REGISTRATION_MODES,
@@ -190,7 +193,7 @@ class SiteSettings(models.Model):
         return f"Site Settings ({self.registration_mode})"
 
 
-# ============ INVITE CODE MODEL (NEW) ============
+# ============ INVITE CODE MODEL ============
 class InviteCode(models.Model):
     """Invite codes for beta registration"""
     code = models.CharField(
@@ -371,30 +374,6 @@ class AccountRequest(models.Model):
         self.invite_code = invite
         self.save()
         
-        # TODO: Send email with invite code
-        # send_invite_email(self.email, invite.code)
-        
-        return invite
-
-# REPLACE THE TODO comment with actual email sending:
-    def approve_and_create_invite(self, approved_by):
-        """Approve request and create invite code"""
-        self.status = 'approved'
-        self.reviewed_by = approved_by
-        self.reviewed_at = timezone.now()
-        
-        # Create invite code for this email
-        invite = InviteCode.objects.create(
-            code=InviteCode.generate_code(),
-            email=self.email,  # Restrict to requester's email
-            created_by=approved_by,
-            max_uses=1,
-            notes=f"Created for account request from {self.first_name} {self.last_name}"
-        )
-        
-        self.invite_code = invite
-        self.save()
-        
         # NOTE: Email is sent from the view to avoid circular imports
         
         return invite
@@ -406,9 +385,6 @@ class AccountRequest(models.Model):
         self.reviewed_at = timezone.now()
         self.rejection_reason = reason
         self.save()
-        
-        # TODO: Send rejection email
-        # send_rejection_email(self.email, reason)
     
     def __str__(self):
         return f"{self.first_name} {self.last_name} - {self.status}"

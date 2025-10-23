@@ -16,24 +16,17 @@ from cases.models import Case
 def submit_inquiry(request):
     """Submit contact inquiry from main site"""
     
-    # Generate unique ID
-    inquiry_id = f"inq_{uuid.uuid4()}"
-    
-    # Add ID to request data
-    data = request.data.copy()
-    data['id'] = inquiry_id
-    
-    serializer = ContactInquirySerializer(data=data)
+    serializer = ContactInquirySerializer(data=request.data)
     
     if serializer.is_valid():
-        serializer.save()
+        inquiry = serializer.save()
         
         # TODO: Send email notification to admin
         
         return Response({
             'success': True,
             'message': 'Inquiry submitted successfully',
-            'inquiry_id': inquiry_id
+            'inquiry_id': inquiry.id
         }, status=status.HTTP_200_OK)
     
     return Response({
@@ -48,15 +41,8 @@ def submit_inquiry(request):
 def submit_tip(request):
     """Submit tip from victim memorial site"""
     
-    # Generate unique ID
-    tip_id = f"tip_{uuid.uuid4()}"
-    
-    # Add ID to request data
-    data = request.data.copy()
-    data['id'] = tip_id
-    
     # Validate case exists
-    case_id = data.get('case_id')
+    case_id = request.data.get('case_id')
     if not case_id:
         return Response({
             'success': False,
@@ -71,17 +57,17 @@ def submit_tip(request):
             'message': 'Case not found'
         }, status=status.HTTP_404_NOT_FOUND)
     
-    serializer = TipSerializer(data=data)
+    serializer = TipSerializer(data=request.data)
     
     if serializer.is_valid():
-        serializer.save()
+        tip = serializer.save()
         
         # TODO: Send email notification to case owner and admin
         
         return Response({
             'success': True,
             'message': 'Tip submitted successfully',
-            'tip_id': tip_id
+            'tip_id': tip.id
         }, status=status.HTTP_200_OK)
     
     return Response({

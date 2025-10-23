@@ -21,7 +21,6 @@ export const submitContactInquiry = async (data) => {
       subject: data.subject,
       message: data.message,
       case_reference: data.case_reference || null,
-      submitted_at: new Date().toISOString(),
       user_agent: navigator.userAgent,
     });
 
@@ -59,7 +58,6 @@ export const submitTip = async (data, caseId) => {
       tip_content: data.tip_content,
       is_anonymous: data.is_anonymous,
       urgency: data.urgency,
-      submitted_at: new Date().toISOString(),
       user_agent: navigator.userAgent,
     });
 

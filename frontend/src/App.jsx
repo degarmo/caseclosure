@@ -1,5 +1,5 @@
 /**
- * App.jsx - Updated with Spotlight and SpotlightAdmin integration
+ * App.jsx - Consolidated with single unified dashboard
  * Location: frontend/src/App.jsx
  */
 
@@ -14,31 +14,32 @@ import Layout from "./pages/Layout";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Pricing from "./pages/Pricing";
-import Spotlight from "./pages/Spotlight";  // Keep existing public Spotlight page
+import Spotlight from "./pages/Spotlight";
 import Contact from "./pages/Contact";
 import Discover from "./pages/Discover";
 import RequestAccount from "./pages/RequestAccount";
-import CaseDetails from './dashboard/components/CaseDetails';
+//import CaseDetails from './dashboard/components/CaseDetails';
+
 // Auth Pages
 import Signup from "./pages/Signup";
 import SignIn from "./pages/SignIn";
 
-// NEW: Import unified Dashboard from the new location
-import Dashboard from "./dashboard";
-
+// Dashboard Component
+import Dashboard from "@/components/dashboard/Dashboard";
 
 // Case Creator Components
 import CaseCreator from "./components/CaseCreator";
+import CaseDetails from "./components/dashboard/sections/Cases/CaseDetails"
 import ProfileSettings from "./pages/ProfileSettings";
 import EditorWrapper from "./components/CaseCreator/EditorWrapper";
 
 // Template System Components
 import TemplatePreviewWrapper from './components/CaseCreator/views/TemplatePreviewWrapper';
 import TemplateRenderer from "./templates/TemplateRenderer";
-import CustomizationView from './components/CaseCreator/views/CustomizationView/CustomizationView';
 
 // Utils
 import getSubdomain from "./utils/getSubdomain";
+import api from "./utils/axios";
 
 function useAuth() {
   let user = null;
@@ -58,20 +59,58 @@ function RequireAuth({ children }) {
   return children;
 }
 
-// Admin auth wrapper (checks for staff/admin status)
+// Admin auth wrapper
 function RequireAdmin({ children }) {
   const { user, isAuthenticated } = useAuth();
-  const location = useLocation();
   
   if (!isAuthenticated) {
-    return <Navigate to="/signin" state={{ from: location }} replace />;
+    return <Navigate to="/signin" replace />;
   }
   
-  // Check if user is staff or admin
   if (!user?.is_staff && !user?.is_admin && !user?.is_superuser) {
     return <Navigate to="/dashboard" replace />;
   }
   
+  return children;
+}
+
+// Beta mode route protection
+function BetaProtectedRoute({ children }) {
+  const [betaMode, setBetaMode] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkBetaMode();
+  }, []);
+
+  const checkBetaMode = async () => {
+    try {
+      const response = await api.get('/auth/settings/public/invite-status/');
+      setBetaMode(response.data.is_invite_only === true);
+    } catch (error) {
+      // If endpoint fails, assume beta is enabled
+      setBetaMode(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If beta mode is disabled, redirect to signup
+  if (!betaMode) {
+    return <Navigate to="/signup" replace />;
+  }
+
   return children;
 }
 
@@ -111,11 +150,6 @@ function AppContent() {
     return !hostname.includes('caseclosure');
   }, [hostname, location.pathname]);
 
-  // Debug logging (moved outside JSX)
-  useEffect(() => {
-
-  }, [user]);
-
   // Logout handler
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -128,7 +162,7 @@ function AppContent() {
     window.location.href = "/signin";
   };
 
-  // Modal handlers - Updated to handle editing
+  // Modal handlers
   const handleOpenCaseModal = (caseId = null) => {
     setEditingCaseId(caseId);
     setShowCaseCreator(true);
@@ -145,20 +179,15 @@ function AppContent() {
     setEditingCaseId(null);
     
     if (caseData.id && !editingCaseId) {
-      // Only navigate to editor for new cases, not edits
       navigate(`/editor/${caseData.id}`);
     } else if (editingCaseId) {
-      // For edits, refresh the dashboard
       window.location.reload();
     }
   };
 
-  // Navigation function for CaseCreator to use
   const handleNavigateFromModal = (path) => {
-    // Close the modal first
     setShowCaseCreator(false);
     setEditingCaseId(null);
-    // Then navigate
     setTimeout(() => {
       navigate(path);
     }, 100);
@@ -176,7 +205,7 @@ function AppContent() {
         const updatedUser = JSON.parse(userData);
         window.location.reload();
       } catch (e) {
-        console.error('Failed to update user data:', e);
+        // Handle error silently
       }
     }
   };
@@ -190,7 +219,7 @@ function AppContent() {
   return (
     <>
       <Routes>
-        {/* Template Preview Routes (for iframe in editor) */}
+        {/* Template Preview Routes */}
         <Route path="/preview/:caseId/:page" element={<TemplatePreviewWrapper />} />
         <Route path="/preview/:caseId" element={<TemplatePreviewWrapper />} />
 
@@ -221,7 +250,7 @@ function AppContent() {
         />
         <Route path="cases/:caseId" element={<CaseDetails />} />
 
-        {/* NEW: Edit Case Route - This needs to be BEFORE the dashboard/* route */}
+        {/* Edit Case Route */}
         <Route 
           path="/dashboard/cases/edit/:id" 
           element={
@@ -230,11 +259,9 @@ function AppContent() {
                 mode="edit"
                 onClose={() => navigate('/dashboard')}
                 onComplete={(caseData) => {
-                  // Don't navigate here - let the CaseCreator handle it
-                  console.log('Case edit completed:', caseData);
+                  // Case edit completed
                 }}
                 onNavigate={(path) => {
-                  // Don't navigate if going to template in edit mode - handled internally
                   if (path !== 'template') {
                     navigate(path);
                   }
@@ -244,7 +271,7 @@ function AppContent() {
           } 
         />
 
-        {/* NEW: Create Case Route */}
+        {/* Create Case Route */}
         <Route 
           path="/dashboard/cases/new" 
           element={
@@ -253,7 +280,6 @@ function AppContent() {
                 mode="create"
                 onClose={() => navigate('/dashboard')}
                 onComplete={(caseData) => {
-                  // After successful creation, navigate to editor
                   if (caseData.id) {
                     navigate(`/editor/${caseData.id}`);
                   }
@@ -273,15 +299,23 @@ function AppContent() {
         <Route path="/spotlight" element={<Layout><Spotlight /></Layout>} />
         <Route path="/contact" element={<Layout><Contact /></Layout>} />
         <Route path="/discover" element={<Layout><Discover /></Layout>} />
-        <Route path="/request-account" element={<Layout><RequestAccount /></Layout>} />
-
         
+        {/* Request Account - Only available if beta mode is enabled */}
+        <Route 
+          path="/request-account" 
+          element={
+            <BetaProtectedRoute>
+              <Layout><RequestAccount /></Layout>
+            </BetaProtectedRoute>
+          } 
+        />
+
         {/* Auth Routes */}
         <Route path="/signup" element={<Signup />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/login" element={<SignIn />} />
 
-        {/* Protected Dashboard Routes - Now Unified */}
+        {/* Dashboard */}
         <Route
           path="/dashboard/*"
           element={
@@ -295,25 +329,19 @@ function AppContent() {
           }
         />
         
-        {/* Spotlight Dashboard Routes (handled by Dashboard component) */}
-        {/* These will be child routes inside the Dashboard component:
-            - /dashboard/spotlight - User feed
-            - /dashboard/spotlight/admin - Admin moderation
-        */}
-        
-        {/* Settings - redirects to dashboard */}
+        {/* Settings redirect */}
         <Route
           path="/settings/user"
           element={<Navigate to="/dashboard" replace />}
         />
         
-        {/* Admin - redirects to dashboard (role-based access is handled inside Dashboard) */}
+        {/* Admin redirect */}
         <Route
           path="/admin"
           element={<Navigate to="/dashboard" replace />}
         />
         
-        {/* Cases list - redirects to dashboard */}
+        {/* Cases list redirect */}
         <Route
           path="/cases/list"
           element={<Navigate to="/dashboard" replace />}
@@ -336,7 +364,7 @@ function AppContent() {
         />
       </Routes>
 
-      {/* Modals - Outside Router context - Updated to handle edit mode */}
+      {/* Modals */}
       {showCaseCreator && (
         <div className="fixed inset-0 z-[60]">
           <CaseCreator
@@ -376,9 +404,6 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <>
-        <title>Case Closure - Crowdsourcing Closure. One Case at a Time.</title>
-      </>
       <AppContent />
     </Router>
   );

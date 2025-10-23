@@ -13,8 +13,12 @@ from django.utils import timezone
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.template.loader import render_to_string  # ADD THIS
+from django.contrib.auth.models import User  # ADD THIS
+from datetime import timedelta 
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.contrib.auth import get_user_model
 import cloudinary
 from cloudinary.uploader import upload
 import json
@@ -22,14 +26,17 @@ import logging
 import os
 import re
 import time
+import uuid
 
-from .models import Case, SpotlightPost, TemplateRegistry, DeploymentLog, CasePhoto, LEOInvite, CaseAccess
+from .models import (Case, SpotlightPost, TemplateRegistry, DeploymentLog, CasePhoto, CaseAccess, CaseInvitation)
 from .serializers import (
     CaseSerializer, 
     SpotlightPostSerializer, 
     TemplateRegistrySerializer,
     DeploymentLogSerializer,
-    CasePhotoSerializer
+    CasePhotoSerializer,
+    CaseInvitationSerializer,
+    CreateCaseInvitationSerializer
 )
 from .services.deployment import get_deployment_service
 
@@ -116,6 +123,10 @@ class CaseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Filter cases based on user permissions and account type.
+        Includes:
+        1. Cases owned by user
+        2. Cases where user is detective/assigned
+        3. Cases where user has CaseAccess permission
         """
         try:
             user = self.request.user
@@ -130,9 +141,21 @@ class CaseViewSet(viewsets.ModelViewSet):
                     return Case.objects.all().order_by('-created_at')
                 
                 if profile.account_type == 'detective':
+                    # Police/Detectives can see:
+                    # 1. Cases assigned to them directly
+                    # 2. Cases where they have CaseAccess permission
+                    from cases.models import CaseAccess
+                    
+                    # Get case IDs where user has access
+                    accessible_case_ids = CaseAccess.objects.filter(
+                        user=user,
+                        accepted=True
+                    ).values_list('case_id', flat=True)
+                    
                     return Case.objects.filter(
                         Q(user=user) | 
-                        Q(detective_email=user.email)
+                        Q(detective_email=user.email) |
+                        Q(id__in=accessible_case_ids)
                     ).distinct().order_by('-created_at')
                 
                 if profile.account_type == 'advocate':
@@ -148,8 +171,9 @@ class CaseViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             logger.error(f"Error in get_queryset: {str(e)}")
-            return Case.objects.none()
-    
+            return Case.objects.none()    
+        
+        
     def create(self, request, *args, **kwargs):
         """Override create to handle photo upload separately."""
         serializer = self.get_serializer(data=request.data)
@@ -808,7 +832,178 @@ class CaseViewSet(viewsets.ModelViewSet):
             logger.warning(f"Error during case deletion cleanup: {str(e)}")
         
         super().perform_destroy(instance)
+    # Add these methods to your CaseViewSet class in cases/views.py
 
+    @action(detail=True, methods=['get'])
+    def access_list(self, request, id=None):
+        """Get all users with access to this case"""
+        case = self.get_object()
+        
+        # Check permissions - only case owner or admin can see this
+        if case.user != request.user and not request.user.is_staff:
+            raise PermissionDenied("You can only manage access for your own cases")
+        
+        try:
+            # Get all CaseAccess records for this case
+            accesses = CaseAccess.objects.filter(case=case).select_related('user')
+            
+            access_list = []
+            for access in accesses:
+                access_list.append({
+                    'id': access.id,
+                    'user_id': access.user.id,
+                    'email': access.user.email,
+                    'first_name': access.user.first_name,
+                    'last_name': access.user.last_name,
+                    'account_type': access.user.account_type,
+                    'access_level': access.access_level,
+                    'can_view_tips': access.can_view_tips,
+                    'can_view_tracking': access.can_view_tracking,
+                    'can_view_personal_info': access.can_view_personal_info,
+                    'can_export_data': access.can_export_data,
+                    'invited_at': access.invited_at.isoformat() if access.invited_at else None,
+                    'invited_by_email': access.invited_by.email if access.invited_by else None,
+                    'accepted': access.accepted,
+                    'accepted_at': access.accepted_at.isoformat() if access.accepted_at else None,
+                    'last_accessed': access.last_accessed.isoformat() if access.last_accessed else None,
+                    'access_count': access.access_count,
+                })
+            
+            return Response({
+                'case_id': str(case.id),
+                'case_title': case.case_title,
+                'total_access_count': len(access_list),
+                'access_list': access_list
+            })
+            
+        except Exception as e:
+            logger.error(f"Error fetching case access list: {str(e)}")
+            return Response(
+                {'error': 'Failed to fetch access list'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def revoke_access(self, request, id=None):
+        """Revoke access for a user from this case"""
+        case = self.get_object()
+        
+        # Check permissions - only case owner or admin can revoke access
+        if case.user != request.user and not request.user.is_staff:
+            raise PermissionDenied("You can only manage access for your own cases")
+        
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            User = get_user_model()
+            user = User.objects.get(id=user_id)
+            
+            # Find and delete the CaseAccess record
+            access = CaseAccess.objects.filter(case=case, user=user).first()
+            
+            if not access:
+                return Response(
+                    {'error': 'User does not have access to this case'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Log the revocation
+            user_email = user.email
+            access.delete()
+            
+            logger.info(f"Access revoked for {user_email} to case {case.id} by {request.user.email}")
+            
+            return Response({
+                'success': True,
+                'message': f'Access revoked for {user_email}',
+                'revoked_user': user_email,
+                'case_id': str(case.id)
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error revoking access: {str(e)}")
+            return Response(
+                {'error': 'Failed to revoke access'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def update_access_permissions(self, request, id=None):
+        """Update permissions for a user's case access"""
+        case = self.get_object()
+        
+        # Check permissions
+        if case.user != request.user and not request.user.is_staff:
+            raise PermissionDenied("You can only manage access for your own cases")
+        
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            User = get_user_model()
+            user = User.objects.get(id=user_id)
+            
+            access = CaseAccess.objects.filter(case=case, user=user).first()
+            
+            if not access:
+                return Response(
+                    {'error': 'User does not have access to this case'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Update permissions
+            if 'can_view_tips' in request.data:
+                access.can_view_tips = request.data['can_view_tips']
+            if 'can_view_tracking' in request.data:
+                access.can_view_tracking = request.data['can_view_tracking']
+            if 'can_view_personal_info' in request.data:
+                access.can_view_personal_info = request.data['can_view_personal_info']
+            if 'can_export_data' in request.data:
+                access.can_export_data = request.data['can_export_data']
+            if 'access_level' in request.data:
+                access.access_level = request.data['access_level']
+            
+            access.save()
+            
+            logger.info(f"Permissions updated for {user.email} to case {case.id}")
+            
+            return Response({
+                'success': True,
+                'message': f'Permissions updated for {user.email}',
+                'updated_user': user.email,
+                'permissions': {
+                    'can_view_tips': access.can_view_tips,
+                    'can_view_tracking': access.can_view_tracking,
+                    'can_view_personal_info': access.can_view_personal_info,
+                    'can_export_data': access.can_export_data,
+                }
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error updating permissions: {str(e)}")
+            return Response(
+                {'error': 'Failed to update permissions'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 # cases/views.py
 # Find your existing SpotlightPostViewSet class and REPLACE it with this entire class
@@ -997,3 +1192,315 @@ class DeploymentLogViewSet(viewsets.ReadOnlyModelViewSet):
         return DeploymentLog.objects.filter(
             case__user=self.request.user
         ).order_by('-started_at')
+    
+
+# ============================================================================
+# CASE INVITATION VIEWSET
+# ============================================================================
+
+# cases/views.py - CaseInvitationViewSet COMPLETE
+
+class CaseInvitationViewSet(viewsets.ModelViewSet):
+    """Handle case access invitations for LEO, investigators, advocates"""
+    queryset = CaseInvitation.objects.all()
+    serializer_class = CaseInvitationSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CreateCaseInvitationSerializer
+        return CaseInvitationSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new invitation for a case.
+        Two scenarios:
+        1. User doesn't exist: Create invitation, send email with signup link
+        2. User exists: Grant access immediately, send notification
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        data = serializer.validated_data
+        case = Case.objects.get(id=data['case_id'])
+        invitee_email = data['invitee_email']
+        
+        # Map invitation_type to access_level for CaseAccess
+        access_level_mapping = {
+            'police': 'leo',
+            'investigator': 'private_investigator',
+            'advocate': 'advocate',
+            'family': 'collaborator',
+            'other': 'viewer',
+        }
+        access_level = access_level_mapping.get(data['user_type'], 'viewer')
+        
+        # Check if user exists
+        try:
+            User = get_user_model()
+            user = User.objects.get(email=invitee_email)
+            logger.info(f"[INVITATION] User EXISTS: {user.email}")
+            
+            # User exists - grant access immediately
+            access, created = CaseAccess.objects.get_or_create(
+                case=case,
+                user=user,
+                defaults={
+                    'access_level': access_level,
+                    'invited_by': request.user,
+                    'accepted': True,
+                    'accepted_at': timezone.now(),
+                    'can_view_tips': True,
+                    'can_view_tracking': False,
+                    'can_view_personal_info': False,
+                    'can_export_data': False,
+                }
+            )
+            
+            logger.info(f"[INVITATION] CaseAccess created: {created}, ID: {access.id}")
+            
+            # Send notification email to existing user
+            try:
+                logger.info(f"[INVITATION] Calling _send_existing_user_notification()")
+                self._send_existing_user_notification(
+                    user=user,
+                    case=case,
+                    inviter=request.user,
+                    access_type=data['user_type'],
+                    subject_line=data['subject_line'],
+                    message_body=data['message_body']
+                )
+                logger.info(f"[INVITATION] ✓ Notification email method completed")
+            except Exception as email_error:
+                logger.error(f"[INVITATION] ✗ Notification email error: {str(email_error)}", exc_info=True)
+            
+            return Response(
+                {
+                    'status': 'success',
+                    'message': f'Access granted to {user.get_full_name() or user.email}. Notification sent.',
+                    'type': 'existing_user',
+                    'case_access_id': str(access.id)
+                },
+                status=status.HTTP_201_CREATED
+            )
+        
+        except User.DoesNotExist:
+            logger.info(f"[INVITATION] User DOES NOT EXIST: {invitee_email}")
+            
+            # Generate unique invitation code
+            invitation_code = str(uuid.uuid4())
+            
+            # User doesn't exist - create invitation
+            invitation, created = CaseInvitation.objects.get_or_create(
+                case=case,
+                invitee_email=invitee_email,
+                defaults={
+                    'invitee_name': data['invitee_name'],
+                    'invitation_type': data['user_type'],
+                    'invitee_account_type': CaseInvitation.get_account_type_from_invitation_type(data['user_type']),
+                    'invited_by': request.user,
+                    'subject_line': data['subject_line'],
+                    'message_body': data['message_body'],
+                    'invitation_code': invitation_code,
+                    'expires_at': timezone.now() + timedelta(days=30),
+                    'status': 'pending'
+                }
+            )
+            
+            logger.info(f"[INVITATION] Invitation created: {created}, ID: {invitation.id}")
+            
+            if created:
+                # Send invitation email to new user
+                try:
+                    logger.info(f"[INVITATION] Calling _send_invitation_email()")
+                    self._send_invitation_email(
+                        invitation=invitation,
+                        inviter=request.user
+                    )
+                    logger.info(f"[INVITATION] ✓ Invitation email method completed")
+                except Exception as email_error:
+                    logger.error(f"[INVITATION] ✗ Invitation email error: {str(email_error)}", exc_info=True)
+                
+                return Response(
+                    {
+                        'status': 'success',
+                        'message': f'Invitation sent to {invitee_email}',
+                        'type': 'new_user',
+                        'invitation_id': str(invitation.id),
+                        'expires_in_days': 30
+                    },
+                    status=status.HTTP_201_CREATED
+                )
+            else:
+                return Response(
+                    {
+                        'status': 'already_invited',
+                        'message': f'{invitee_email} has already been invited to this case',
+                        'type': 'duplicate',
+                        'invitation_id': str(invitation.id)
+                    },
+                    status=status.HTTP_200_OK
+                )
+    
+    @action(detail=False, methods=['get'])
+    def my_pending_invitations(self, request):
+        """Get pending invitations for current user's email"""
+        invitations = CaseInvitation.objects.filter(
+            invitee_email=request.user.email,
+            status='pending',
+            expires_at__gt=timezone.now()
+        ).order_by('-created_at')
+        serializer = self.get_serializer(invitations, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def accept(self, request, pk=None):
+        """Accept an invitation and grant case access"""
+        invitation = self.get_object()
+        
+        # Verify email matches current user
+        if invitation.invitee_email != request.user.email:
+            return Response(
+                {'error': 'This invitation is not for your account'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if not already accepted or expired
+        if invitation.status != 'pending':
+            return Response(
+                {'error': f'Invitation has already been {invitation.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if invitation.is_expired():
+            invitation.status = 'expired'
+            invitation.save()
+            return Response(
+                {'error': 'Invitation has expired'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create case access
+        access, created = CaseAccess.objects.get_or_create(
+            case=invitation.case,
+            user=request.user,
+            defaults={
+                'access_type': invitation.access_type,
+                'granted_by': invitation.invited_by,
+                'accepted': True,
+                'accepted_at': timezone.now()
+            }
+        )
+        
+        # Update invitation status
+        invitation.status = 'accepted'
+        invitation.accepted_at = timezone.now()
+        invitation.accepted_by = request.user
+        invitation.save()
+        
+        return Response(
+            {
+                'status': 'success',
+                'message': f'You now have access to {invitation.case.case_title}',
+                'case_id': str(invitation.case.id),
+                'access_type': invitation.access_type
+            },
+            status=status.HTTP_200_OK
+        )
+    
+    def _send_invitation_email(self, invitation, inviter):
+        """Send invitation email to new user (doesn't have account yet)"""
+        print(f"\n[EMAIL DEBUG] _send_invitation_email() called")
+        print(f"[EMAIL DEBUG] EMAIL_BACKEND: {settings.EMAIL_BACKEND}")
+        print(f"[EMAIL DEBUG] EMAIL_HOST: {settings.EMAIL_HOST}")
+        print(f"[EMAIL DEBUG] EMAIL_HOST_USER: {settings.EMAIL_HOST_USER}")
+        print(f"[EMAIL DEBUG] DEFAULT_FROM_EMAIL: {settings.DEFAULT_FROM_EMAIL}")
+        print(f"[EMAIL DEBUG] FRONTEND_URL: {getattr(settings, 'FRONTEND_URL', 'NOT SET')}")
+        
+        context = {
+            'invitee_name': invitation.invitee_name,
+            'case_title': invitation.case.case_title,
+            'inviter_name': inviter.get_full_name() or inviter.email,
+            'message_body': invitation.message_body,
+            'invitation_code': invitation.invitation_code,
+            'signup_url': f"{getattr(settings, 'FRONTEND_URL', 'caseclosure.org')}/signup?invitation_code={invitation.invitation_code}",
+            'case_id': str(invitation.case.id),
+        }
+        
+        subject = invitation.subject_line
+        
+        try:
+            html_message = render_to_string('emails/case_invitation.html', context)
+            print(f"[EMAIL DEBUG] Template rendered successfully")
+        except Exception as template_error:
+            print(f"[EMAIL DEBUG] Template error (using fallback): {str(template_error)}")
+            html_message = f"""
+            <h2>{subject}</h2>
+            <p>Hi {invitation.invitee_name},</p>
+            <p>{invitation.message_body}</p>
+            <p>To accept this invitation, create an account using this code: {invitation.invitation_code}</p>
+            <p><a href="{context['signup_url']}">Sign Up Here</a></p>
+            """
+        
+        print(f"[EMAIL DEBUG] Attempting send_mail to {invitation.invitee_email}")
+        
+        try:
+            num_sent = send_mail(
+                subject,
+                '',
+                settings.DEFAULT_FROM_EMAIL,
+                [invitation.invitee_email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            print(f"[EMAIL DEBUG] ✓ send_mail returned: {num_sent}")
+        except Exception as e:
+            print(f"[EMAIL DEBUG] ✗ send_mail failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
+    def _send_existing_user_notification(self, user, case, inviter, access_type, subject_line, message_body):
+        """Send notification to existing user about new case access"""
+        print(f"\n[EMAIL DEBUG] _send_existing_user_notification() called")
+        
+        context = {
+            'user_name': user.get_full_name() or user.email,
+            'case_title': case.case_title,
+            'inviter_name': inviter.get_full_name() or inviter.email,
+            'access_type': dict(CaseInvitation.ACCESS_TYPES).get(access_type, access_type),
+            'message_body': message_body,
+            'dashboard_url': f"{getattr(settings, 'FRONTEND_URL', 'https://caseclosure')}/dashboard",
+            'case_id': str(case.id),
+        }
+        
+        try:
+            html_message = render_to_string('emails/case_access_notification.html', context)
+            print(f"[EMAIL DEBUG] Template rendered successfully")
+        except Exception as template_error:
+            print(f"[EMAIL DEBUG] Template error (using fallback): {str(template_error)}")
+            html_message = f"""
+            <h2>{subject_line}</h2>
+            <p>Hi {context['user_name']},</p>
+            <p>{message_body}</p>
+            <p>You now have {context['access_type']} access to: <strong>{case.case_title}</strong></p>
+            <p><a href="{context['dashboard_url']}">View in Dashboard</a></p>
+            """
+        
+        print(f"[EMAIL DEBUG] Attempting send_mail to {user.email}")
+        
+        try:
+            num_sent = send_mail(
+                subject_line,
+                '',
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            print(f"[EMAIL DEBUG] ✓ send_mail returned: {num_sent}")
+        except Exception as e:
+            print(f"[EMAIL DEBUG] ✗ send_mail failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise

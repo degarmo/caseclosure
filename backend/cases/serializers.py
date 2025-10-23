@@ -7,7 +7,8 @@ from .models import (
     SpotlightPost, 
     TemplateRegistry, 
     DeploymentLog, 
-    CasePhoto
+    CasePhoto,
+    CaseInvitation
 )
 
 User = get_user_model()
@@ -442,3 +443,73 @@ class CaseListSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(primary.image.url)
             return primary.image.url
         return None
+
+
+class CaseInvitationSerializer(serializers.ModelSerializer):
+    """Serializer for viewing case invitations"""
+    invited_by_email = serializers.CharField(source='invited_by.email', read_only=True)
+    case_title = serializers.CharField(source='case.case_title', read_only=True)
+    is_expired = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CaseInvitation
+        fields = [
+            'id',
+            'case',
+            'case_title',
+            'invitee_email',
+            'invitee_name',
+            'access_type',
+            'invited_by',
+            'invited_by_email',
+            'subject_line',
+            'message_body',
+            'status',
+            'invitation_code',
+            'created_at',
+            'expires_at',
+            'accepted_at',
+            'is_expired'
+        ]
+        read_only_fields = [
+            'id',
+            'invitation_code',
+            'created_at',
+            'expires_at',
+            'status',
+            'accepted_at',
+            'is_expired'
+        ]
+    
+    def get_is_expired(self, obj):
+        return obj.is_expired()
+
+
+class CreateCaseInvitationSerializer(serializers.Serializer):
+    """Serializer for creating new invitations"""
+    invitee_name = serializers.CharField(max_length=200)
+    invitee_email = serializers.EmailField()
+    case_id = serializers.IntegerField()
+    user_type = serializers.ChoiceField(
+        choices=['police', 'investigator', 'advocate', 'family', 'other']
+    )
+    subject_line = serializers.CharField(max_length=255)
+    message_body = serializers.CharField()
+    invited_by = serializers.IntegerField()
+    
+    def validate_case_id(self, value):
+        """Verify case exists"""
+        try:
+            Case.objects.get(id=value)
+        except Case.DoesNotExist:
+            raise serializers.ValidationError("Case not found")
+        return value
+    
+    def validate(self, data):
+        """Verify the inviter owns the case"""
+        case = Case.objects.get(id=data['case_id'])
+        if case.user_id != data['invited_by']:
+            raise serializers.ValidationError(
+                "You can only invite people to cases you own"
+            )
+        return data

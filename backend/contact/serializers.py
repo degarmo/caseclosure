@@ -12,7 +12,7 @@ class ContactInquirySerializer(serializers.ModelSerializer):
             'subject', 'message', 'case_reference', 'status',
             'submitted_at', 'user_agent', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'submitted_at', 'created_at', 'updated_at']
 
 
 class TipSerializer(serializers.ModelSerializer):
@@ -28,7 +28,7 @@ class TipSerializer(serializers.ModelSerializer):
             'urgency', 'status', 'submitted_at', 'user_agent',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'submitted_at', 'created_at', 'updated_at']
     
     def create(self, validated_data):
         case_id = validated_data.pop('case_id')

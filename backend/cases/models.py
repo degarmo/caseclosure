@@ -683,3 +683,142 @@ class DeploymentLog(models.Model):
         indexes = [
             models.Index(fields=['case', '-started_at']),
         ]
+
+class CaseInvitation(models.Model):
+    """
+    Stores invitation details for users who don't have accounts yet.
+    When they sign up, link them to the case via CaseAccess and set their account_type.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('expired', 'Expired'),
+    ]
+    
+    # Invitation type choices - what role they'll have
+    INVITATION_TYPES = [
+        ('police', 'Law Enforcement'),
+        ('investigator', 'Private Investigator'),
+        ('advocate', 'Victim Advocate'),
+        ('family', 'Family Member'),
+        ('other', 'Other'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='invitations')
+    invitee_email = models.EmailField()
+    invitee_name = models.CharField(max_length=200)
+    
+    # What type of invitation (police, family, etc.)
+    invitation_type = models.CharField(
+        max_length=20, 
+        choices=INVITATION_TYPES,
+        help_text="Role they'll have when they sign up"
+    )
+    
+    # What account_type they should get on CustomUser
+    # This is determined from invitation_type but stored explicitly
+    invitee_account_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('unverified', 'Unverified User'),
+            ('verified', 'Verified Family Member'),
+            ('helper', 'Community Helper'),
+            ('detective', 'Law Enforcement'),
+            ('advocate', 'Victim Advocate'),
+            ('admin', 'Administrator'),
+        ],
+        default='unverified',
+        help_text="Account type they'll receive when signing up"
+    )
+    
+    # Permission flags for this specific case access
+    can_view_tips = models.BooleanField(default=True)
+    can_view_tracking = models.BooleanField(default=False)
+    can_view_personal_info = models.BooleanField(default=False)
+    can_export_data = models.BooleanField(default=False)
+    read_only = models.BooleanField(
+        default=True,
+        help_text="If True, user can only view, not edit"
+    )
+    
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='sent_case_invitations'
+    )
+    
+    # Email content
+    subject_line = models.CharField(max_length=255)
+    message_body = models.TextField()
+    
+    # Invitation tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    invitation_code = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='accepted_case_invitations'
+    )
+    
+    class Meta:
+        db_table = 'case_invitations'
+        unique_together = ('case', 'invitee_email')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['invitation_code']),
+            models.Index(fields=['case', 'status']),
+        ]
+    
+    def is_expired(self):
+        return timezone.now() > self.expires_at and self.status == 'pending'
+    
+    @staticmethod
+    def get_account_type_from_invitation_type(invitation_type):
+        """
+        Map invitation type to account_type for CustomUser
+        """
+        mapping = {
+            'police': 'detective',           # Law Enforcement
+            'investigator': 'helper',         # Private Investigator
+            'advocate': 'advocate',           # Victim Advocate
+            'family': 'verified',             # Verified Family Member
+            'other': 'unverified',            # Other
+        }
+        return mapping.get(invitation_type, 'unverified')
+    
+    def save(self, *args, **kwargs):
+        # Auto-set account_type based on invitation_type
+        if not self.invitee_account_type or self.invitee_account_type == 'unverified':
+            self.invitee_account_type = self.get_account_type_from_invitation_type(self.invitation_type)
+        
+        # Set permissions based on invitation_type
+        if self.invitation_type == 'police':
+            self.can_view_tips = True
+            self.can_view_tracking = False
+            self.can_view_personal_info = False
+            self.can_export_data = False
+            self.read_only = True
+        elif self.invitation_type == 'advocate':
+            self.can_view_tips = True
+            self.can_view_tracking = False
+            self.can_view_personal_info = True
+            self.can_export_data = False
+            self.read_only = True
+        elif self.invitation_type == 'family':
+            self.can_view_tips = True
+            self.can_view_tracking = True
+            self.can_view_personal_info = True
+            self.can_export_data = True
+            self.read_only = False
+        
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"Invitation for {self.invitee_email} to {self.case.case_title}"

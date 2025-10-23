@@ -1,14 +1,38 @@
-// src/dashboard/components/CasesList.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '@/api/axios';
+import api from '@/utils/axios';
 import { 
-  Folder, Eye, Edit, Trash2, ToggleLeft, ToggleRight, 
-  Calendar, DollarSign, MapPin, User, Search, Filter,
-  Plus, RefreshCw, CheckCircle, XCircle, Clock, Palette
-} from 'lucide-react';
+  FolderIcon,
+  EyeIcon,
+  PencilIcon,
+  TrashIcon,
+  CalendarIcon,
+  CurrencyDollarIcon,
+  MapPinIcon,
+  UserIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  PlusIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
+  PaintBrushIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
+} from '@heroicons/react/24/outline';
+import {
+  CheckCircleIcon as CheckCircleSolid,
+  XCircleIcon as XCircleSolid
+} from '@heroicons/react/24/solid';
 
-export default function CasesList({ cases = [], filter = 'all', onRefresh, onEditCase }) {
+export default function CasesList({ 
+  cases = [], 
+  filter = 'all', 
+  onRefresh, 
+  permissions,
+  readOnly = false 
+}) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created');
@@ -42,29 +66,26 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
   });
 
   const handleRowClick = (caseId) => {
-    // Navigate to case details page
     navigate(`/dashboard/cases/${caseId}`);
   };
 
   const handleEditCase = (e, caseId) => {
-    e.stopPropagation(); // Prevent row click
-    // Navigate to the case edit form (same form used for creation)
+    e.stopPropagation();
     navigate(`/dashboard/cases/edit/${caseId}`);
   };
 
   const handleCustomizeTemplate = (e, caseId) => {
-    e.stopPropagation(); // Prevent row click
-    // Navigate to template editor for visual customization
+    e.stopPropagation();
     navigate(`/editor/${caseId}`);
   };
 
   const handleViewCase = (e, caseId) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation();
     navigate(`/dashboard/cases/${caseId}`);
   };
 
   const toggleCaseStatus = async (e, caseId, isDisabled) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation();
     setLoading(true);
     try {
       await api.patch(`/cases/${caseId}/`, { is_disabled: !isDisabled });
@@ -77,7 +98,7 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
   };
 
   const deleteCase = async (e, caseId) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation();
     if (!window.confirm('Are you sure you want to permanently delete this case? This action cannot be undone.')) {
       return;
     }
@@ -154,25 +175,27 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                      filter === 'disabled' ? 'Disabled Cases' : 'Cases';
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
       {/* Header */}
-      <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{filterTitle}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{filterTitle}</h2>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/dashboard/cases/new')}
-              className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Create Case
-            </button>
+            {!readOnly && permissions?.can('create_cases') && (
+              <button
+                onClick={() => navigate('/dashboard/cases/new')}
+                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2 font-medium"
+              >
+                <PlusIcon className="w-4 h-4" />
+                Create Case
+              </button>
+            )}
             <button
               onClick={onRefresh}
               disabled={loading}
-              className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl hover:shadow-md transition-all flex items-center gap-2 font-medium"
+              className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:shadow-md transition-all flex items-center gap-2 font-medium"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
           </div>
@@ -181,19 +204,19 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
         {/* Search and Filters */}
         <div className="flex items-center gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by case name, victim, ID, city, or state..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm"
+            className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm"
           >
             <option value="created">Sort by Created</option>
             <option value="name">Sort by Name</option>
@@ -202,9 +225,9 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
           </select>
         </div>
 
-        {/* Bulk Actions */}
-        {selectedCases.length > 0 && (
-          <div className="mt-4 p-3 bg-indigo-50 dark:bg-indigo-950 rounded-lg flex items-center justify-between">
+        {/* Bulk Actions - Only show for admins */}
+        {!readOnly && selectedCases.length > 0 && (
+          <div className="mt-4 p-3 bg-indigo-50 dark:bg-indigo-950/20 rounded-lg flex items-center justify-between">
             <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
               {selectedCases.length} case(s) selected
             </span>
@@ -241,66 +264,72 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
       {/* Cases Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+          <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
             <tr>
-              <th className="p-4 text-left">
-                <input
-                  type="checkbox"
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedCases(filteredCases.map(c => c.id));
-                    } else {
-                      setSelectedCases([]);
-                    }
-                  }}
-                  checked={selectedCases.length === filteredCases.length && filteredCases.length > 0}
-                />
-              </th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Case</th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Victim</th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Incident Date</th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Location</th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Reward</th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Status</th>
-              <th className="p-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Actions</th>
+              {!readOnly && (
+                <th className="p-4 text-left">
+                  <input
+                    type="checkbox"
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCases(filteredCases.map(c => c.id));
+                      } else {
+                        setSelectedCases([]);
+                      }
+                    }}
+                    checked={selectedCases.length === filteredCases.length && filteredCases.length > 0}
+                    className="rounded"
+                  />
+                </th>
+              )}
+              <th className="p-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Case</th>
+              <th className="p-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Victim</th>
+              <th className="p-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Incident Date</th>
+              <th className="p-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Location</th>
+              <th className="p-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Reward</th>
+              <th className="p-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Status</th>
+              <th className="p-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredCases.length > 0 ? filteredCases.map(case_ => (
               <tr 
                 key={case_.id} 
                 onClick={() => handleRowClick(case_.id)}
-                className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors ${
+                className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors ${
                   case_.is_disabled ? 'opacity-60' : ''
                 }`}
               >
-                <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={selectedCases.includes(case_.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedCases([...selectedCases, case_.id]);
-                      } else {
-                        setSelectedCases(selectedCases.filter(id => id !== case_.id));
-                      }
-                    }}
-                  />
-                </td>
+                {!readOnly && (
+                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedCases.includes(case_.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedCases([...selectedCases, case_.id]);
+                        } else {
+                          setSelectedCases(selectedCases.filter(id => id !== case_.id));
+                        }
+                      }}
+                      className="rounded"
+                    />
+                  </td>
+                )}
                 <td className="p-4">
                   <div>
-                    <p className="font-medium text-slate-900 dark:text-white">
+                    <p className="font-medium text-gray-900 dark:text-white">
                       {case_.case_title || `Case #${case_.id}`}
                     </p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       ID: {case_.id} • {case_.case_type || 'Unknown'}
                     </p>
                   </div>
                 </td>
                 <td className="p-4">
                   <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-300">
+                    <UserIcon className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
                       {case_.first_name && case_.last_name 
                         ? `${case_.first_name} ${case_.last_name}`
                         : 'Unknown'}
@@ -309,24 +338,24 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                 </td>
                 <td className="p-4">
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-300">
+                    <CalendarIcon className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
                       {case_.incident_date ? new Date(case_.incident_date).toLocaleDateString() : 'Not set'}
                     </span>
                   </div>
                 </td>
                 <td className="p-4">
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-300">
+                    <MapPinIcon className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
                       {formatLocation(case_)}
                     </span>
                   </div>
                 </td>
                 <td className="p-4">
                   <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    <CurrencyDollarIcon className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       {case_.reward_amount ? `$${parseFloat(case_.reward_amount).toLocaleString()}` : 'None'}
                     </span>
                   </div>
@@ -338,59 +367,65 @@ export default function CasesList({ cases = [], filter = 'all', onRefresh, onEdi
                   <div className="flex items-center gap-1">
                     <button
                       onClick={(e) => handleViewCase(e, case_.id)}
-                      className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                      className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
                       title="View Details"
                     >
-                      <Eye className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                      <EyeIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                     </button>
-                    <button
-                      onClick={(e) => handleEditCase(e, case_.id)}
-                      className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                      title="Edit Case Information"
-                    >
-                      <Edit className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    </button>
-                    <button
-                      onClick={(e) => handleCustomizeTemplate(e, case_.id)}
-                      className="p-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
-                      title="Customize Website Template"
-                    >
-                      <Palette className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    </button>
-                    <button
-                      onClick={(e) => toggleCaseStatus(e, case_.id, case_.is_disabled)}
-                      disabled={loading}
-                      className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                      title={case_.is_disabled ? 'Enable Case' : 'Disable Case'}
-                    >
-                      {case_.is_disabled ? (
-                        <ToggleLeft className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                      ) : (
-                        <ToggleRight className="w-4 h-4 text-green-600" />
-                      )}
-                    </button>
-                    <button
-                      onClick={(e) => deleteCase(e, case_.id)}
-                      disabled={loading}
-                      className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      title="Delete Case"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </button>
+                    {!readOnly && (
+                      <>
+                        <button
+                          onClick={(e) => handleEditCase(e, case_.id)}
+                          className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                          title="Edit Case Information"
+                        >
+                          <PencilIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </button>
+                        <button
+                          onClick={(e) => handleCustomizeTemplate(e, case_.id)}
+                          className="p-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+                          title="Customize Website Template"
+                        >
+                          <PaintBrushIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        </button>
+                        <button
+                          onClick={(e) => toggleCaseStatus(e, case_.id, case_.is_disabled)}
+                          disabled={loading}
+                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                          title={case_.is_disabled ? 'Enable Case' : 'Disable Case'}
+                        >
+                          {case_.is_disabled ? (
+                            <XCircleIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                          ) : (
+                            <CheckCircleIcon className="w-4 h-4 text-green-600" />
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => deleteCase(e, case_.id)}
+                          disabled={loading}
+                          className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          title="Delete Case"
+                        >
+                          <TrashIcon className="w-4 h-4 text-red-600" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan="8" className="p-8 text-center text-slate-500">
-                  <Folder className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                <td colSpan={readOnly ? "7" : "8"} className="p-8 text-center text-gray-500">
+                  <FolderIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                   <p>No cases found</p>
-                  <button
-                    onClick={() => navigate('/dashboard/cases/new')}
-                    className="mt-3 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
-                  >
-                    Create your first case
-                  </button>
+                  {!readOnly && permissions?.can('create_cases') && (
+                    <button
+                      onClick={() => navigate('/dashboard/cases/new')}
+                      className="mt-3 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                    >
+                      Create your first case
+                    </button>
+                  )}
                 </td>
               </tr>
             )}

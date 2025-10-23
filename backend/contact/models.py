@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+import uuid
 from cases.models import Case
 
 
@@ -20,7 +21,7 @@ class ContactInquiry(models.Model):
         ('archived', 'Archived'),
     ]
     
-    id = models.CharField(max_length=255, primary_key=True)
+    id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField()
     phone = models.CharField(max_length=50, blank=True, null=True)
@@ -64,7 +65,7 @@ class Tip(models.Model):
         ('archived', 'Archived'),
     ]
     
-    id = models.CharField(max_length=255, primary_key=True)
+    id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='tips')
     submitter_name = models.CharField(max_length=255, blank=True, null=True)
     submitter_email = models.EmailField(blank=True, null=True)

@@ -1,4 +1,4 @@
-# cases/urls.py - Updated URL configuration with case-specific spotlight
+# cases/urls.py - Complete URL configuration
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -9,7 +9,8 @@ from .views import (
     TemplateRegistryViewSet,
     CasePhotoViewSet,
     DeploymentLogViewSet,
-    ImageUploadView
+    ImageUploadView,
+    CaseInvitationViewSet
 )
 
 # Create router and register all viewsets
@@ -17,21 +18,16 @@ router = DefaultRouter()
 
 # Register all viewsets
 router.register(r'cases', CaseViewSet, basename='case')
-router.register(r'case-spotlight', SpotlightPostViewSet, basename='case-spotlight')  # ✅ CHANGED: spotlight-posts → case-spotlight
+router.register(r'case-spotlight', SpotlightPostViewSet, basename='case-spotlight')
 router.register(r'templates', TemplateRegistryViewSet, basename='template')
 router.register(r'case-photos', CasePhotoViewSet, basename='case-photo')
 router.register(r'deployment-logs', DeploymentLogViewSet, basename='deployment-log')
+router.register(r'case-invitations', CaseInvitationViewSet, basename='case-invitation')
 
 # Combine router URLs with custom paths
 urlpatterns = [
     path('images/upload/', ImageUploadView.as_view(), name='image-upload'),
     path('', include(router.urls)),
-    
-    # LEO invitation endpoints
-    path('cases/<uuid:case_id>/invite-leo/', api_views.invite_leo, name='invite_leo'),
-    path('accept-invite/', api_views.accept_leo_invite, name='accept_leo_invite'),
-    path('cases/<uuid:case_id>/active-leos/', api_views.get_active_leos, name='active_leos'),
-    path('cases/<uuid:case_id>/revoke-access/<uuid:access_id>/', api_views.revoke_access, name='revoke_access'),
 ]
 
 # ================================================================
@@ -61,7 +57,7 @@ GET    /api/cases/my_cases/                     - Get only current user's cases
 GET    /api/cases/stats/                        - Get case statistics
 GET    /api/cases/by-subdomain/{subdomain}/     - Get case by subdomain (public)
 
-CASE-SPECIFIC SPOTLIGHT POSTS:  ✅ UPDATED
+CASE-SPECIFIC SPOTLIGHT POSTS:
 ------------------------------------
 GET    /api/case-spotlight/                 - List posts (?case_id=xxx to filter)
 POST   /api/case-spotlight/                 - Create post (requires case_id)
@@ -90,10 +86,11 @@ DEPLOYMENT LOGS:
 GET    /api/deployment-logs/                - List logs (?case_id=xxx to filter)
 GET    /api/deployment-logs/{id}/           - Get log detail
 
-LEO INVITATION ENDPOINTS:
+CASE INVITATIONS (NEW):
 ------------------------------------
-POST   /api/cases/{case_id}/invite-leo/     - Invite LEO to case
-POST   /api/accept-invite/                  - Accept LEO invitation
-GET    /api/cases/{case_id}/active-leos/    - Get active LEOs for case
-DELETE /api/cases/{case_id}/revoke-access/{access_id}/  - Revoke LEO access
+POST   /api/case-invitations/                    - Create invitation
+GET    /api/case-invitations/                    - List invitations
+GET    /api/case-invitations/{id}/               - Get invitation detail
+GET    /api/case-invitations/my_pending_invitations/  - Get user's pending invitations
+POST   /api/case-invitations/{id}/accept/        - Accept an invitation
 """

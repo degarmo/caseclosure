@@ -1,14 +1,18 @@
-
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
 import { ArrowRight, Heart, Search } from "lucide-react";
 
 export default function HeroSection() {
+  const handleSignupClick = () => {
+    window.location.href = "/signup";
+  };
+
+  const handleAboutClick = () => {
+    window.location.href = "/about";
+  };
+
   return (
     <section className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/5 via-transparent to-orange-100/20" />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/5 via-transparent to-orange-100/20 pointer-events-none" />
       
       <div className="max-w-7xl mx-auto px-6 py-20 lg:py-32">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -26,27 +30,20 @@ export default function HeroSection() {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                asChild
-                size="lg" 
-                className="accent-gradient text-slate-800 hover:shadow-lg transition-all duration-300 group rounded-full px-8 py-4 text-lg font-semibold"
+              <button 
+                onClick={handleSignupClick}
+                className="accent-gradient text-slate-800 hover:shadow-lg transition-all duration-300 rounded-full px-8 py-4 text-lg font-semibold inline-flex items-center justify-center group cursor-pointer"
               >
-                <Link to={createPageUrl("Pricing")}>
-                  Start a Case Page
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </Button>
+                Start a Case Page
+                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </button>
               
-              <Button 
-                variant="outline" 
-                size="lg"
-                asChild
-                className="border-slate-300 text-slate-700 hover:bg-slate-50 rounded-full px-8 py-4 text-lg"
+              <button 
+                onClick={handleAboutClick}
+                className="border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-full px-8 py-4 text-lg inline-flex items-center justify-center transition-all duration-300 cursor-pointer"
               >
-                <Link to={createPageUrl("About")}>
-                  Learn How It Works
-                </Link>
-              </Button>
+                Learn How It Works
+              </button>
             </div>
             
             <div className="flex items-center gap-8 pt-4">
