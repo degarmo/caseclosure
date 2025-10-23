@@ -8,8 +8,8 @@ import UsersList from '../sections/Users/UsersList';
 import UserDetails from '../sections/Users/UserDetails';
 import AccountRequests from '../sections/Users/AccountRequests';
 import Settings from '../sections/Settings/Settings';
-import SpotlightPostsList from '../sections/spotlight/SpotlightPostsList';
-import SpotlightEditor from '../sections/spotlight/SpotlightEditor';
+import SpotlightPostsList from '../sections/Spotlight/SpotlightPostsList';
+import SpotlightEditor from '../sections/Spotlight/SpotlightEditor';
 import PoliceCaseDetail from '../sections/Cases/PoliceCaseDetail';
 
 export default function ContentArea({ 
@@ -170,14 +170,6 @@ export default function ContentArea({
           />
         );
 
-      case 'police-case-detail':
-        return (
-          <PoliceCaseDetail
-            caseId={selectedCaseId}
-            permissions={permissions}
-            onRefresh={() => onRefresh(['cases', 'messages', 'spotlight'])}
-          />
-        );
 
       case 'messages-tips':
         return (
