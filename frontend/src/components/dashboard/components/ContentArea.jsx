@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import api from '@/utils/axios';
 // Import existing components
 import CasesList from '../sections/Cases/CasesList';
 import CaseDetails from '../sections/Cases/CaseDetails';
@@ -53,22 +54,55 @@ export default function ContentArea({
 
   const handleDeletePost = async (postId) => {
     if (window.confirm('Are you sure you want to delete this post?')) {
-      console.log('Delete post:', postId);
-      onRefresh(['spotlight']);
+      try {
+        await api.delete(`/spotlight/${postId}/`);
+        onRefresh(['spotlight']);
+      } catch (error) {
+        console.error('Error deleting post:', error);
+        alert('Failed to delete post');
+      }
     }
   };
 
   const handleSubmitPost = async (postData) => {
     try {
       console.log('Submitting spotlight post:', postData);
-      await api.post('/spotlight/', postData);
+      
+      // Extract plain text from HTML content
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = postData.content || '';
+      const contentText = tempDiv.textContent || tempDiv.innerText || '';
+      
+      // Prepare final data with required content_text field
+      const finalData = {
+        ...postData,
+        content_text: contentText.trim(),
+      };
+      
+      // Remove case if it's "main-website" or empty
+      if (finalData.case === 'main-website' || !finalData.case) {
+        delete finalData.case;
+      }
+      
+      console.log('Final spotlight data:', finalData);
+      
+      // Create or update post
+      if (editingPost) {
+        await api.patch(`/spotlight/${editingPost.id}/`, finalData);
+      } else {
+        await api.post('/spotlight/', finalData);
+      }
       
       setShowSpotlightEditor(false);
       setEditingPost(null);
       onRefresh(['spotlight']);
+      
     } catch (error) {
       console.error('Error saving post:', error);
-      alert('Failed to save post');
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.detail || 
+                          'Failed to save post';
+      alert(errorMessage);
     }
   };
 
