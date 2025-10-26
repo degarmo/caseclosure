@@ -61,6 +61,8 @@ export default function ContentArea({
   const handleSubmitPost = async (postData) => {
     try {
       console.log('Submitting spotlight post:', postData);
+      await api.post('/spotlight/', postData);
+      
       setShowSpotlightEditor(false);
       setEditingPost(null);
       onRefresh(['spotlight']);
