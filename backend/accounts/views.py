@@ -448,7 +448,6 @@ class RegisterView(generics.CreateAPIView):
                     can_create_spotlight=False,            # ❌ No spotlight creation
                     can_upload_evidence=False,             # ❌ No photo uploads
                     can_invite_users=False,                # ❌ No invitations
-                    can_contact_family=invitation.invitation_type in ['police', 'investigator', 'advocate']
                 )
                 print(f"DEBUG: CaseAccess created - ID: {case_access.id}")
                 
