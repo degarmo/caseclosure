@@ -372,34 +372,7 @@ class RegisterView(generics.CreateAPIView):
             # Create user and case access in a transaction
             print("DEBUG: Starting transaction to create user and case access")
             with transaction.atomic():
-                # Create the user with account_type from invitation
-                print(f"DEBUG: Creating user with account_type: {invitation.invitee_account_type}")
-                user = User.objects.create_user(
-                    email=email,
-                    password=password,
-                    first_name=first_name,
-                    last_name=last_name,
-                    username=email,  # Use email as username
-                    account_type=invitation.invitee_account_type,
-                    is_active=True,  # Active immediately - no approval needed
-                    is_staff=False,  # Never make staff from invitation
-                    is_superuser=False
-                )
-                print(f"DEBUG: User created - ID: {user.id}, account_type: {user.account_type}")
-                
-                # Create UserProfile with appropriate settings
-                profile, created = UserProfile.objects.get_or_create(
-                    user=user,
-                    defaults={
-                        'verified': invitation.invitee_account_type in ['verified', 'detective', 'advocate'],
-                        'can_create_cases': invitation.invitee_account_type in ['verified', 'advocate'],
-                        'max_cases': 1 if invitation.invitee_account_type == 'verified' else 0,
-                        'current_cases': 0
-                    }
-                )
-                print(f"DEBUG: UserProfile created: {created}")
-                
-                # Determine access level based on invitation type
+                # Determine access level AND account type based on invitation type
                 access_level_map = {
                     'police': 'leo',
                     'investigator': 'private_investigator',
@@ -408,7 +381,51 @@ class RegisterView(generics.CreateAPIView):
                     'other': 'viewer'
                 }
                 access_level = access_level_map.get(invitation.invitation_type, 'viewer')
+                
+                # Map invitation type to User.account_type
+                account_type_map = {
+                    'police': 'leo',           # Police get LEO account type
+                    'investigator': 'leo',     # Private investigators also get LEO
+                    'advocate': 'advocate',    # Advocates get advocate type
+                    'family': 'verified',      # Family members get verified
+                    'other': 'basic'          # Others get basic
+                }
+                account_type = account_type_map.get(invitation.invitation_type, 'basic')
+                
+                print(f"DEBUG: Invitation type: {invitation.invitation_type}")
                 print(f"DEBUG: Access level: {access_level}")
+                print(f"DEBUG: Account type: {account_type}")
+                
+                # Create the user with mapped account_type
+                user = User.objects.create_user(
+                    email=email,
+                    password=password,
+                    first_name=first_name,
+                    last_name=last_name,
+                    username=email,  # Use email as username
+                    account_type=account_type,  # Use mapped account_type
+                    is_active=True,  # Active immediately - no approval needed
+                    is_staff=False,  # Never make staff from invitation
+                    is_superuser=False
+                )
+                print(f"DEBUG: User created - ID: {user.id}, account_type: {user.account_type}")
+                
+                # Create UserProfile with appropriate settings based on account_type
+                profile_verified = account_type in ['leo', 'advocate', 'verified']
+                profile_can_create = account_type in ['advocate', 'verified']
+                profile_max_cases = 1 if account_type == 'verified' else 0
+                
+                profile, created = UserProfile.objects.get_or_create(
+                    user=user,
+                    defaults={
+                        'verified': profile_verified,
+                        'can_create_cases': profile_can_create,
+                        'max_cases': profile_max_cases,
+                        'current_cases': 0,
+                        'account_type': account_type  # Also set on profile
+                    }
+                )
+                print(f"DEBUG: UserProfile created: {created}, verified: {profile_verified}")
                 
                 # Create the CaseAccess record
                 print(f"DEBUG: Creating CaseAccess for case: {invitation.case.id}")
@@ -420,15 +437,15 @@ class RegisterView(generics.CreateAPIView):
                     invitation_message=invitation.message_body,
                     accepted=True,  # Auto-accept since they're signing up
                     accepted_at=timezone.now(),
-                    # Copy permissions from invitation
-                    can_view_tips=invitation.can_view_tips,
-                    can_view_tracking=invitation.can_view_tracking,
-                    can_view_personal_info=invitation.can_view_personal_info,
-                    can_export_data=invitation.can_export_data,
-                    can_view_evidence=True,  # Default permission
-                    can_contact_family=invitation.invitation_type in ['police', 'investigator', 'advocate']
+                    # LEO permissions: View everything, edit nothing
+                    can_view_tips=True,                    # ✅ See all tips/messages
+                    can_view_tracking=True,                # ✅ See metrics
+                    can_view_personal_info=True,           # ✅ See case details
+                    can_view_evidence=True,                # ✅ See photos
+                    can_export_data=True,                  # ✅ Export reports
+                    can_contact_family=True,               # ✅ Message family
                 )
-                print(f"DEBUG: CaseAccess created - ID: {case_access.id}")
+                print(f"DEBUG: CaseAccess created - ID: {case_access.id}, access_level: {access_level}")
                 
                 # Mark invitation as accepted
                 invitation.status = 'accepted'

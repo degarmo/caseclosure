@@ -1,929 +1,1390 @@
-# cases/views.py - Updated views with template customization and deployment
+# accounts/views.py
+# UPDATED VERSION WITH ENHANCED EMAIL FUNCTIONALITY AND ERROR HANDLING
 
-from rest_framework import viewsets, status
-from rest_framework.views import APIView  
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.throttling import UserRateThrottle
-from django.db.models import Q, F
-from django.db import transaction
-from django.utils import timezone
-from django.conf import settings
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-from django.template.loader import render_to_string  # ADD THIS
-from django.contrib.auth.models import User  # ADD THIS
-from datetime import timedelta 
-from django.core.cache import cache
-from django.core.mail import send_mail
+from rest_framework import generics, permissions, status
 from django.contrib.auth import get_user_model
-import cloudinary
-from cloudinary.uploader import upload
-import json
+from rest_framework.serializers import ModelSerializer
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.shortcuts import redirect
+from django.contrib.auth import login
+from django.urls import reverse
+from django.conf import settings
+from django.utils import timezone
+from django.db import transaction
+import urllib.parse
 import logging
-import os
-import re
-import time
+import traceback
 import uuid
 
-from .models import (Case, SpotlightPost, TemplateRegistry, DeploymentLog, CasePhoto, CaseAccess, CaseInvitation)
-from .serializers import (
-    CaseSerializer, 
-    SpotlightPostSerializer, 
-    TemplateRegistrySerializer,
-    DeploymentLogSerializer,
-    CasePhotoSerializer,
-    CaseInvitationSerializer,
-    CreateCaseInvitationSerializer
-)
-from .services.deployment import get_deployment_service
+# Import email utilities with error handling
+try:
+    from utils.email import send_invite_email, send_rejection_email, send_request_confirmation_email
+    EMAIL_UTILS_AVAILABLE = True
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.error(f"Failed to import email utilities: {e}")
+    EMAIL_UTILS_AVAILABLE = False
+    # Create dummy functions if import fails
+    def send_invite_email(email, code, name):
+        logger.error("Email utilities not available - cannot send invite email")
+        return False
+    def send_rejection_email(email, name, reason):
+        logger.error("Email utilities not available - cannot send rejection email")
+        return False
+    def send_request_confirmation_email(email, name):
+        logger.error("Email utilities not available - cannot send confirmation email")
+        return False
+
+# For Google OAuth (if using dj-rest-auth)
+try:
+    from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+    from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+    from dj_rest_auth.registration.views import SocialLoginView
+    ALLAUTH_INSTALLED = True
+except ImportError:
+    ALLAUTH_INSTALLED = False
+    
+from .models import UserProfile, SiteSettings, InviteCode, AccountRequest
+from .serializers import UserProfileSerializer, UserSerializer, RegisterSerializer
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
+# ============== JWT Token Customization ==============
 
-# Custom throttle class for deployment rate limiting
-class DeploymentRateThrottle(UserRateThrottle):
-    """Limit deployments to prevent abuse - 10 per hour per user"""
-    rate = '10/hour'
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Custom token serializer to include user data in response"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Since USERNAME_FIELD is 'email', update the fields
+        if User.USERNAME_FIELD == 'email':
+            self.fields[self.username_field].label = 'Email'
+    
+    def validate(self, attrs):
+        logger.info(f"Login attempt with fields: {list(attrs.keys())}")
+        
+        try:
+            data = super().validate(attrs)
+            
+            # Add user data to response
+            data['user'] = {
+                'id': self.user.id,
+                'email': self.user.email,
+                'username': self.user.username,
+                'first_name': self.user.first_name,
+                'last_name': self.user.last_name,
+                'is_staff': self.user.is_staff,
+            }
+            
+            logger.info(f"Successful login for user: {self.user.email}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Login error: {str(e)}")
+            logger.error(f"Attrs received: {attrs}")
+            raise
 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """Custom login view that returns user data with tokens"""
+    serializer_class = CustomTokenObtainPairSerializer
 
-# Reserved subdomains that cannot be used
-RESERVED_SUBDOMAINS = {
-    'www', 'api', 'admin', 'app', 'mail', 'ftp', 'blog',
-    'dashboard', 'support', 'help', 'docs', 'status',
-    'cdn', 'assets', 'static', 'media', 'files', 'images',
-    'staging', 'dev', 'test', 'demo', 'sandbox',
-    'account', 'accounts', 'auth', 'login', 'signup',
-    'register', 'logout', 'profile', 'settings',
-    'billing', 'payment', 'checkout', 'subscribe'
-}
+# ============== User Registration & Management ==============
 
-
-class ImageUploadView(APIView):
+class RegisterView(generics.CreateAPIView):
     """
-    Generic image upload endpoint for customizations.
-    Uploads to Cloudinary and returns the URL.
+    User registration endpoint with DUAL invite code support:
+    1. invitation_code (UUID) - Case invitation that bypasses account requests
+    2. invite_code (string) - Admin invite code for normal registration
     """
+    queryset = User.objects.all()
+    serializer_class = RegisterSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        print("=" * 70)
+        print("DEBUG: Registration started")
+        print(f"DEBUG: Request data: {request.data}")
+        print("=" * 70)
+        
+        try:
+            # ========== NEW: CHECK FOR CASE INVITATION CODE FIRST ==========
+            # This bypasses the entire account request workflow
+            invitation_code = request.data.get('invitation_code')  # UUID format
+            
+            if invitation_code:
+                print(f"DEBUG: Case invitation code detected: {invitation_code}")
+                return self._handle_case_invitation_signup(request, invitation_code)
+            
+            # ========== EXISTING FLOW: Normal registration with admin invite codes ==========
+            
+            # Get site settings
+            print("DEBUG: Getting site settings...")
+            settings_obj = SiteSettings.get_settings()
+            print(f"DEBUG: Registration mode: {settings_obj.registration_mode}")
+            
+            # Check registration mode
+            if settings_obj.registration_mode == 'closed':
+                print("DEBUG: Registration is closed")
+                return Response({
+                    'error': 'Registration is currently closed.',
+                    'message': settings_obj.beta_message
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Check user limit if set
+            if settings_obj.max_users > 0 and settings_obj.current_user_count >= settings_obj.max_users:
+                print(f"DEBUG: User limit reached: {settings_obj.current_user_count}/{settings_obj.max_users}")
+                return Response({
+                    'error': 'We\'ve reached our user limit. Please try again later.'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Check for invite code if in invite_only mode
+            invite = None
+            if settings_obj.registration_mode == 'invite_only':
+                invite_code = request.data.get('invite_code', '').upper()
+                print(f"DEBUG: Invite code provided: {invite_code}")
+                
+                if not invite_code:
+                    print("DEBUG: No invite code provided")
+                    return Response({
+                        'error': 'An invite code is required during our beta period.',
+                        'field_errors': {'invite_code': ['This field is required.']}
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Validate invite code
+                try:
+                    print(f"DEBUG: Looking up invite code: {invite_code}")
+                    invite = InviteCode.objects.get(code=invite_code)
+                    print(f"DEBUG: Invite found - Valid: {invite.is_valid()}")
+                    
+                    if not invite.is_valid():
+                        print("DEBUG: Invite code is invalid/expired")
+                        return Response({
+                            'error': 'This invite code is expired or has been used.',
+                            'field_errors': {'invite_code': ['Invalid or expired code.']}
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    # Check if restricted to specific email
+                    email = request.data.get('email', '').lower()
+                    print(f"DEBUG: Email check - Invite email: {invite.email}, User email: {email}")
+                    
+                    if invite.email and invite.email.lower() != email:
+                        print("DEBUG: Email mismatch with invite code")
+                        return Response({
+                            'error': 'This invite code is not valid for your email address.',
+                            'field_errors': {'invite_code': ['Code not valid for this email.']}
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                        
+                except InviteCode.DoesNotExist:
+                    print(f"DEBUG: Invite code not found: {invite_code}")
+                    return Response({
+                        'error': 'Invalid invite code.',
+                        'field_errors': {'invite_code': ['Code not found.']}
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create the user
+            print("DEBUG: Creating serializer...")
+            serializer = self.get_serializer(data=request.data)
+            
+            print("DEBUG: Validating serializer...")
+            if not serializer.is_valid():
+                print(f"DEBUG: Serializer validation failed: {serializer.errors}")
+                return Response({
+                    'error': 'Validation failed',
+                    'field_errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Save the user
+            print("DEBUG: About to save user...")
+            user = serializer.save()
+            print(f"DEBUG: User created - ID: {user.id}, Email: {user.email}")
+            print(f"DEBUG: User account_type: {user.account_type}")
+            print(f"DEBUG: User is_staff: {user.is_staff}")
+            
+            # Double-check that the user is not staff
+            if user.is_staff or user.is_superuser:
+                print("DEBUG: Resetting staff/superuser flags")
+                user.is_staff = False
+                user.is_superuser = False
+                user.save()
+                logger.warning(f"Had to reset staff/superuser flags for new user: {user.email}")
+            
+            # Mark invite code as used if applicable
+            if invite:
+                print(f"DEBUG: Marking invite code as used...")
+                invite.use(user)
+                
+                # If this invite came from an AccountRequest, mark it as completed
+                account_request = AccountRequest.objects.filter(
+                    invite_code=invite
+                ).first()
+                if account_request:
+                    print(f"DEBUG: Marking account request as completed")
+                    account_request.status = 'completed'
+                    account_request.save()
+            
+            # Update user count
+            print("DEBUG: Updating user count...")
+            settings_obj.current_user_count = User.objects.filter(is_active=True).count()
+            settings_obj.save()
+            print(f"DEBUG: New user count: {settings_obj.current_user_count}")
+            
+            # Generate tokens for the new user
+            print("DEBUG: Generating tokens...")
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+            print(f"DEBUG: Tokens generated - Access length: {len(access_token)}, Refresh length: {len(refresh_token)}")
+            
+            logger.info(f"New user registered: {user.email} with invite code: {invite_code if invite else 'None'}")
+            
+            # Build response data
+            print("DEBUG: Building response...")
+            response_data = {
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'is_staff': False,
+                    'account_type': user.account_type,
+                },
+                'access': access_token,
+                'refresh': refresh_token,
+                'message': 'Registration successful! You can now create your memorial page.'
+            }
+            
+            print(f"DEBUG: Response data prepared: {response_data['user']}")
+            print("DEBUG: About to return success response...")
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            print("=" * 70)
+            print(f"ERROR: Registration failed!")
+            print(f"ERROR Type: {type(e).__name__}")
+            print(f"ERROR Message: {str(e)}")
+            print("=" * 70)
+            
+            import traceback
+            traceback.print_exc()
+            
+            logger.error(f"Registration error for email {request.data.get('email', 'unknown')}: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            return Response({
+                'error': 'An error occurred during registration. Please try again.',
+                'field_errors': {}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _handle_case_invitation_signup(self, request, invitation_code):
+        """
+        NEW METHOD: Handle signup via case invitation code.
+        This bypasses the account request workflow entirely and provides immediate access.
+        """
+        print("=" * 70)
+        print("DEBUG: Processing CASE INVITATION signup")
+        print(f"DEBUG: Invitation code: {invitation_code}")
+        print("=" * 70)
+        
+        try:
+            # Import here to avoid circular imports
+            from cases.models import CaseInvitation, CaseAccess
+            
+            # Validate UUID format
+            try:
+                uuid.UUID(invitation_code)
+            except ValueError:
+                print("DEBUG: Invalid UUID format for invitation code")
+                return Response({
+                    'error': 'Invalid invitation code format.',
+                    'field_errors': {'invitation_code': ['Invalid code format.']}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Look up the case invitation
+            try:
+                print(f"DEBUG: Looking up CaseInvitation with code: {invitation_code}")
+                invitation = CaseInvitation.objects.select_related('case', 'invited_by').get(
+                    invitation_code=invitation_code,
+                    status='pending'
+                )
+                print(f"DEBUG: Found invitation - Case: {invitation.case.case_title}, Email: {invitation.invitee_email}")
+            except CaseInvitation.DoesNotExist:
+                print("DEBUG: Invitation not found or already accepted")
+                return Response({
+                    'error': 'This invitation is invalid or has already been used.',
+                    'field_errors': {'invitation_code': ['Invalid or expired invitation.']}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if invitation has expired
+            if invitation.is_expired():
+                print("DEBUG: Invitation has expired")
+                invitation.status = 'expired'
+                invitation.save()
+                return Response({
+                    'error': 'This invitation has expired.',
+                    'field_errors': {'invitation_code': ['Invitation expired.']}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get user data from request
+            email = request.data.get('email', '').strip().lower()
+            password = request.data.get('password')
+            first_name = request.data.get('first_name', '').strip()
+            last_name = request.data.get('last_name', '').strip()
+            
+            print(f"DEBUG: User data - Email: {email}, Name: {first_name} {last_name}")
+            
+            # Validate required fields
+            if not all([email, password, first_name, last_name]):
+                print("DEBUG: Missing required fields")
+                return Response({
+                    'error': 'All fields are required.',
+                    'field_errors': {
+                        'email': ['Email is required.'] if not email else [],
+                        'password': ['Password is required.'] if not password else [],
+                        'first_name': ['First name is required.'] if not first_name else [],
+                        'last_name': ['Last name is required.'] if not last_name else [],
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Verify email matches invitation (if invitation has email specified)
+            if invitation.invitee_email and invitation.invitee_email.lower() != email:
+                print(f"DEBUG: Email mismatch - Expected: {invitation.invitee_email}, Got: {email}")
+                return Response({
+                    'error': 'Email does not match the invitation.',
+                    'field_errors': {'email': ['This email does not match the invitation.']}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if email already exists
+            if User.objects.filter(email=email).exists():
+                print(f"DEBUG: Email already exists: {email}")
+                return Response({
+                    'error': 'An account with this email already exists.',
+                    'field_errors': {'email': ['Email already registered.']}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create user and case access in a transaction
+            print("DEBUG: Starting transaction to create user and case access")
+            with transaction.atomic():
+                # Determine access level AND account type based on invitation type
+                access_level_map = {
+                    'police': 'leo',
+                    'investigator': 'private_investigator',
+                    'advocate': 'advocate',
+                    'family': 'collaborator',
+                    'other': 'viewer'
+                }
+                access_level = access_level_map.get(invitation.invitation_type, 'viewer')
+                
+                # Map invitation type to User.account_type
+                account_type_map = {
+                    'police': 'leo',           # Police get LEO account type
+                    'investigator': 'leo',     # Private investigators also get LEO
+                    'advocate': 'advocate',    # Advocates get advocate type
+                    'family': 'verified',      # Family members get verified
+                    'other': 'basic'          # Others get basic
+                }
+                account_type = account_type_map.get(invitation.invitation_type, 'basic')
+                
+                print(f"DEBUG: Invitation type: {invitation.invitation_type}")
+                print(f"DEBUG: Access level: {access_level}")
+                print(f"DEBUG: Account type: {account_type}")
+                
+                # Create the user with mapped account_type
+                user = User.objects.create_user(
+                    email=email,
+                    password=password,
+                    first_name=first_name,
+                    last_name=last_name,
+                    username=email,  # Use email as username
+                    account_type=account_type,  # Use mapped account_type
+                    is_active=True,  # Active immediately - no approval needed
+                    is_staff=False,  # Never make staff from invitation
+                    is_superuser=False
+                )
+                print(f"DEBUG: User created - ID: {user.id}, account_type: {user.account_type}")
+                
+                # Create UserProfile with appropriate settings based on account_type
+                profile_verified = account_type in ['leo', 'advocate', 'verified']
+                profile_can_create = account_type in ['advocate', 'verified']
+                profile_max_cases = 1 if account_type == 'verified' else 0
+                
+                profile, created = UserProfile.objects.get_or_create(
+                    user=user,
+                    defaults={
+                        'verified': profile_verified,
+                        'can_create_cases': profile_can_create,
+                        'max_cases': profile_max_cases,
+                        'current_cases': 0,
+                        'account_type': account_type  # Also set on profile
+                    }
+                )
+                print(f"DEBUG: UserProfile created: {created}, verified: {profile_verified}")
+                
+                # Create the CaseAccess record
+                print(f"DEBUG: Creating CaseAccess for case: {invitation.case.id}")
+                case_access = CaseAccess.objects.create(
+                    case=invitation.case,
+                    user=user,
+                    access_level=access_level,
+                    invited_by=invitation.invited_by,
+                    invitation_message=invitation.message_body,
+                    accepted=True,  # Auto-accept since they're signing up
+                    accepted_at=timezone.now(),
+                    # Copy permissions from invitation
+                    can_view_tips=True,                    # ✅ See all tips/messages
+                    can_view_tracking=True,                # ✅ See metrics
+                    can_view_personal_info=True,           # ✅ See case details
+                    can_view_evidence=True,                # ✅ See photos
+                    can_export_data=True,                  # ✅ Export reports
+                    can_contact_family=True,               # ✅ Message family
+                    can_edit_case=False,                   # ❌ No editing
+                    can_create_spotlight=False,            # ❌ No spotlight creation
+                    can_upload_evidence=False,             # ❌ No photo uploads
+                    can_invite_users=False,                # ❌ No invitations
+                    can_contact_family=invitation.invitation_type in ['police', 'investigator', 'advocate']
+                )
+                print(f"DEBUG: CaseAccess created - ID: {case_access.id}")
+                
+                # Mark invitation as accepted
+                invitation.status = 'accepted'
+                invitation.accepted_at = timezone.now()
+                invitation.accepted_by = user
+                invitation.save()
+                print("DEBUG: Invitation marked as accepted")
+            
+            print("DEBUG: Transaction completed successfully")
+            
+            # Update user count
+            settings_obj = SiteSettings.get_settings()
+            settings_obj.current_user_count = User.objects.filter(is_active=True).count()
+            settings_obj.save()
+            print(f"DEBUG: Updated user count: {settings_obj.current_user_count}")
+            
+            # Generate tokens for immediate login
+            print("DEBUG: Generating authentication tokens")
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+            
+            logger.info(
+                f"New user registered via case invitation: {user.email} "
+                f"(account_type: {user.account_type}, case: {invitation.case.case_title})"
+            )
+            
+            print("=" * 70)
+            print("DEBUG: Case invitation signup SUCCESSFUL!")
+            print(f"DEBUG: User {user.email} now has access to case {invitation.case.id}")
+            print("=" * 70)
+            
+            return Response({
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'is_staff': False,
+                    'account_type': user.account_type,
+                },
+                'refresh': refresh_token,
+                'access': access_token,
+                'message': 'Account created successfully! You now have access to the case.',
+                'case_id': invitation.case.id,
+                'case_title': invitation.case.case_title,
+                'access_level': access_level
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            print(f"DEBUG: Exception during case invitation signup: {str(e)}")
+            logger.error(f"Case invitation signup error: {str(e)}")
+            traceback.print_exc()
+            
+            return Response({
+                'error': 'An error occurred during registration. Please try again.',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============== Registration Status Check ==============
+
+class RegistrationStatusView(APIView):
+    """Check current registration status and mode"""
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        settings_obj = SiteSettings.get_settings()
+        return Response({
+            'mode': settings_obj.registration_mode,
+            'message': settings_obj.beta_message,
+            'google_auth_enabled': settings_obj.enable_google_auth,
+            'user_count': settings_obj.current_user_count,
+            'max_users': settings_obj.max_users if settings_obj.max_users > 0 else None
+        })
+
+# ============== Public Invite Status ==============
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_invite_status(request):
+    """Check if invites are currently available"""
+    try:
+        settings_obj = SiteSettings.get_settings()
+        return Response({
+            'registration_mode': settings_obj.registration_mode,
+            'is_invite_only': settings_obj.registration_mode == 'invite_only',
+            'is_closed': settings_obj.registration_mode == 'closed',
+            'is_open': settings_obj.registration_mode == 'open',
+            'message': settings_obj.beta_message,
+            'user_count': settings_obj.current_user_count,
+            'max_users': settings_obj.max_users if settings_obj.max_users > 0 else None,
+            'can_register': settings_obj.registration_mode != 'closed',
+        })
+    except Exception as e:
+        logger.error(f"Error checking public invite status: {str(e)}")
+        return Response({
+            'error': 'Failed to check registration status',
+            'can_register': False
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ============== Site Settings Management ==============
+
+class SiteSettingsView(APIView):
+    permission_classes = [IsAdminUser]
+    
+    def get(self, request):
+        settings_obj = SiteSettings.get_settings()
+        return Response({
+            'registration_mode': settings_obj.registration_mode,
+            'beta_message': settings_obj.beta_message,
+            'invite_only_mode': settings_obj.invite_only_mode,
+            'beta_mode_enabled': settings_obj.invite_only_mode,
+            'enable_google_auth': settings_obj.enable_google_auth,
+            'enable_case_creation': settings_obj.enable_case_creation,
+            'enable_public_pages': settings_obj.enable_public_pages,
+            'max_users': settings_obj.max_users,
+            'maintenance_mode': settings_obj.maintenance_mode,
+            'maintenance_message': settings_obj.maintenance_message,
+        })
+    
+    def patch(self, request):
+            print("=" * 70)
+            print("DEBUG: SiteSettingsView.patch() called!")
+            print(f"DEBUG: Request data: {request.data}")
+            print(f"DEBUG: User: {request.user.email}")
+            print(f"DEBUG: Is staff: {request.user.is_staff}")
+            print("=" * 70)
+            
+            try:
+                settings_obj = SiteSettings.get_settings()
+                print(f"DEBUG: Got settings - current registration_mode: {settings_obj.registration_mode}")
+                
+                # Handle the frontend's beta_mode_enabled field name
+                if 'beta_mode_enabled' in request.data:
+                    beta_enabled = request.data['beta_mode_enabled']
+                    print(f"DEBUG: beta_mode_enabled found: {beta_enabled}")
+                    request.data['invite_only_mode'] = beta_enabled
+                    # Also set registration_mode based on the toggle
+                    request.data['registration_mode'] = 'invite_only' if beta_enabled else 'open'
+                    print(f"DEBUG: Set registration_mode to: {request.data['registration_mode']}")
+                
+                # Handle direct registration_mode updates
+                if 'invite_only_mode' in request.data and 'registration_mode' not in request.data:
+                    # If only invite_only_mode was provided, sync registration_mode
+                    invite_only = request.data['invite_only_mode']
+                    request.data['registration_mode'] = 'invite_only' if invite_only else 'open'
+                    print(f"DEBUG: Synced registration_mode to: {request.data['registration_mode']}")
+                
+                # Update allowed fields
+                update_fields = [
+                    'registration_mode', 'beta_message', 'enable_google_auth',
+                    'enable_case_creation', 'enable_public_pages', 'max_users',
+                    'maintenance_mode', 'maintenance_message', 
+                    'invite_only_mode'
+                ]
+                
+                for field in update_fields:
+                    if field in request.data:
+                        old_value = getattr(settings_obj, field)
+                        new_value = request.data[field]
+                        print(f"DEBUG: Updating {field}: {old_value} -> {new_value}")
+                        setattr(settings_obj, field, new_value)
+                
+                settings_obj.updated_by = request.user
+                settings_obj.save()
+                print("DEBUG: Settings saved successfully!")
+                
+                logger.info(f"Site settings updated by {request.user.email}")
+                
+                print("=" * 70)
+                print("DEBUG: Returning response")
+                print(f"DEBUG: Final registration_mode: {settings_obj.registration_mode}")
+                print(f"DEBUG: Final invite_only_mode: {settings_obj.invite_only_mode}")
+                print("=" * 70)
+                
+                return Response({
+                    'status': 'Settings updated successfully',
+                    'registration_mode': settings_obj.registration_mode,
+                    'invite_only_mode': settings_obj.invite_only_mode,
+                    'beta_mode_enabled': settings_obj.invite_only_mode
+                })
+            
+            except Exception as e:
+                print("=" * 70)
+                print(f"DEBUG: ERROR in patch method: {e}")
+                import traceback
+                traceback.print_exc()
+                print("=" * 70)
+                logger.error(f"Error patching settings: {e}")
+                logger.error(traceback.format_exc())
+                
+                return Response({
+                    'error': 'Failed to update settings',
+                    'details': str(e)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ============= Notification View ======================
+
+class NotificationView(APIView):
+    """Get notifications including pending account requests for admins"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        notifications = []
+        
+        # Add account requests as notifications for admins
+        if request.user.is_staff or request.user.is_superuser:
+            pending_requests = AccountRequest.objects.filter(status='pending').order_by('-submitted_at')[:5]
+            for req in pending_requests:
+                notifications.append({
+                    'id': f'request_{req.id}',
+                    'type': 'account_request',
+                    'message': f'New account request from {req.first_name} {req.last_name}',
+                    'time': req.submitted_at.strftime('%B %d at %I:%M %p'),
+                    'read': False,
+                    'urgent': True
+                })
+        
+        return Response(notifications)
+
+# ============== Account Request Management ==============
+
+class AccountRequestView(APIView):
+    """Handle account requests"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        """Submit a new account request"""
+        logger.info(f"Received account request data: {request.data}")
+        
+        required_fields = ['first_name', 'last_name', 'email', 'phone', 'description']
+        
+        for field in required_fields:
+            if not request.data.get(field):
+                return Response({
+                    'error': f'{field.replace("_", " ").title()} is required',
+                    'error_type': 'missing_field'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        email = request.data.get('email')
+        
+        # Check for existing account
+        if User.objects.filter(email=email).exists():
+            return Response({
+                'error': 'An account already exists with this email address. Please sign in instead.',
+                'error_type': 'account_exists'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check for existing request
+        existing_request = AccountRequest.objects.filter(email=email).first()
+        if existing_request:
+            if existing_request.status == 'pending':
+                return Response({
+                    'error': f'A request for this email is already pending (submitted {existing_request.submitted_at.strftime("%B %d, %Y")}). We\'ll review it within 48 hours.',
+                    'error_type': 'pending_request'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif existing_request.status == 'approved':
+                return Response({
+                    'error': 'This email has already been approved. Check your email for the invite code or go to sign up.',
+                    'error_type': 'already_approved'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif existing_request.status == 'rejected':
+                # Allow resubmission if previously rejected
+                logger.info(f"Deleting previous rejected request for {email}")
+                existing_request.delete()
+        
+        # Create the account request
+        try:
+            account_request = AccountRequest.objects.create(
+                first_name=request.data['first_name'],
+                last_name=request.data['last_name'],
+                email=email,
+                phone=request.data['phone'],
+                relation=request.data.get('relation', ''),
+                organization=request.data.get('organization', ''),
+                location=request.data.get('location', ''),
+                description=request.data['description'],
+                supporting_links=request.data.get('supporting_links', '')
+            )
+            
+            # Send confirmation email
+            try:
+                if EMAIL_UTILS_AVAILABLE and hasattr(locals(), 'send_request_confirmation_email'):
+                    send_request_confirmation_email(email, request.data['first_name'])
+                    logger.info(f"Confirmation email sent to {email}")
+            except Exception as e:
+                logger.warning(f"Failed to send confirmation email: {e}")
+            
+            # Check if auto-approval is enabled
+            settings_obj = SiteSettings.get_settings()
+            if settings_obj.auto_approve_requests:
+                # Auto-approve and create invite
+                invite = account_request.approve_and_create_invite(None)
+                
+                # Send invite email
+                email_sent = False
+                try:
+                    if EMAIL_UTILS_AVAILABLE:
+                        email_sent = send_invite_email(
+                            account_request.email, 
+                            invite.code, 
+                            account_request.first_name
+                        )
+                        logger.info(f"Auto-approval: Invite email {'sent' if email_sent else 'failed'} for {email}")
+                except Exception as e:
+                    logger.error(f"Failed to send auto-approval email: {e}")
+                
+                message = f'Your request has been approved! Check your email for invite code: {invite.code}'
+            else:
+                message = 'Your request has been submitted and is under review. We\'ll contact you within 48 hours.'
+            
+            logger.info(f"Account request created successfully for {email}")
+            
+            return Response({
+                'message': message,
+                'request_id': account_request.id
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error creating account request: {str(e)}")
+            logger.error(traceback.format_exc())
+            return Response({
+                'error': 'Failed to create account request. Please try again.',
+                'error_type': 'server_error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AccountRequestAdminView(APIView):
+    """Admin endpoints for managing account requests"""
+    permission_classes = [IsAdminUser]
+    
+    def get(self, request):
+        """Get account requests with optional filtering"""
+        status_filter = request.GET.get('status', 'pending')
+        if status_filter == 'all':
+            account_requests = AccountRequest.objects.all().order_by('-submitted_at')
+        else:
+            account_requests = AccountRequest.objects.filter(status=status_filter).order_by('-submitted_at')
+        
+        # Build detailed response
+        data = []
+        for req in account_requests:
+            request_data = {
+                'id': req.id,
+                'name': f'{req.first_name} {req.last_name}',
+                'first_name': req.first_name,
+                'last_name': req.last_name,
+                'email': req.email,
+                'phone': req.phone,
+                'relation': req.relation,
+                'organization': req.organization,
+                'location': req.location,
+                'description': req.description,
+                'supporting_links': req.supporting_links,
+                'status': req.status,
+                'submitted_at': req.submitted_at,
+                'reviewed_at': req.reviewed_at,
+                'reviewed_by': req.reviewed_by.email if req.reviewed_by else None,
+                'rejection_reason': req.rejection_reason,
+            }
+            
+            # Add invite code if exists
+            if req.invite_code:
+                request_data['invite_code'] = req.invite_code.code
+            
+            data.append(request_data)
+        
+        return Response(data)
+    
+    def post(self, request):
+        """Approve or reject an account request"""
+        request_id = request.data.get('request_id')
+        action = request.data.get('action')
+        
+        print("=" * 70)
+        print("DEBUG: AccountRequestAdminView.post() called")
+        print(f"DEBUG: Action: {action}")
+        print(f"DEBUG: Request ID: {request_id}")
+        print(f"DEBUG: EMAIL_UTILS_AVAILABLE = {EMAIL_UTILS_AVAILABLE}")
+        print("=" * 70)
+        
+        logger.info(f"Admin action received: {action} for request_id: {request_id}")
+        
+        if not request_id or action not in ['approve', 'reject']:
+            print(f"DEBUG: Invalid request - action={action}, request_id={request_id}")
+            return Response({
+                'error': 'Invalid request - missing request_id or invalid action'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            account_request = AccountRequest.objects.get(id=request_id)
+            print(f"DEBUG: Found account request for {account_request.email}")
+            
+            if action == 'approve':
+                print("DEBUG: Processing APPROVE action")
+                
+                # Create invite code
+                invite = account_request.approve_and_create_invite(request.user)
+                print(f"DEBUG: Invite code created: {invite.code}")
+                
+                # Send invite email
+                print(f"DEBUG: Attempting to send email to {account_request.email}")
+                email_sent = False
+                
+                try:
+                    if EMAIL_UTILS_AVAILABLE:
+                        print("DEBUG: Email utilities are available, sending email...")
+                        email_sent = send_invite_email(
+                            account_request.email, 
+                            invite.code, 
+                            account_request.first_name
+                        )
+                        print(f"DEBUG: Email send result: {email_sent}")
+                    else:
+                        print("DEBUG: Email utilities NOT available")
+                except Exception as email_error:
+                    print(f"DEBUG: Email error: {str(email_error)}")
+                    logger.error(f"Email sending failed: {str(email_error)}")
+                    logger.error(traceback.format_exc())
+                
+                logger.info(f"Account request approved for {account_request.email} by {request.user.email}")
+                logger.info(f"Email {'sent' if email_sent else 'NOT sent'} to {account_request.email}")
+                
+                print("=" * 70)
+                print(f"DEBUG: Approval complete - Email sent: {email_sent}")
+                print("=" * 70)
+                
+                return Response({
+                    'message': f'Request approved. Invite code: {invite.code}',
+                    'invite_code': invite.code,
+                    'email_sent': email_sent
+                })
+            
+            elif action == 'reject':
+                print("DEBUG: Processing REJECT action")
+                reason = request.data.get('reason', 'No reason provided')
+                account_request.reject(request.user, reason)
+                
+                # Send rejection email
+                email_sent = False
+                try:
+                    if EMAIL_UTILS_AVAILABLE:
+                        email_sent = send_rejection_email(
+                            account_request.email, 
+                            account_request.first_name, 
+                            reason
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to send rejection email: {e}")
+                
+                logger.info(f"Account request rejected for {account_request.email} by {request.user.email}")
+                
+                print("=" * 70)
+                print(f"DEBUG: Rejection complete - Email sent: {email_sent}")
+                print("=" * 70)
+                
+                return Response({
+                    'message': 'Request rejected',
+                    'email_sent': email_sent
+                })
+                
+        except AccountRequest.DoesNotExist:
+            print(f"DEBUG: Account request {request_id} not found")
+            logger.error(f"Account request {request_id} not found")
+            return Response({
+                'error': 'Account request not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        except Exception as e:
+            print(f"DEBUG: Error in admin action: {str(e)}")
+            logger.error(f"Error processing account request action: {str(e)}")
+            logger.error(traceback.format_exc())
+            return Response({
+                'error': 'Failed to process request',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ============== Invite Code Management ==============
+
+class InviteCodeManagementView(APIView):
+    """Admin endpoints for managing invite codes"""
+    permission_classes = [IsAdminUser]
+    
+    def get(self, request):
+        """Get all invite codes"""
+        codes = InviteCode.objects.all().order_by('-created_at')
+        
+        data = []
+        for code in codes:
+            data.append({
+                'id': code.id,
+                'code': code.code,
+                'email': code.email,
+                'max_uses': code.max_uses,
+                'times_used': code.times_used,
+                'is_valid': code.is_valid(),
+                'created_by': code.created_by.email if code.created_by else None,
+                'created_at': code.created_at,
+                'expires_at': code.expires_at,
+                'used_by': [u.email for u in code.used_by.all()]
+            })
+        
+        return Response(data)
+    
+    def post(self, request):
+        """Create a new invite code"""
+        email = request.data.get('email')  # Optional - restrict to specific email
+        max_uses = request.data.get('max_uses', 1)
+        expires_days = request.data.get('expires_days', 30)
+        
+        # Generate random code
+        import random
+        import string
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        
+        # Check if code already exists (very unlikely)
+        while InviteCode.objects.filter(code=code).exists():
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        
+        invite_code = InviteCode.objects.create(
+            code=code,
+            email=email if email else None,
+            max_uses=max_uses,
+            created_by=request.user,
+            expires_at=timezone.now() + timedelta(days=expires_days)
+        )
+        
+        logger.info(f"Invite code {code} created by {request.user.email}")
+        
+        return Response({
+            'code': code,
+            'email': email,
+            'max_uses': max_uses,
+            'expires_at': invite_code.expires_at
+        }, status=status.HTTP_201_CREATED)
+    
+    def delete(self, request):
+        """Delete an invite code"""
+        code_id = request.data.get('code_id')
+        
+        try:
+            invite_code = InviteCode.objects.get(id=code_id)
+            code = invite_code.code
+            invite_code.delete()
+            
+            logger.info(f"Invite code {code} deleted by {request.user.email}")
+            
+            return Response({'message': 'Invite code deleted'})
+        except InviteCode.DoesNotExist:
+            return Response({
+                'error': 'Invite code not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+# ============== User Profile Views ==============
+
+class CurrentUserView(APIView):
+    """Get current logged-in user data"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+
+class UserDetailView(APIView):
+    """Get details for a specific user"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+            return Response(UserSerializer(user).data)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class MyProfileView(APIView):
+    """Get and update current user's profile"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user.profile)
+        return Response(serializer.data)
+    
+    def patch(self, request):
+        serializer = UserProfileSerializer(
+            request.user.profile, 
+            data=request.data, 
+            partial=True
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# ============== Google OAuth Views ==============
+
+class GoogleOAuthLoginView(APIView):
+    """Initiate Google OAuth login flow"""
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        # Check if Google auth is enabled
+        settings_obj = SiteSettings.get_settings()
+        if not settings_obj.enable_google_auth:
+            return Response({
+                'error': 'Google authentication is not enabled'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Build OAuth URL
+        redirect_uri = request.build_absolute_uri(reverse('google-oauth-callback'))
+        
+        google_auth_url = (
+            f'https://accounts.google.com/o/oauth2/v2/auth?'
+            f'client_id={settings.GOOGLE_OAUTH_CLIENT_ID}&'
+            f'redirect_uri={urllib.parse.quote(redirect_uri)}&'
+            f'response_type=code&'
+            f'scope=openid email profile'
+        )
+        
+        return Response({'auth_url': google_auth_url})
+
+
+class GoogleOAuthCallbackView(APIView):
+    """Handle Google OAuth callback"""
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        # This is a placeholder - actual implementation would:
+        # 1. Exchange code for tokens
+        # 2. Get user info from Google
+        # 3. Create or login user
+        # 4. Return JWT tokens
+        
+        code = request.GET.get('code')
+        if not code:
+            return Response({'error': 'No code provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # In production, you'd:
+        # 1. Exchange code for access token
+        # 2. Fetch user email from Google
+        # 3. Create/login user
+        # 4. Generate JWT
+        
+        # For now, just redirect to frontend
+        frontend_url = settings.FRONTEND_URL
+        return redirect(f'{frontend_url}/oauth-callback?code={code}')
+
+# ============== Auth Views ==============
+
+class LogoutView(APIView):
+    """Logout user by blacklisting their refresh token"""
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        print(f"[DEBUG] Upload request from user: {request.user}")
-        
-        image = request.FILES.get('image')
-        if not image:
-            return Response(
-                {'error': 'No image provided'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        try:
+            refresh_token = request.data.get('refresh')
+            if refresh_token:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            
+            return Response({'message': 'Logged out successfully'})
+        except Exception as e:
+            logger.error(f"Logout error: {e}")
+            return Response({
+                'error': 'Logout failed'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetRequestView(APIView):
+    """Request password reset email"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        email = request.data.get('email')
         
         try:
-            print(f"[DEBUG] Uploading image: {image.name}, size: {image.size}")
-            
-            result = upload(
-                image,
-                folder="caseclosure/customizations",
-                resource_type="image",
-                allowed_formats=['jpg', 'jpeg', 'png', 'gif', 'webp'],
-                transformation=[
-                    {'quality': 'auto:good'},
-                    {'fetch_format': 'auto'}
-                ]
-            )
-            
-            print(f"[DEBUG] Cloudinary upload successful: {result['secure_url']}")
+            user = User.objects.get(email=email)
+            # In production, send password reset email here
+            # For now, just log
+            logger.info(f"Password reset requested for {email}")
             
             return Response({
-                'url': result['secure_url'],
-                'public_id': result['public_id'],
-                'width': result.get('width'),
-                'height': result.get('height')
+                'message': 'If an account exists with this email, a reset link will be sent.'
             })
-            
-        except Exception as e:
-            print(f"[ERROR] Cloudinary upload failed: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            
-            return Response(
-                {'error': f'Upload failed: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        except User.DoesNotExist:
+            # Don't reveal if user exists
+            return Response({
+                'message': 'If an account exists with this email, a reset link will be sent.'
+            })
 
+# ============== Admin User Management ==============
 
-class CaseViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for Case model with template customization and deployment support.
-    """
-    serializer_class = CaseSerializer
-    permission_classes = [IsAuthenticated]
-    lookup_field = 'id'
+class AdminUsersListView(APIView):
+    """Get list of all users (admin only)"""
+    permission_classes = [IsAdminUser]
     
-    def get_queryset(self):
-        """
-        Filter cases based on user permissions and account type.
-        Includes:
-        1. Cases owned by user
-        2. Cases where user is detective/assigned
-        3. Cases where user has CaseAccess permission
-        """
-        try:
-            user = self.request.user
-            
-            if user.is_superuser or user.is_staff:
-                return Case.objects.all().order_by('-created_at')
-            
+    def get(self, request):
+        users = User.objects.all().order_by('-date_joined')
+        
+        data = []
+        for user in users:
             try:
                 profile = user.profile
-                
-                if profile.account_type == 'admin':
-                    return Case.objects.all().order_by('-created_at')
-                
-                if profile.account_type == 'detective':
-                    # Police/Detectives can see:
-                    # 1. Cases assigned to them directly
-                    # 2. Cases where they have CaseAccess permission
-                    from cases.models import CaseAccess
-                    
-                    # Get case IDs where user has access
-                    accessible_case_ids = CaseAccess.objects.filter(
-                        user=user,
-                        accepted=True
-                    ).values_list('case_id', flat=True)
-                    
-                    return Case.objects.filter(
-                        Q(user=user) | 
-                        Q(detective_email=user.email) |
-                        Q(id__in=accessible_case_ids)
-                    ).distinct().order_by('-created_at')
-                
-                if profile.account_type == 'advocate':
-                    return Case.objects.filter(user=user).order_by('-created_at')
-                
-                if profile.account_type == 'verified':
-                    return Case.objects.filter(user=user).order_by('-created_at')
-                
-            except Exception as e:
-                logger.debug(f"Error accessing profile for user {user.id}: {str(e)}")
+                profile_data = {
+                    'verified': profile.verified,
+                    'can_create_cases': profile.can_create_cases,
+                    'current_cases': profile.current_cases,
+                    'max_cases': profile.max_cases
+                }
+            except:
+                profile_data = {}
             
-            return Case.objects.filter(user=user).order_by('-created_at')
-            
-        except Exception as e:
-            logger.error(f"Error in get_queryset: {str(e)}")
-            return Case.objects.none()    
+            data.append({
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_active': user.is_active,
+                'is_staff': user.is_staff,
+                'is_superuser': user.is_superuser,
+                'account_type': user.account_type,
+                'date_joined': user.date_joined,
+                'profile': profile_data
+            })
         
-        
-    def create(self, request, *args, **kwargs):
-        """Override create to handle photo upload separately."""
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        
-        case = serializer.instance
-        
-        if 'victim_photo' in request.FILES:
-            victim_photo = request.FILES['victim_photo']
-            self._handle_victim_photo_upload(case, victim_photo)
-        
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(data)
+
+
+class AdminUserDetailView(APIView):
+    """Get, update, or delete a specific user (admin only)"""
+    permission_classes = [IsAdminUser]
     
-    def update(self, request, *args, **kwargs):
-        """Override update to handle photo upload separately."""
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        
-        if 'victim_photo' in request.FILES:
-            victim_photo = request.FILES['victim_photo']
-            self._handle_victim_photo_upload(instance, victim_photo)
-        
-        if getattr(instance, '_prefetched_objects_cache', None):
-            instance._prefetched_objects_cache = {}
-        
-        return Response(serializer.data)
-    
-    def _handle_victim_photo_upload(self, case, photo_file):
-        """Helper method to handle victim photo upload."""
+    def get(self, request, user_id):
         try:
-            existing_primary = CasePhoto.objects.filter(
-                case=case,
-                is_primary=True
-            ).first()
+            user = User.objects.get(id=user_id)
             
-            if existing_primary:
-                if existing_primary.image:
-                    default_storage.delete(existing_primary.image.name)
-                existing_primary.delete()
-            
-            case_photo = CasePhoto.objects.create(
-                case=case,
-                image=photo_file,
-                caption='Primary victim photo',
-                is_primary=True,
-                is_public=True,
-                order=0
-            )
-            
-            logger.info(f"Victim photo uploaded for case {case.id}: {case_photo.image.url}")
-            
-            if hasattr(case, 'victim_photo'):
-                case.victim_photo = case_photo.image
-                case.save(update_fields=['victim_photo'])
-            
-            return case_photo
-            
-        except Exception as e:
-            logger.error(f"Error uploading victim photo for case {case.id}: {str(e)}")
-            raise ValidationError(f"Failed to upload photo: {str(e)}")
-    
-    def perform_create(self, serializer):
-        """Automatically set the user when creating a case."""
-        user = self.request.user
-        
-        try:
-            if hasattr(user, 'profile'):
+            # Get user's profile
+            try:
                 profile = user.profile
-                
-                if not profile.can_create_cases:
-                    raise PermissionDenied("You don't have permission to create cases.")
-                
-                if profile.current_cases >= profile.max_cases:
-                    raise PermissionDenied(f"You have reached your maximum limit of {profile.max_cases} cases.")
-                
-                if not profile.phone_verified:
-                    raise PermissionDenied("Please verify your phone number before creating a case.")
-                
-                try:
-                    profile.increment_case_count()
-                except Exception as e:
-                    logger.warning(f"Could not increment case count: {str(e)}")
-        except Exception as e:
-            logger.debug(f"Profile check during case creation: {str(e)}")
-        
-        template_id = self.request.data.get('template_id', 'beacon')
-        
-        try:
-            template = TemplateRegistry.objects.get(template_id=template_id)
-            initial_template_data = {
-                'customizations': self._get_default_customizations(template.schema),
-                'metadata': {
-                    'created_at': timezone.now().isoformat(),
-                    'template_version': template.version
+                profile_data = {
+                    'organization': profile.organization,
+                    'role': profile.role,
+                    'bio': profile.bio,
+                    'phone': profile.phone,
+                    'location': profile.location,
+                    'preferred_contact': profile.preferred_contact,
+                    'notifications_tips': profile.notifications_tips,
+                    'notifications_updates': profile.notifications_updates,
+                    'timezone': profile.timezone,
+                    'language': profile.language,
+                    'verified': profile.verified,
+                    'can_create_cases': profile.can_create_cases,
+                    'max_cases': profile.max_cases,
+                    'current_cases': profile.current_cases,
                 }
-            }
-        except TemplateRegistry.DoesNotExist:
-            initial_template_data = {'customizations': {}, 'metadata': {}}
-        
-        serializer.save(
-            user=user,
-            template_data=initial_template_data
-        )
-    
-    def _get_default_customizations(self, schema):
-        """Extract default values from template schema."""
-        customizations = {}
-        
-        for section_key, section_value in schema.items():
-            if isinstance(section_value, dict):
-                customizations[section_key] = {}
-                for field_key, field_config in section_value.items():
-                    if isinstance(field_config, dict) and 'default' in field_config:
-                        customizations[section_key][field_key] = field_config['default']
-        
-        return customizations
-    
-    @action(detail=True, methods=['post'])
-    def upload_victim_photo(self, request, id=None):
-        """Dedicated endpoint for uploading victim photo."""
-        case = self.get_object()
-        
-        if case.user != request.user and not request.user.is_staff:
-            raise PermissionDenied("You can only upload photos for your own cases.")
-        
-        if 'victim_photo' not in request.FILES:
-            return Response(
-                {'error': 'No photo file provided'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            photo = self._handle_victim_photo_upload(case, request.FILES['victim_photo'])
-            
-            return Response({
-                'success': True,
-                'message': 'Photo uploaded successfully',
-                'photo_url': photo.image.url if photo.image else None,
-                'photo_id': photo.id
-            })
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
-    @action(detail=True, methods=['post'])
-    def save_customizations(self, request, id=None):
-        """Save customizations with improved error handling and logging."""
-        try:
-            case = self.get_object()
-            
-            if case.user != request.user and not request.user.is_staff:
-                raise PermissionDenied("You can only edit your own cases.")
-            
-            customizations = request.data.get('customizations', {})
-            
-            if not isinstance(customizations, dict):
-                return Response(
-                    {'error': 'Customizations must be an object/dictionary'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            cleaned_customizations = {}
-            for key, value in customizations.items():
-                if value is not None:
-                    cleaned_customizations[key] = value
-            
-            logger.info(f"Saving {len(cleaned_customizations)} customization fields for case {id}")
-            
-            if not case.template_data:
-                case.template_data = {}
-            
-            if not isinstance(case.template_data, dict):
-                case.template_data = {}
-            
-            case.template_data['customizations'] = cleaned_customizations
-            case.template_data['last_saved'] = timezone.now().isoformat()
-            
-            try:
-                case.save(update_fields=['template_data'])
-                logger.info(f"Successfully saved customizations for case {id}")
-            except Exception as save_error:
-                logger.error(f"Database save error for case {id}: {str(save_error)}")
-                return Response(
-                    {'error': f'Failed to save to database: {str(save_error)}'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            
-            return Response({
-                'success': True,
-                'message': 'Customizations saved successfully',
-                'template_data': case.template_data,
-                'customization_count': len(cleaned_customizations)
-            })
-            
-        except PermissionDenied as e:
-            return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
-        except Case.DoesNotExist:
-            return Response({'error': 'Case not found'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"Unexpected error saving customizations for case {id}: {str(e)}")
-            return Response(
-                {'error': f'Server error: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    @action(detail=False, methods=['POST'])
-    def check_subdomain(self, request):
-        """Check if a subdomain is available for use."""
-        subdomain = request.data.get('subdomain', '').lower().strip()
-        case_id = request.data.get('case_id')  # ✅ ADD THIS LINE
-        
-        if not subdomain:
-            return Response({
-                'available': False,
-                'message': 'Subdomain is required'
-            })
-        
-        if len(subdomain) < 3:
-            return Response({
-                'available': False,
-                'message': 'Subdomain must be at least 3 characters'
-            })
-        
-        if not re.match(r'^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$', subdomain):
-            return Response({
-                'available': False,
-                'message': 'Invalid format. Use only lowercase letters, numbers, and hyphens.'
-            })
-        
-        if subdomain in RESERVED_SUBDOMAINS:
-            return Response({
-                'available': False,
-                'message': 'This subdomain is reserved'
-            })
-        
-        # ✅ FIXED: Exclude current case from availability check
-        query = Case.objects.filter(subdomain=subdomain)
-        if case_id:
-            query = query.exclude(id=case_id)
-        exists = query.exists()
-        
-        return Response({
-            'available': not exists,
-            'message': 'Available!' if not exists else 'This subdomain is already taken',
-            'subdomain': subdomain
-        })
-
-    @action(detail=True, methods=['post'])
-    def deploy(self, request, id=None):
-        """Deploy the case to its subdomain with full production safeguards."""
-        case = self.get_object()
-        
-        if case.user != request.user and not request.user.is_staff:
-            raise PermissionDenied("You can only deploy your own cases.")
-        
-        # ✅ SAFE CACHE OPERATIONS - Handle Redis not being available
-        lock_key = f'deploying_case_{case.id}'
-        try:
-            if cache.get(lock_key):
-                return Response(
-                    {
-                        'error': 'A deployment is already in progress for this case. Please wait.',
-                        'status': 'deploying'
-                    },
-                    status=status.HTTP_409_CONFLICT
-                )
-            cache.set(lock_key, True, 300)
-        except Exception as cache_error:
-            logger.warning(f"Cache unavailable during deploy lock check: {cache_error}")
-            # Continue without cache lock in development environments
-        
-        try:
-            validation_errors = []
-            
-            if not case.first_name:
-                validation_errors.append('First name is required')
-            if not case.last_name:
-                validation_errors.append('Last name is required')
-            if not case.case_title:
-                validation_errors.append('Case title is required')
-            if not case.case_type:
-                validation_errors.append('Case type is required')
-            if not case.template_id:
-                validation_errors.append('Template must be selected')
-            
-            if validation_errors:
-                return Response(
-                    {
-                        'error': 'Cannot deploy incomplete case',
-                        'validation_errors': validation_errors
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            subdomain = request.data.get('subdomain', '').lower().strip()
-            
-            if subdomain:
-                if not re.match(r'^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$', subdomain):
-                    return Response(
-                        {
-                            'error': 'Invalid subdomain format',
-                            'details': 'Subdomain must start and end with a letter or number.'
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                
-                if len(subdomain) < 3 or len(subdomain) > 50:
-                    return Response(
-                        {'error': 'Subdomain must be between 3 and 50 characters'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                
-                if subdomain in RESERVED_SUBDOMAINS:
-                    return Response(
-                        {
-                            'error': 'This subdomain is reserved',
-                            'suggestion': f'{subdomain}-{case.first_name.lower()}'
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                
-                if Case.objects.filter(subdomain=subdomain).exclude(id=case.id).exists():
-                    counter = 1
-                    suggestion = f"{subdomain}-{counter}"
-                    while Case.objects.filter(subdomain=suggestion).exists():
-                        counter += 1
-                        suggestion = f"{subdomain}-{counter}"
-                    
-                    return Response(
-                        {
-                            'error': 'This subdomain is already taken',
-                            'suggestion': suggestion
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                
-                case.subdomain = subdomain
-                
-            elif not case.subdomain:
-                base_subdomain = f"{case.first_name}-{case.last_name}".lower()
-                base_subdomain = re.sub(r'[^a-z0-9-]', '', base_subdomain)
-                base_subdomain = re.sub(r'-+', '-', base_subdomain)
-                base_subdomain = base_subdomain[:40].strip('-')
-                
-                if not base_subdomain or len(base_subdomain) < 3:
-                    return Response(
-                        {
-                            'error': 'Cannot auto-generate subdomain from name',
-                            'details': 'Please provide a subdomain manually'
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                
-                if base_subdomain in RESERVED_SUBDOMAINS:
-                    base_subdomain = f"{base_subdomain}-case"
-                
-                subdomain = base_subdomain
-                counter = 1
-                
-                while Case.objects.filter(subdomain=subdomain).exclude(id=case.id).exists():
-                    subdomain = f"{base_subdomain}-{counter}"
-                    counter += 1
-                    if counter > 1000:
-                        return Response(
-                            {'error': 'Could not generate unique subdomain. Please provide one manually.'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                        )
-                
-                case.subdomain = subdomain
-            
-            with transaction.atomic():
-                case.save(update_fields=['subdomain'])
-                
-                case.deployment_status = 'deploying'
-                case.save(update_fields=['deployment_status'])
-                
-                try:
-                    deployment_service = get_deployment_service()
-                    result = deployment_service.deploy_case(case)
-                    
-                    if not result.get('success'):
-                        raise Exception(result.get('error', 'Deployment service returned failure'))
-                    
-                    logger.info(f"Successfully deployed case {id} to {case.subdomain}.caseclosure.org")
-                    
-                    return Response({
-                        'success': True,
-                        'message': f'Your website is now live at {case.subdomain}.caseclosure.org!',
-                        'subdomain': case.subdomain,
-                        'url': case.deployment_url,
-                        'status': 'deployed',
-                        'deployed_at': case.last_deployed_at.isoformat() if case.last_deployed_at else None
-                    })
-                    
-                except Exception as deploy_error:
-                    logger.error(f"Deployment failed for case {id}: {str(deploy_error)}")
-                    
-                    case.deployment_status = 'failed'
-                    case.deployment_error = str(deploy_error)
-                    case.is_public = False
-                    case.save(update_fields=['deployment_status', 'deployment_error', 'is_public'])
-                    
-                    error_message = str(deploy_error)
-                    if 'timeout' in error_message.lower():
-                        error_message = 'Deployment timed out. Please try again in a few minutes.'
-                    elif 'connection' in error_message.lower():
-                        error_message = 'Network error during deployment. Please try again.'
-                    
-                    return Response(
-                        {
-                            'success': False,
-                            'error': error_message,
-                            'status': 'failed',
-                            'details': str(deploy_error) if settings.DEBUG else None
-                        },
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                    )
-        
-        except ValidationError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        except Exception as e:
-            logger.error(f"Unexpected deployment error for case {id}: {str(e)}", exc_info=True)
-            
-            try:
-                case.deployment_status = 'failed'
-                case.deployment_error = str(e)
-                case.save(update_fields=['deployment_status', 'deployment_error'])
             except:
-                pass
+                profile_data = {}
             
-            return Response(
-                {
-                    'error': 'An unexpected error occurred during deployment',
-                    'details': str(e) if settings.DEBUG else 'Please contact support if this persists'
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        
-        finally:
-            # ✅ SAFE CACHE DELETE
-            try:
-                cache.delete(lock_key)
-            except Exception as cache_error:
-                logger.warning(f"Cache unavailable during lock cleanup: {cache_error}")
-                # Ignore cache errors during cleanup
-
-    @action(detail=True, methods=['get'])
-    def deployment_status(self, request, id=None):
-        """Get detailed deployment status with enhanced information."""
-        case = self.get_object()
-        
-        latest_log = case.deployment_logs.first()
-        
-        # ✅ SAFE CACHE CHECK
-        lock_key = f'deploying_case_{case.id}'
-        is_deploying = False
-        try:
-            is_deploying = cache.get(lock_key) is not None
-        except Exception as cache_error:
-            logger.warning(f"Cache unavailable during status check: {cache_error}")
-            # Fall back to checking deployment_status from database
-            is_deploying = case.deployment_status == 'deploying'
-        
-        response_data = {
-            'deployment_status': case.deployment_status,
-            'subdomain': case.subdomain,
-            'deployment_url': case.get_full_url(),
-            'is_public': case.is_public,
-            'is_disabled': case.is_disabled,
-            'last_deployed_at': case.last_deployed_at.isoformat() if case.last_deployed_at else None,
-            'deployment_error': case.deployment_error if case.deployment_error else None,
-            'is_deploying': is_deploying
-        }
-        
-        if latest_log:
-            response_data['latest_deployment'] = {
-                'id': str(latest_log.id),
-                'action': latest_log.action,
-                'status': latest_log.status,
-                'started_at': latest_log.started_at.isoformat(),
-                'completed_at': latest_log.completed_at.isoformat() if latest_log.completed_at else None,
-                'duration_seconds': latest_log.duration_seconds,
-                'error': latest_log.error_message
-            }
-        
-        response_data['total_deployments'] = case.deployment_logs.count()
-        
-        return Response(response_data)
-
-    @action(detail=True, methods=['post'])
-    def undeploy(self, request, id=None):
-        """Take the case website offline."""
-        case = self.get_object()
-        
-        if case.user != request.user and not request.user.is_staff:
-            raise PermissionDenied("You can only manage your own cases.")
-        
-        if case.deployment_status == 'not_deployed' and not case.is_public:
-            return Response({
-                'success': True,
-                'message': 'Website is already offline',
-                'status': 'not_deployed'
-            })
-        
-        try:
-            with transaction.atomic():
-                deployment_service = get_deployment_service()
-                result = deployment_service.undeploy_case(case)
-                
-                if result.get('success'):
-                    logger.info(f"Successfully undeployed case {id}")
-                    
-                    return Response({
-                        'success': True,
-                        'message': 'Website has been taken offline',
-                        'status': 'not_deployed'
-                    })
-                else:
-                    raise Exception(result.get('error', 'Undeploy failed'))
-        
-        except Exception as e:
-            logger.error(f"Undeploy failed for case {id}: {str(e)}")
-            
-            return Response(
-                {'success': False, 'error': f'Failed to take website offline: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    
-    @action(detail=False, methods=['get'])
-    def my_cases(self, request):
-        """Get only the current user's cases."""
-        try:
-            cases = Case.objects.filter(user=request.user).order_by('-created_at')
-            serializer = self.get_serializer(cases, many=True)
-            return Response(serializer.data)
-        except Exception as e:
-            logger.error(f"Error in my_cases: {str(e)}")
-            return Response(
-                {'error': 'Failed to retrieve cases'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    @action(detail=False, methods=['get'])
-    def stats(self, request):
-        """Get statistics about user's cases including deployment stats."""
-        try:
-            user = request.user
-            queryset = self.get_queryset()
-            
-            stats = {
-                'total_cases': queryset.count(),
-                'public_cases': queryset.filter(is_public=True).count(),
-                'private_cases': queryset.filter(is_public=False).count(),
-                'deployed_cases': queryset.filter(deployment_status='deployed').count(),
-                'cases_with_rewards': queryset.filter(reward_amount__isnull=False).count(),
-                'cases_by_template': {},
-                'deployment_stats': {
-                    'deployed': queryset.filter(deployment_status='deployed').count(),
-                    'deploying': queryset.filter(deployment_status='deploying').count(),
-                    'failed': queryset.filter(deployment_status='failed').count(),
-                    'not_deployed': queryset.filter(deployment_status='not_deployed').count(),
-                }
+            user_data = {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_active': user.is_active,
+                'is_staff': user.is_staff,
+                'is_superuser': user.is_superuser,
+                'account_type': user.account_type,
+                'phone': user.phone,
+                'city': user.city,
+                'state': user.state,
+                'country': user.country,
+                'zip_code': user.zip_code,
+                'date_joined': user.date_joined,
+                'last_login': user.last_login,
+                'profile': profile_data
             }
             
-            for template in TemplateRegistry.objects.filter(is_active=True):
-                count = queryset.filter(template_id=template.template_id).count()
-                if count > 0:
-                    stats['cases_by_template'][template.template_id] = count
+            return Response(user_data)
             
-            try:
-                if hasattr(user, 'profile'):
-                    profile = user.profile
-                    stats.update({
-                        'can_create_cases': getattr(profile, 'can_create_cases', True),
-                        'current_cases': getattr(profile, 'current_cases', 0),
-                        'max_cases': getattr(profile, 'max_cases', 10),
-                        'remaining_cases': max(0, getattr(profile, 'max_cases', 10) - getattr(profile, 'current_cases', 0)),
-                        'account_type': getattr(profile, 'account_type', 'basic'),
-                        'is_verified': getattr(profile, 'identity_verified', False),
-                    })
-            except Exception as e:
-                logger.debug(f"Could not get profile stats: {str(e)}")
-            
-            return Response(stats)
-            
-        except Exception as e:
-            logger.error(f"Error in stats: {str(e)}")
+        except User.DoesNotExist:
             return Response(
-                {'error': 'Failed to retrieve statistics'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    @action(detail=False, methods=['get'], url_path='by-subdomain/(?P<subdomain>[^/.]+)', 
-            permission_classes=[AllowAny])
-    def by_subdomain(self, request, subdomain=None):
-        """Get case by subdomain for public website rendering."""
-        try:
-            case = Case.objects.get(
-                subdomain=subdomain,
-                is_public=True,
-                is_disabled=False
-            )
-            
-            if case.deployment_status != 'deployed':
-                return Response(
-                    {'error': 'This website is not yet deployed'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            serializer = self.get_serializer(case)
-            
-            spotlight_posts = []
-            try:
-                posts = SpotlightPost.objects.filter(
-                    case=case,
-                    status='published'
-                ).order_by('-published_at')[:10]
-                
-                spotlight_posts = SpotlightPostSerializer(posts, many=True, context={'request': request}).data
-            except:
-                pass
-            
-            response_data = serializer.data
-            response_data['spotlight_posts'] = spotlight_posts
-            
-            return Response(response_data)
-            
-        except Case.DoesNotExist:
-            return Response(
-                {'error': 'Case not found'},
+                {'error': 'User not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            logger.error(f"Error fetching case by subdomain: {str(e)}")
+            logger.error(f"Error fetching user {user_id}: {str(e)}")
             return Response(
-                {'error': 'An error occurred'},
+                {'error': 'Failed to fetch user details'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    def perform_destroy(self, instance):
-        """When deleting a case, cleanup related data."""
+    def put(self, request, user_id):
+        """Update user details"""
         try:
-            if hasattr(instance.user, 'profile'):
-                instance.user.profile.decrement_case_count()
-        except Exception as e:
-            logger.warning(f"Error during case deletion cleanup: {str(e)}")
-        
-        super().perform_destroy(instance)
-    # Add these methods to your CaseViewSet class in cases/views.py
-
-    @action(detail=True, methods=['get'])
-    def access_list(self, request, id=None):
-        """Get all users with access to this case"""
-        case = self.get_object()
-        
-        # Check permissions - only case owner or admin can see this
-        if case.user != request.user and not request.user.is_staff:
-            raise PermissionDenied("You can only manage access for your own cases")
-        
-        try:
-            # Get all CaseAccess records for this case
-            accesses = CaseAccess.objects.filter(case=case).select_related('user')
+            user = User.objects.get(id=user_id)
+            profile = user.profile
             
-            access_list = []
-            for access in accesses:
-                access_list.append({
-                    'id': access.id,
-                    'user_id': access.user.id,
-                    'email': access.user.email,
-                    'first_name': access.user.first_name,
-                    'last_name': access.user.last_name,
-                    'account_type': access.user.account_type,
-                    'access_level': access.access_level,
-                    'can_view_tips': access.can_view_tips,
-                    'can_view_tracking': access.can_view_tracking,
-                    'can_view_personal_info': access.can_view_personal_info,
-                    'can_export_data': access.can_export_data,
-                    'invited_at': access.invited_at.isoformat() if access.invited_at else None,
-                    'invited_by_email': access.invited_by.email if access.invited_by else None,
-                    'accepted': access.accepted,
-                    'accepted_at': access.accepted_at.isoformat() if access.accepted_at else None,
-                    'last_accessed': access.last_accessed.isoformat() if access.last_accessed else None,
-                    'access_count': access.access_count,
+            # Update user fields
+            user_fields = ['email', 'username', 'first_name', 'last_name', 
+                          'is_active', 'is_staff', 'is_superuser', 'account_type',
+                          'phone', 'city', 'state', 'country', 'zip_code']
+            
+            for field in user_fields:
+                if field in request.data:
+                    setattr(user, field, request.data[field])
+            
+            if 'profile' in request.data:
+                profile_data = request.data['profile']
+                profile_fields = ['organization', 'role', 'bio', 'location',
+                                 'preferred_contact', 'notifications_tips', 
+                                 'notifications_updates', 'timezone', 'language',
+                                 'verified', 'can_create_cases', 'max_cases']
+                
+                for field in profile_fields:
+                    if field in profile_data:
+                        setattr(profile, field, profile_data[field])
+                
+                profile.save()
+            
+            user.save()
+            
+            logger.info(f"Admin {request.user.email} updated user {user.email}")
+            
+            return self.get(request, user_id)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error updating user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to update user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def patch(self, request, user_id):
+        """Partial update user details"""
+        try:
+            user = User.objects.get(id=user_id)
+            
+            if 'is_active' in request.data:
+                user.is_active = request.data['is_active']
+                action = "activated" if user.is_active else "deactivated"
+                logger.info(f"Admin {request.user.email} {action} user {user.email}")
+            
+            if 'is_staff' in request.data:
+                user.is_staff = request.data['is_staff']
+            
+            if 'is_superuser' in request.data:
+                user.is_superuser = request.data['is_superuser']
+            
+            for field, value in request.data.items():
+                if hasattr(user, field) and field not in ['id', 'password']:
+                    setattr(user, field, value)
+            
+            user.save()
+            
+            return self.get(request, user_id)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error patching user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to update user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def delete(self, request, user_id):
+        """Delete user account"""
+        try:
+            user = User.objects.get(id=user_id)
+            
+            if user.id == request.user.id:
+                return Response(
+                    {'error': 'Cannot delete your own account'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            user_email = user.email
+            
+            user.delete()
+            
+            logger.info(f"Admin {request.user.email} deleted user {user_email}")
+            
+            return Response(
+                {'message': 'User deleted successfully'},
+                status=status.HTTP_204_NO_CONTENT
+            )
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error deleting user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to delete user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def post(self, request, user_id):
+        """Handle special actions like password reset"""
+        try:
+            user = User.objects.get(id=user_id)
+            action = request.data.get('action')
+            
+            if action == 'reset_password':
+                import random
+                import string
+                temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+                user.set_password(temp_password)
+                user.save()
+                
+                logger.info(f"Admin {request.user.email} reset password for user {user.email}")
+                
+                return Response({
+                    'message': 'Password reset successfully',
+                    'temp_password': temp_password
                 })
             
-            return Response({
-                'case_id': str(case.id),
-                'case_title': case.case_title,
-                'total_access_count': len(access_list),
-                'access_list': access_list
-            })
-            
-        except Exception as e:
-            logger.error(f"Error fetching case access list: {str(e)}")
             return Response(
-                {'error': 'Failed to fetch access list'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    @action(detail=True, methods=['post'])
-    def revoke_access(self, request, id=None):
-        """Revoke access for a user from this case"""
-        case = self.get_object()
-        
-        # Check permissions - only case owner or admin can revoke access
-        if case.user != request.user and not request.user.is_staff:
-            raise PermissionDenied("You can only manage access for your own cases")
-        
-        user_id = request.data.get('user_id')
-        if not user_id:
-            return Response(
-                {'error': 'user_id is required'},
+                {'error': 'Invalid action'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        try:
-            User = get_user_model()
-            user = User.objects.get(id=user_id)
-            
-            # Find and delete the CaseAccess record
-            access = CaseAccess.objects.filter(case=case, user=user).first()
-            
-            if not access:
-                return Response(
-                    {'error': 'User does not have access to this case'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            # Log the revocation
-            user_email = user.email
-            access.delete()
-            
-            logger.info(f"Access revoked for {user_email} to case {case.id} by {request.user.email}")
-            
-            return Response({
-                'success': True,
-                'message': f'Access revoked for {user_email}',
-                'revoked_user': user_email,
-                'case_id': str(case.id)
-            })
             
         except User.DoesNotExist:
             return Response(
@@ -931,576 +1392,53 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            logger.error(f"Error revoking access: {str(e)}")
+            logger.error(f"Error handling action for user {user_id}: {str(e)}")
             return Response(
-                {'error': 'Failed to revoke access'},
+                {'error': 'Action failed'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class UserCasesView(APIView):
+    """Get all cases for a specific user"""
+    permission_classes = [IsAdminUser]
     
-    @action(detail=True, methods=['post'])
-    def update_access_permissions(self, request, id=None):
-        """Update permissions for a user's case access"""
-        case = self.get_object()
-        
-        # Check permissions
-        if case.user != request.user and not request.user.is_staff:
-            raise PermissionDenied("You can only manage access for your own cases")
-        
-        user_id = request.data.get('user_id')
-        if not user_id:
-            return Response(
-                {'error': 'user_id is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+    def get(self, request, user_id):
         try:
-            User = get_user_model()
             user = User.objects.get(id=user_id)
             
-            access = CaseAccess.objects.filter(case=case, user=user).first()
+            from cases.models import Case
             
-            if not access:
-                return Response(
-                    {'error': 'User does not have access to this case'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+            cases = Case.objects.filter(user=user)
             
-            # Update permissions
-            if 'can_view_tips' in request.data:
-                access.can_view_tips = request.data['can_view_tips']
-            if 'can_view_tracking' in request.data:
-                access.can_view_tracking = request.data['can_view_tracking']
-            if 'can_view_personal_info' in request.data:
-                access.can_view_personal_info = request.data['can_view_personal_info']
-            if 'can_export_data' in request.data:
-                access.can_export_data = request.data['can_export_data']
-            if 'access_level' in request.data:
-                access.access_level = request.data['access_level']
+            case_data = []
+            for case in cases:
+                case_data.append({
+                    'id': case.id,
+                    'name': getattr(case, 'name', f'Case #{case.id}'),
+                    'victim_name': getattr(case, 'victim_name', 'Unknown'),
+                    'incident_date': getattr(case, 'incident_date', None),
+                    'reward_amount': getattr(case, 'reward_amount', 0),
+                    'status': getattr(case, 'status', 'active'),
+                    'is_disabled': getattr(case, 'is_disabled', False),
+                    'created_at': case.created_at if hasattr(case, 'created_at') else None,
+                })
             
-            access.save()
-            
-            logger.info(f"Permissions updated for {user.email} to case {case.id}")
-            
-            return Response({
-                'success': True,
-                'message': f'Permissions updated for {user.email}',
-                'updated_user': user.email,
-                'permissions': {
-                    'can_view_tips': access.can_view_tips,
-                    'can_view_tracking': access.can_view_tracking,
-                    'can_view_personal_info': access.can_view_personal_info,
-                    'can_export_data': access.can_export_data,
-                }
-            })
+            return Response(case_data)
             
         except User.DoesNotExist:
             return Response(
                 {'error': 'User not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        except Exception as e:
-            logger.error(f"Error updating permissions: {str(e)}")
+        except ImportError:
+            logger.error("Cases app not found - cannot fetch user cases")
             return Response(
-                {'error': 'Failed to update permissions'},
+                {'error': 'Cases module not available'},
+                status=status.HTTP_501_NOT_IMPLEMENTED
+            )
+        except Exception as e:
+            logger.error(f"Error fetching cases for user {user_id}: {str(e)}")
+            return Response(
+                {'error': 'Failed to fetch user cases'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-# cases/views.py
-# Find your existing SpotlightPostViewSet class and REPLACE it with this entire class
-
-class SpotlightPostViewSet(viewsets.ModelViewSet):
-    """ViewSet for case-specific Spotlight blog posts with permissions."""
-    serializer_class = SpotlightPostSerializer
-    
-    def get_permissions(self):
-        """Public can view, authenticated can create/edit their own posts."""
-        if self.action in ['list', 'retrieve']:
-            return [AllowAny()]
-        return [IsAuthenticated()]
-    
-    def get_queryset(self):
-        """Filter posts based on permissions and filters."""
-        queryset = SpotlightPost.objects.select_related('case').all()
-        
-        # Filter by case_id if provided
-        case_id = self.request.query_params.get('case_id')
-        if case_id:
-            queryset = queryset.filter(case__id=case_id)
-        
-        # Filter by case subdomain (for public template pages)
-        subdomain = self.request.query_params.get('subdomain')
-        if subdomain:
-            queryset = queryset.filter(case__subdomain=subdomain)
-        
-        # Filter by status
-        status_filter = self.request.query_params.get('status')
-        
-        # Handle permissions
-        if self.request.user.is_authenticated:
-            if self.request.user.is_staff or self.request.user.is_superuser:
-                # Admin can see all posts
-                if status_filter:
-                    queryset = queryset.filter(status=status_filter)
-            else:
-                # Users can see their own posts (any status) or published posts from others
-                queryset = queryset.filter(
-                    Q(case__user=self.request.user) |
-                    Q(status='published', published_at__lte=timezone.now())
-                )
-                if status_filter:
-                    queryset = queryset.filter(
-                        case__user=self.request.user,
-                        status=status_filter
-                    )
-        else:
-            # Public can only see published posts
-            queryset = queryset.filter(
-                status='published',
-                published_at__lte=timezone.now()
-            )
-        
-        return queryset.order_by('-is_pinned', '-published_at', '-created_at')
-    
-    def perform_create(self, serializer):
-        """Create a new spotlight post with validation."""
-        case_id = self.request.data.get('case')
-        
-        if not case_id:
-            raise ValidationError("case is required")
-        
-        try:
-            case = Case.objects.get(id=case_id)
-        except Case.DoesNotExist:
-            raise ValidationError("Case not found")
-        
-        # Permission check: User must own the case OR be admin
-        if not (case.user == self.request.user or 
-                self.request.user.is_staff or 
-                self.request.user.is_superuser):
-            raise PermissionDenied("You can only create posts for your own cases")
-        
-        # Set published_at if status is published
-        if serializer.validated_data.get('status') == 'published':
-            if not serializer.validated_data.get('published_at'):
-                serializer.validated_data['published_at'] = timezone.now()
-        
-        serializer.save(case=case)
-    
-    def perform_update(self, serializer):
-        """Update existing post with permission check."""
-        instance = self.get_object()
-        
-        # Permission check
-        if not (instance.case.user == self.request.user or 
-                self.request.user.is_staff or 
-                self.request.user.is_superuser):
-            raise PermissionDenied("You can only edit posts for your own cases")
-        
-        # Handle status changes
-        if serializer.validated_data.get('status') == 'published' and not instance.published_at:
-            serializer.validated_data['published_at'] = timezone.now()
-        
-        serializer.save()
-    
-    def perform_destroy(self, instance):
-        """Delete post with permission check."""
-        if not (instance.case.user == self.request.user or 
-                self.request.user.is_staff or 
-                self.request.user.is_superuser):
-            raise PermissionDenied("You can only delete posts for your own cases")
-        
-        instance.delete()
-    
-    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
-    def increment_view(self, request, pk=None):
-        """Increment view count for a post."""
-        post = self.get_object()
-        post.view_count = F('view_count') + 1
-        post.save(update_fields=['view_count'])
-        post.refresh_from_db()
-        return Response({'view_count': post.view_count})
-
-
-class TemplateRegistryViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for available templates (read-only)."""
-    serializer_class = TemplateRegistrySerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        """Return only active templates."""
-        queryset = TemplateRegistry.objects.filter(is_active=True)
-        
-        user = self.request.user
-        if hasattr(user, 'profile'):
-            if user.profile.account_type not in ['pro', 'enterprise', 'admin']:
-                queryset = queryset.filter(is_premium=False)
-        
-        return queryset.order_by('name')
-
-
-class CasePhotoViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing case photos."""
-    serializer_class = CasePhotoSerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        """Filter photos by case ownership."""
-        case_id = self.request.query_params.get('case_id')
-        
-        if case_id:
-            return CasePhoto.objects.filter(
-                case__id=case_id,
-                case__user=self.request.user
-            ).order_by('order', 'uploaded_at')
-        
-        return CasePhoto.objects.filter(
-            case__user=self.request.user
-        ).order_by('order', 'uploaded_at')
-    
-    def perform_create(self, serializer):
-        """Upload a new photo for a case."""
-        case_id = self.request.data.get('case_id')
-        
-        try:
-            case = Case.objects.get(id=case_id, user=self.request.user)
-        except Case.DoesNotExist:
-            raise ValidationError("Case not found or you don't have permission.")
-        
-        is_primary = self.request.data.get('is_primary', False)
-        
-        if is_primary:
-            CasePhoto.objects.filter(case=case, is_primary=True).update(is_primary=False)
-        
-        serializer.save(case=case)
-
-
-class DeploymentLogViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for viewing deployment logs (read-only)."""
-    serializer_class = DeploymentLogSerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        """Filter logs by case ownership."""
-        case_id = self.request.query_params.get('case_id')
-        
-        if case_id:
-            return DeploymentLog.objects.filter(
-                case__id=case_id,
-                case__user=self.request.user
-            ).order_by('-started_at')
-        
-        return DeploymentLog.objects.filter(
-            case__user=self.request.user
-        ).order_by('-started_at')
-    
-
-# ============================================================================
-# CASE INVITATION VIEWSET
-# ============================================================================
-
-# cases/views.py - CaseInvitationViewSet COMPLETE
-
-class CaseInvitationViewSet(viewsets.ModelViewSet):
-    """Handle case access invitations for LEO, investigators, advocates"""
-    queryset = CaseInvitation.objects.all()
-    serializer_class = CaseInvitationSerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_serializer_class(self):
-        if self.action == 'create':
-            return CreateCaseInvitationSerializer
-        return CaseInvitationSerializer
-    
-    def create(self, request, *args, **kwargs):
-        """
-        Create a new invitation for a case.
-        Two scenarios:
-        1. User doesn't exist: Create invitation, send email with signup link
-        2. User exists: Grant access immediately, send notification
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        data = serializer.validated_data
-        case = Case.objects.get(id=data['case_id'])
-        invitee_email = data['invitee_email']
-        
-        # Map invitation_type to access_level for CaseAccess
-        access_level_mapping = {
-            'police': 'leo',
-            'investigator': 'private_investigator',
-            'advocate': 'advocate',
-            'family': 'collaborator',
-            'other': 'viewer',
-        }
-        access_level = access_level_mapping.get(data['user_type'], 'viewer')
-        
-        # Check if user exists
-        try:
-            User = get_user_model()
-            user = User.objects.get(email=invitee_email)
-            logger.info(f"[INVITATION] User EXISTS: {user.email}")
-            
-            # User exists - grant access immediately
-            access, created = CaseAccess.objects.get_or_create(
-                case=case,
-                user=user,
-                defaults={
-                    'access_level': access_level,
-                    'invited_by': request.user,
-                    'accepted': True,
-                    'accepted_at': timezone.now(),
-                    'can_view_tips': True,
-                    'can_view_tracking': False,
-                    'can_view_personal_info': False,
-                    'can_export_data': False,
-                }
-            )
-            
-            logger.info(f"[INVITATION] CaseAccess created: {created}, ID: {access.id}")
-            
-            # Send notification email to existing user
-            try:
-                logger.info(f"[INVITATION] Calling _send_existing_user_notification()")
-                self._send_existing_user_notification(
-                    user=user,
-                    case=case,
-                    inviter=request.user,
-                    access_type=data['user_type'],
-                    subject_line=data['subject_line'],
-                    message_body=data['message_body']
-                )
-                logger.info(f"[INVITATION] ✓ Notification email method completed")
-            except Exception as email_error:
-                logger.error(f"[INVITATION] ✗ Notification email error: {str(email_error)}", exc_info=True)
-            
-            return Response(
-                {
-                    'status': 'success',
-                    'message': f'Access granted to {user.get_full_name() or user.email}. Notification sent.',
-                    'type': 'existing_user',
-                    'case_access_id': str(access.id)
-                },
-                status=status.HTTP_201_CREATED
-            )
-        
-        except User.DoesNotExist:
-            logger.info(f"[INVITATION] User DOES NOT EXIST: {invitee_email}")
-            
-            # Generate unique invitation code
-            invitation_code = str(uuid.uuid4())
-            
-            # User doesn't exist - create invitation
-            invitation, created = CaseInvitation.objects.get_or_create(
-                case=case,
-                invitee_email=invitee_email,
-                defaults={
-                    'invitee_name': data['invitee_name'],
-                    'invitation_type': data['user_type'],
-                    'invitee_account_type': CaseInvitation.get_account_type_from_invitation_type(data['user_type']),
-                    'invited_by': request.user,
-                    'subject_line': data['subject_line'],
-                    'message_body': data['message_body'],
-                    'invitation_code': invitation_code,
-                    'expires_at': timezone.now() + timedelta(days=30),
-                    'status': 'pending'
-                }
-            )
-            
-            logger.info(f"[INVITATION] Invitation created: {created}, ID: {invitation.id}")
-            
-            if created:
-                # Send invitation email to new user
-                try:
-                    logger.info(f"[INVITATION] Calling _send_invitation_email()")
-                    self._send_invitation_email(
-                        invitation=invitation,
-                        inviter=request.user
-                    )
-                    logger.info(f"[INVITATION] ✓ Invitation email method completed")
-                except Exception as email_error:
-                    logger.error(f"[INVITATION] ✗ Invitation email error: {str(email_error)}", exc_info=True)
-                
-                return Response(
-                    {
-                        'status': 'success',
-                        'message': f'Invitation sent to {invitee_email}',
-                        'type': 'new_user',
-                        'invitation_id': str(invitation.id),
-                        'expires_in_days': 30
-                    },
-                    status=status.HTTP_201_CREATED
-                )
-            else:
-                return Response(
-                    {
-                        'status': 'already_invited',
-                        'message': f'{invitee_email} has already been invited to this case',
-                        'type': 'duplicate',
-                        'invitation_id': str(invitation.id)
-                    },
-                    status=status.HTTP_200_OK
-                )
-    
-    @action(detail=False, methods=['get'])
-    def my_pending_invitations(self, request):
-        """Get pending invitations for current user's email"""
-        invitations = CaseInvitation.objects.filter(
-            invitee_email=request.user.email,
-            status='pending',
-            expires_at__gt=timezone.now()
-        ).order_by('-created_at')
-        serializer = self.get_serializer(invitations, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def accept(self, request, pk=None):
-        """Accept an invitation and grant case access"""
-        invitation = self.get_object()
-        
-        # Verify email matches current user
-        if invitation.invitee_email != request.user.email:
-            return Response(
-                {'error': 'This invitation is not for your account'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Check if not already accepted or expired
-        if invitation.status != 'pending':
-            return Response(
-                {'error': f'Invitation has already been {invitation.status}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if invitation.is_expired():
-            invitation.status = 'expired'
-            invitation.save()
-            return Response(
-                {'error': 'Invitation has expired'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Create case access
-        access, created = CaseAccess.objects.get_or_create(
-            case=invitation.case,
-            user=request.user,
-            defaults={
-                'access_type': invitation.access_type,
-                'granted_by': invitation.invited_by,
-                'accepted': True,
-                'accepted_at': timezone.now()
-            }
-        )
-        
-        # Update invitation status
-        invitation.status = 'accepted'
-        invitation.accepted_at = timezone.now()
-        invitation.accepted_by = request.user
-        invitation.save()
-        
-        return Response(
-            {
-                'status': 'success',
-                'message': f'You now have access to {invitation.case.case_title}',
-                'case_id': str(invitation.case.id),
-                'access_type': invitation.access_type
-            },
-            status=status.HTTP_200_OK
-        )
-    
-    def _send_invitation_email(self, invitation, inviter):
-        """Send invitation email to new user (doesn't have account yet)"""
-        print(f"\n[EMAIL DEBUG] _send_invitation_email() called")
-        print(f"[EMAIL DEBUG] EMAIL_BACKEND: {settings.EMAIL_BACKEND}")
-        print(f"[EMAIL DEBUG] EMAIL_HOST: {settings.EMAIL_HOST}")
-        print(f"[EMAIL DEBUG] EMAIL_HOST_USER: {settings.EMAIL_HOST_USER}")
-        print(f"[EMAIL DEBUG] DEFAULT_FROM_EMAIL: {settings.DEFAULT_FROM_EMAIL}")
-        print(f"[EMAIL DEBUG] FRONTEND_URL: {getattr(settings, 'FRONTEND_URL', 'NOT SET')}")
-        
-        context = {
-            'invitee_name': invitation.invitee_name,
-            'case_title': invitation.case.case_title,
-            'inviter_name': inviter.get_full_name() or inviter.email,
-            'message_body': invitation.message_body,
-            'invitation_code': invitation.invitation_code,
-            'signup_url': f"{getattr(settings, 'FRONTEND_URL', 'caseclosure.org')}/signup?invitation_code={invitation.invitation_code}",
-            'case_id': str(invitation.case.id),
-        }
-        
-        subject = invitation.subject_line
-        
-        try:
-            html_message = render_to_string('emails/case_invitation.html', context)
-            print(f"[EMAIL DEBUG] Template rendered successfully")
-        except Exception as template_error:
-            print(f"[EMAIL DEBUG] Template error (using fallback): {str(template_error)}")
-            html_message = f"""
-            <h2>{subject}</h2>
-            <p>Hi {invitation.invitee_name},</p>
-            <p>{invitation.message_body}</p>
-            <p>To accept this invitation, create an account using this code: {invitation.invitation_code}</p>
-            <p><a href="{context['signup_url']}">Sign Up Here</a></p>
-            """
-        
-        print(f"[EMAIL DEBUG] Attempting send_mail to {invitation.invitee_email}")
-        
-        try:
-            num_sent = send_mail(
-                subject,
-                '',
-                settings.DEFAULT_FROM_EMAIL,
-                [invitation.invitee_email],
-                html_message=html_message,
-                fail_silently=False,
-            )
-            print(f"[EMAIL DEBUG] ✓ send_mail returned: {num_sent}")
-        except Exception as e:
-            print(f"[EMAIL DEBUG] ✗ send_mail failed: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            raise
-    
-    def _send_existing_user_notification(self, user, case, inviter, access_type, subject_line, message_body):
-        """Send notification to existing user about new case access"""
-        print(f"\n[EMAIL DEBUG] _send_existing_user_notification() called")
-        
-        context = {
-            'user_name': user.get_full_name() or user.email,
-            'case_title': case.case_title,
-            'inviter_name': inviter.get_full_name() or inviter.email,
-            'access_type': dict(CaseInvitation.ACCESS_TYPES).get(access_type, access_type),
-            'message_body': message_body,
-            'dashboard_url': f"{getattr(settings, 'FRONTEND_URL', 'https://caseclosure')}/dashboard",
-            'case_id': str(case.id),
-        }
-        
-        try:
-            html_message = render_to_string('emails/case_access_notification.html', context)
-            print(f"[EMAIL DEBUG] Template rendered successfully")
-        except Exception as template_error:
-            print(f"[EMAIL DEBUG] Template error (using fallback): {str(template_error)}")
-            html_message = f"""
-            <h2>{subject_line}</h2>
-            <p>Hi {context['user_name']},</p>
-            <p>{message_body}</p>
-            <p>You now have {context['access_type']} access to: <strong>{case.case_title}</strong></p>
-            <p><a href="{context['dashboard_url']}">View in Dashboard</a></p>
-            """
-        
-        print(f"[EMAIL DEBUG] Attempting send_mail to {user.email}")
-        
-        try:
-            num_sent = send_mail(
-                subject_line,
-                '',
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                html_message=html_message,
-                fail_silently=False,
-            )
-            print(f"[EMAIL DEBUG] ✓ send_mail returned: {num_sent}")
-        except Exception as e:
-            print(f"[EMAIL DEBUG] ✗ send_mail failed: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            raise
