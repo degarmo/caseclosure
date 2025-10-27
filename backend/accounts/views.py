@@ -437,15 +437,20 @@ class RegisterView(generics.CreateAPIView):
                     invitation_message=invitation.message_body,
                     accepted=True,  # Auto-accept since they're signing up
                     accepted_at=timezone.now(),
-                    # LEO permissions: View everything, edit nothing
+                    # Copy permissions from invitation
                     can_view_tips=True,                    # ✅ See all tips/messages
                     can_view_tracking=True,                # ✅ See metrics
                     can_view_personal_info=True,           # ✅ See case details
                     can_view_evidence=True,                # ✅ See photos
                     can_export_data=True,                  # ✅ Export reports
                     can_contact_family=True,               # ✅ Message family
+                    can_edit_case=False,                   # ❌ No editing
+                    can_create_spotlight=False,            # ❌ No spotlight creation
+                    can_upload_evidence=False,             # ❌ No photo uploads
+                    can_invite_users=False,                # ❌ No invitations
+                    can_contact_family=invitation.invitation_type in ['police', 'investigator', 'advocate']
                 )
-                print(f"DEBUG: CaseAccess created - ID: {case_access.id}, access_level: {access_level}")
+                print(f"DEBUG: CaseAccess created - ID: {case_access.id}")
                 
                 # Mark invitation as accepted
                 invitation.status = 'accepted'
