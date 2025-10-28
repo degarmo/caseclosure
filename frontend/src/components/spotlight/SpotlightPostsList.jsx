@@ -13,8 +13,12 @@ export default function SpotlightPostsList({
   title, 
   emptyMessage,
   showScheduledTime = false,
-  loading = false
+  loading = false,
+  user = null  // Add user prop
 }) {
+  // Check if user is LEO
+  const isLEO = user?.account_type === 'leo';
+  
   const getStatusBadge = (status) => {
     const colors = {
       published: 'bg-green-100 text-green-800',
@@ -100,25 +104,28 @@ export default function SpotlightPostsList({
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 ml-4">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => onEdit && onEdit(post)}
-                    disabled={loading}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-red-600 hover:text-red-700"
-                    onClick={() => onDelete(post.id)}
-                    disabled={loading}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                {/* Only show edit/delete buttons if NOT LEO */}
+                {!isLEO && (
+                  <div className="flex items-center gap-2 ml-4">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onEdit && onEdit(post)}
+                      disabled={loading}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => onDelete(post.id)}
+                      disabled={loading}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

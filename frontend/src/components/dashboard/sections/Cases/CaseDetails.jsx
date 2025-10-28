@@ -18,6 +18,22 @@ export default function CaseDetails() {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('basic');
+  const [user, setUser] = useState(null);
+
+  // Get user from localStorage
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error('Error parsing user:', e);
+      }
+    }
+  }, []);
+
+  // Check if user is LEO
+  const isLEO = user?.account_type === 'leo';
 
   useEffect(() => {
     loadCaseData();
@@ -127,13 +143,17 @@ export default function CaseDetails() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate(`/editor/${caseId}`)}
-                className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-2 font-medium"
-              >
-                <Edit className="w-4 h-4" />
-                Customize Template
-              </button>
+              {!isLEO && (
+                <>
+                  <button
+                    onClick={() => navigate(`/editor/${caseId}`)}
+                    className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-2 font-medium"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Customize Template
+                  </button>
+                </>
+              )}
               
               {caseData?.deployment_url && (
                 <a
@@ -147,22 +167,26 @@ export default function CaseDetails() {
                 </a>
               )}
 
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2 font-medium disabled:opacity-50"
-              >
-                {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
+              {!isLEO && (
+                <>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2 font-medium disabled:opacity-50"
+                  >
+                    {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
 
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2 font-medium"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
+                  <button
+                    onClick={handleDelete}
+                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2 font-medium"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -211,11 +235,11 @@ export default function CaseDetails() {
           {/* Content Area */}
           <div className="flex-1">
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
-              {activeTab === 'basic' && <BasicInfoTab caseData={caseData} onChange={handleInputChange} />}
-              {activeTab === 'physical' && <PhysicalDescriptionTab caseData={caseData} onChange={handleInputChange} />}
-              {activeTab === 'incident' && <IncidentDetailsTab caseData={caseData} onChange={handleInputChange} />}
-              {activeTab === 'investigation' && <InvestigationTab caseData={caseData} onChange={handleInputChange} />}
-              {activeTab === 'reward' && <RewardTab caseData={caseData} onChange={handleInputChange} />}
+              {activeTab === 'basic' && <BasicInfoTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
+              {activeTab === 'physical' && <PhysicalDescriptionTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
+              {activeTab === 'incident' && <IncidentDetailsTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
+              {activeTab === 'investigation' && <InvestigationTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
+              {activeTab === 'reward' && <RewardTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
               {activeTab === 'deployment' && <DeploymentTab caseData={caseData} caseId={caseId} onRefresh={loadCaseData} />}
             </div>
           </div>
@@ -226,10 +250,15 @@ export default function CaseDetails() {
 }
 
 // Tab Components
-function BasicInfoTab({ caseData, onChange }) {
+function BasicInfoTab({ caseData, onChange, isReadOnly = false }) {
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white">Basic Information</h2>
+      {isReadOnly && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+          🔒 Read-only mode: You have view access to this case but cannot make changes.
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <FormField
@@ -237,6 +266,7 @@ function BasicInfoTab({ caseData, onChange }) {
           value={caseData?.case_title || ''}
           onChange={(value) => onChange('case_title', value)}
           required
+          disabled={isReadOnly}
         />
 
         <FormField
@@ -244,6 +274,7 @@ function BasicInfoTab({ caseData, onChange }) {
           type="select"
           value={caseData?.case_type || 'missing'}
           onChange={(value) => onChange('case_type', value)}
+          disabled={isReadOnly}
           options={[
             { value: 'missing', label: 'Missing Person' },
             { value: 'homicide', label: 'Homicide' },
@@ -258,12 +289,14 @@ function BasicInfoTab({ caseData, onChange }) {
           value={caseData?.first_name || ''}
           onChange={(value) => onChange('first_name', value)}
           required
+          disabled={isReadOnly}
         />
 
         <FormField
           label="Middle Name"
           value={caseData?.middle_name || ''}
           onChange={(value) => onChange('middle_name', value)}
+          disabled={isReadOnly}
         />
 
         <FormField
@@ -271,12 +304,14 @@ function BasicInfoTab({ caseData, onChange }) {
           value={caseData?.last_name || ''}
           onChange={(value) => onChange('last_name', value)}
           required
+          disabled={isReadOnly}
         />
 
         <FormField
           label="Nickname"
           value={caseData?.nickname || ''}
           onChange={(value) => onChange('nickname', value)}
+          disabled={isReadOnly}
         />
 
         <FormField
@@ -284,6 +319,7 @@ function BasicInfoTab({ caseData, onChange }) {
           type="date"
           value={caseData?.date_of_birth || ''}
           onChange={(value) => onChange('date_of_birth', value)}
+          disabled={isReadOnly}
         />
 
         <FormField
@@ -291,6 +327,7 @@ function BasicInfoTab({ caseData, onChange }) {
           type="date"
           value={caseData?.date_of_death || ''}
           onChange={(value) => onChange('date_of_death', value)}
+          disabled={isReadOnly}
         />
 
         <FormField
@@ -298,12 +335,14 @@ function BasicInfoTab({ caseData, onChange }) {
           type="date"
           value={caseData?.date_missing || ''}
           onChange={(value) => onChange('date_missing', value)}
+          disabled={isReadOnly}
         />
 
         <FormField
           label="Case Number"
           value={caseData?.case_number || ''}
           onChange={(value) => onChange('case_number', value)}
+          disabled={isReadOnly}
         />
       </div>
 
@@ -313,12 +352,13 @@ function BasicInfoTab({ caseData, onChange }) {
         value={caseData?.description || ''}
         onChange={(value) => onChange('description', value)}
         rows={6}
+        disabled={isReadOnly}
       />
     </div>
   );
 }
 
-function PhysicalDescriptionTab({ caseData, onChange }) {
+function PhysicalDescriptionTab({ caseData, onChange, isReadOnly = false }) {
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white">Physical Description</h2>
@@ -396,7 +436,7 @@ function PhysicalDescriptionTab({ caseData, onChange }) {
   );
 }
 
-function IncidentDetailsTab({ caseData, onChange }) {
+function IncidentDetailsTab({ caseData, onChange, isReadOnly = false }) {
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white">Incident Details</h2>
@@ -472,7 +512,7 @@ function IncidentDetailsTab({ caseData, onChange }) {
   );
 }
 
-function InvestigationTab({ caseData, onChange }) {
+function InvestigationTab({ caseData, onChange, isReadOnly = false }) {
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white">Investigation Information</h2>
@@ -510,7 +550,7 @@ function InvestigationTab({ caseData, onChange }) {
   );
 }
 
-function RewardTab({ caseData, onChange }) {
+function RewardTab({ caseData, onChange, isReadOnly = false }) {
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white">Reward Information</h2>

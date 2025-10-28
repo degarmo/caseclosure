@@ -31,11 +31,18 @@ export default function ContentArea({
   
   // Watch for spotlight-create section and open modal
   useEffect(() => {
-    if (activeSection === 'spotlight-create') {
+    // Check if user is LEO
+    const isLEO = user?.account_type === 'leo';
+    
+    // Prevent LEO from creating posts
+    if (activeSection === 'spotlight-create' && !isLEO) {
       setShowSpotlightEditor(true);
       onSectionChange('spotlight-posts');
+    } else if (activeSection === 'spotlight-create' && isLEO) {
+      // LEO tried to create - redirect to posts list
+      onSectionChange('spotlight-posts');
     }
-  }, [activeSection, onSectionChange]);
+  }, [activeSection, onSectionChange, user]);
 
   if (loading) {
     return (
@@ -48,11 +55,19 @@ export default function ContentArea({
   }
 
   const handleEditPost = (post) => {
+    // Prevent LEO from editing
+    if (user?.account_type === 'leo') {
+      return;
+    }
     setEditingPost(post);
     setShowSpotlightEditor(true);
   };
 
   const handleDeletePost = async (postId) => {
+    // Prevent LEO from deleting
+    if (user?.account_type === 'leo') {
+      return;
+    }
     if (window.confirm('Are you sure you want to delete this post?')) {
       try {
         await api.delete(`/spotlight/${postId}/`);
@@ -179,6 +194,7 @@ export default function ContentArea({
             title="All Spotlight Posts"
             emptyMessage="No spotlight posts have been created yet."
             isAdmin={permissions.isAdmin()}
+            user={user}
           />
         );
 
@@ -193,6 +209,7 @@ export default function ContentArea({
             emptyMessage="No scheduled posts."
             showScheduledTime={true}
             isAdmin={permissions.isAdmin()}
+            user={user}
           />
         );
 
