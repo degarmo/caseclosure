@@ -727,9 +727,25 @@ class CaseViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def my_cases(self, request):
-        """Get only the current user's cases."""
+        """Get user's owned cases + cases shared with them via CaseAccess."""
         try:
-            cases = Case.objects.filter(user=request.user).order_by('-created_at')
+            user = request.user
+            
+            # Get cases user owns
+            owned_cases = Case.objects.filter(user=user)
+            
+            # Get cases user has CaseAccess to
+            from cases.models import CaseAccess
+            accessible_case_ids = CaseAccess.objects.filter(
+                user=user,
+                accepted=True
+            ).values_list('case_id', flat=True)
+            
+            # Combine owned + accessible cases
+            cases = Case.objects.filter(
+                Q(user=user) | Q(id__in=accessible_case_ids)
+            ).distinct().order_by('-created_at')
+            
             serializer = self.get_serializer(cases, many=True)
             return Response(serializer.data)
         except Exception as e:
