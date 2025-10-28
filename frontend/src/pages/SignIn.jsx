@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Lock, Mail, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import api from "@/api/axios";
+import api, { authUtils } from "@/api/axios";
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -44,9 +44,8 @@ export default function SignIn() {
 
   const handleOAuthSuccess = async (accessToken, refreshToken) => {
     try {
-      // Store tokens - FIXED: Using consistent naming
-      localStorage.setItem("authToken", accessToken);  // Changed from "access" to "authToken"
-      localStorage.setItem("refreshToken", refreshToken);  // Changed from "refresh" to "refreshToken"
+      // Store tokens using authUtils - stores in ALL token locations
+      authUtils.setTokens(accessToken, refreshToken);
       
       // Get user info
       const userResponse = await api.get("auth/user/", {
@@ -91,9 +90,8 @@ export default function SignIn() {
         headers: { "Content-Type": "application/json" },
       });
 
-      // Store tokens - FIXED: Using consistent naming
-      localStorage.setItem("authToken", response.data.access);  // Changed from "access" to "authToken"
-      localStorage.setItem("refreshToken", response.data.refresh);  // Changed from "refresh" to "refreshToken"
+      // Store tokens using authUtils - stores in ALL token locations
+      authUtils.setTokens(response.data.access, response.data.refresh);
 
       // Store user info
       if (response.data.user) {
@@ -109,7 +107,7 @@ export default function SignIn() {
       }
 
       // Log successful login for debugging
-      console.log("Login successful, token stored as 'authToken'");
+      console.log("Login successful, tokens stored");
 
       // Redirect to dashboard or intended page
       const from = location.state?.from?.pathname || "/dashboard";
