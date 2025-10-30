@@ -151,7 +151,7 @@ const SpotlightEditor = ({
 
         <div className="p-6 space-y-4">
           {/* Case Selector - Show if admin has multiple cases OR no caseId provided */}
-          {cases.length > 0 && (
+          {(cases.length > 1 || (cases.length > 0 && !caseId)) && (
             <div>
               <Label>Select Case *</Label>
               <Select 
