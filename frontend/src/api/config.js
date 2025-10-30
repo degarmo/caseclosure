@@ -1,89 +1,162 @@
-// src/api/config.js
-// API configuration and axios instance setup
+// api/config.js
+import axios from "axios";
 
-import axios from 'axios';
+/**
+ * Check if current route is a preview route that shouldn't trigger auth redirects
+ */
+export const isPreviewRoute = () => {
+  return window.location.pathname.startsWith('/preview/');
+};
 
-// Create axios instance with default config
+/**
+ * Determine the correct API URL based on environment and hostname
+ */
+export const getAPIBaseURL = () => {
+  // Development - uses Vite proxy to /api/
+  if (import.meta.env.DEV) {
+    return "/api/";
+  }
+  
+  // Production - check hostname
+  const hostname = window.location.hostname;
+  
+  // Production domains
+  if (hostname === 'caseclosure-frontend.onrender.com' || 
+      hostname === 'caseclosure.org' ||
+      hostname === 'www.caseclosure.org') {
+    return "https://caseclosure-backend.onrender.com/api/";
+  }
+  
+  // Any non-localhost domain should use production backend
+  if (!hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
+    return "https://caseclosure-backend.onrender.com/api/";
+  }
+  
+  return "/api/";
+};
+
+/**
+ * Get access token from localStorage
+ */
+export const getStoredToken = () => {
+  return localStorage.getItem("access") || 
+         localStorage.getItem("authToken") || 
+         localStorage.getItem("access_token") ||
+         localStorage.getItem("token");
+};
+
+/**
+ * Get refresh token from localStorage
+ */
+export const getStoredRefreshToken = () => {
+  return localStorage.getItem("refresh") || 
+         localStorage.getItem("refreshToken") || 
+         localStorage.getItem("refresh_token");
+};
+
+/**
+ * Store tokens in localStorage
+ */
+export const storeTokens = (accessToken, refreshToken = null) => {
+  if (accessToken) {
+    localStorage.setItem("access", accessToken);
+    localStorage.setItem("authToken", accessToken);
+    localStorage.setItem("access_token", accessToken);
+    localStorage.setItem("token", accessToken);
+  }
+  
+  if (refreshToken) {
+    localStorage.setItem("refresh", refreshToken);
+    localStorage.setItem("refreshToken", refreshToken);
+    localStorage.setItem("refresh_token", refreshToken);
+  }
+};
+
+/**
+ * Clear all auth data from localStorage
+ */
+export const clearAuthData = () => {
+  localStorage.removeItem("access");
+  localStorage.removeItem("refresh");
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+};
+
+/**
+ * Create the main axios instance
+ */
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/',
+  baseURL: getAPIBaseURL(),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
-  }
+  },
 });
 
-// Request interceptor for auth
+/**
+ * Request interceptor - add auth token to every request
+ */
 api.interceptors.request.use(
   (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    // Log requests in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.data);
+    if (!isPreviewRoute()) {
+      const token = getStoredToken();
+      
+      if (token) {
+        config.headers["Authorization"] = `Bearer ${token}`;
+      }
     }
     
     return config;
   },
-  (error) => {
-    console.error('[API] Request error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+/**
+ * Response interceptor - handle 401 and refresh token
+ */
 api.interceptors.response.use(
-  (response) => {
-    // Log responses in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API] Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
-    }
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
     
-    // Handle 401 - try to refresh token
+    // Don't redirect preview routes to login
+    if (isPreviewRoute()) {
+      return Promise.reject(error);
+    }
+    
+    // Handle 401 Unauthorized - try to refresh token
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post(
-            `${api.defaults.baseURL}auth/token/refresh/`,
-            { refresh: refreshToken }
-          );
-          
-          localStorage.setItem('access_token', response.data.access);
-          api.defaults.headers.Authorization = `Bearer ${response.data.access}`;
-          originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
-          
-          return api(originalRequest);
+        const refreshToken = getStoredRefreshToken();
+        
+        if (!refreshToken) {
+          throw new Error("No refresh token available");
         }
+        
+        const refreshResponse = await api.post(
+          '/auth/token/refresh/',
+          { refresh: refreshToken }
+        );
+        
+        const newAccessToken = refreshResponse.data.access;
+        storeTokens(newAccessToken);
+        
+        originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
+        return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, redirect to login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+        if (!isPreviewRoute()) {
+          clearAuthData();
+          window.location.href = "/";
+        }
+        
         return Promise.reject(refreshError);
       }
-    }
-    
-    // Log error details
-    if (error.response) {
-      console.error('[API] Response error:', {
-        status: error.response.status,
-        data: error.response.data,
-        url: error.config?.url
-      });
-    } else if (error.request) {
-      console.error('[API] No response received:', error.request);
-    } else {
-      console.error('[API] Request setup error:', error.message);
     }
     
     return Promise.reject(error);
@@ -91,20 +164,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-
-// Export utility functions
-export const setAuthToken = (token) => {
-  if (token) {
-    api.defaults.headers.Authorization = `Bearer ${token}`;
-    localStorage.setItem('access_token', token);
-  } else {
-    delete api.defaults.headers.Authorization;
-    localStorage.removeItem('access_token');
-  }
-};
-
-export const clearAuth = () => {
-  delete api.defaults.headers.Authorization;
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-};

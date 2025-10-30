@@ -1,5 +1,5 @@
 // frontend/src/utils/auth.js
-import api from '@/api/axios';
+import api from './axios';
 
 // Logout function - can be used anywhere in your app
 export const logout = async (navigate, showMessage = true) => {
