@@ -304,7 +304,14 @@ export default function ContentArea({
             setEditingPost(null);
           }}
           initialData={editingPost}
-          cases={data.cases || []}
+          // Admin: show all cases dropdown
+          // User: pass their caseId only
+          cases={permissions.isAdmin() ? (data.cases || []) : []}
+          caseId={!permissions.isAdmin() && data.userCase?.id ? data.userCase.id : null}
+          caseName={!permissions.isAdmin() && data.userCase ? 
+            (data.userCase.case_title || `${data.userCase.first_name} ${data.userCase.last_name}`) : 
+            null
+          }
         />
       )}
     </>
