@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '@/utils/axios';
 import { MessageSquare, Shield, AlertCircle, CheckCircle, Clock, Archive, Eye, Filter, Search } from 'lucide-react';
 
-export default function ContactMessages({ onRefresh }) {
+export default function ContactMessages({ onRefresh, filterType, caseId }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState({ type: '', status: '', search: '' });
@@ -16,8 +16,10 @@ export default function ContactMessages({ onRefresh }) {
     setLoading(true);
     try {
       const params = {};
-      if (filter.type) params.type = filter.type;
-      if (filter.status) params.status = filter.status;
+        if (filterType) params.type = filterType;
+        if (caseId) params.case_id = caseId;
+        if (filter.type) params.type = filter.type;
+        if (filter.status) params.status = filter.status;
       
       const response = await api.get('/contact/messages', { params });
       setMessages(response.data.data || []);
