@@ -427,24 +427,22 @@ class RegisterView(generics.CreateAPIView):
                 )
                 print(f"DEBUG: UserProfile created: {created}, verified: {profile_verified}")
                 
-                # Create the CaseAccess record
+                # Create the CaseAccess record with only existing fields
                 print(f"DEBUG: Creating CaseAccess for case: {invitation.case.id}")
                 case_access = CaseAccess.objects.create(
                     case=invitation.case,
                     user=user,
                     access_level=access_level,
                     invited_by=invitation.invited_by,
-                    invitation_message=invitation.message_body,
-                    accepted=True,  # Auto-accept since they're signing up
+                    accepted=True,
                     accepted_at=timezone.now(),
-                    # LEO permissions - read-only access
-                    can_view_tips=True,                    # ✅ See all tips/messages
-                    can_view_tracking=True,                # ✅ See metrics
-                    can_view_personal_info=True,           # ✅ See case details
-                    can_view_evidence=True,                # ✅ See photos
-                    can_export_data=True,                  # ✅ Export reports
-                    can_contact_family=True,               # ✅ Message family
-                    read_only=True,                        # ✅ Mark as read-only
+                    # Only include fields that exist on CaseAccess model
+                    can_view_tips=True,
+                    can_view_tracking=True,
+                    can_view_personal_info=True,
+                    can_view_evidence=True,
+                    can_export_data=True,
+                    can_contact_family=True,
                 )
                 print(f"DEBUG: CaseAccess created - ID: {case_access.id}")
                 
