@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Switch } from "../components/ui/switch";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Shield, CheckCircle, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import api from '@/utils/axios';
 
 export default function Contact({ caseData, customizations, isPreview }) {
   const [formData, setFormData] = useState({
@@ -53,29 +54,19 @@ export default function Contact({ caseData, customizations, isPreview }) {
     setError(null);
     
     try {
-      // Direct API call
-      const response = await fetch('/api/contact/tip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          case_id: caseData?.id || caseData?.case_id,
-          submitter_name: formData.is_anonymous ? null : formData.submitter_name,
-          submitter_email: formData.is_anonymous ? null : formData.submitter_email,
-          submitter_phone: formData.is_anonymous ? null : formData.submitter_phone,
-          tip_content: formData.tip_content,
-          is_anonymous: formData.is_anonymous,
-          urgency: formData.urgency,
-          submitted_at: new Date().toISOString(),
-          user_agent: navigator.userAgent,
-        }),
+      // Use API client with proper base URL
+      const response = await api.post('/contact/tip', {
+        case_id: caseData?.id || caseData?.case_id,
+        submitter_name: formData.is_anonymous ? null : formData.submitter_name,
+        submitter_email: formData.is_anonymous ? null : formData.submitter_email,
+        submitter_phone: formData.is_anonymous ? null : formData.submitter_phone,
+        tip_content: formData.tip_content,
+        is_anonymous: formData.is_anonymous,
+        urgency: formData.urgency,
+        submitted_at: new Date().toISOString(),
+        user_agent: navigator.userAgent,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to submit tip');
-      }
-      
       setShowSuccess(true);
       setFormData({
         submitter_name: "",
@@ -90,7 +81,8 @@ export default function Contact({ caseData, customizations, isPreview }) {
       setTimeout(() => setShowSuccess(false), 5000);
       
     } catch (err) {
-      setError(err.message || 'Failed to submit tip. Please try again.');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to submit tip. Please try again.';
+      setError(errorMessage);
       console.error("Error submitting tip:", err);
     } finally {
       setIsSubmitting(false);
