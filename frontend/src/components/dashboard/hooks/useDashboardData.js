@@ -122,7 +122,7 @@ export function useDashboardData(user, permissions, options = {}) {
 
       // Fetch spotlight posts - filter by current user if not admin
       const spotlightParams = {};
-      if (user && !permissions.isAdmin()) {
+      if (user && !permissions.isAdmin() && user.account_type !== 'leo') {
         // Regular users only see their own posts
         spotlightParams.author = user.username;
       }
