@@ -16,19 +16,29 @@ const Spotlight = () => {
   const [selectedPost, setSelectedPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [currentUser, setCurrentUser] = useState(null);
 
   console.log('Spotlight component mounted'); // DEBUG
 
+  // Get current user on mount
+  useEffect(() => {
+    const user = getCurrentUser();
+    setCurrentUser(user);
+  }, []);
+
+  // Check if user is LEO (read-only)
+  const isLEO = currentUser?.account_type === 'leo';
+
   useEffect(() => {
     console.log('useEffect triggered with filter:', filter); // DEBUG
-    fetchPosts();
-  }, [filter]);
+    if (currentUser) {
+      fetchPosts();
+    }
+  }, [filter, currentUser]);
 
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      const currentUser = getCurrentUser();
-      
       console.log('Current user:', currentUser); // DEBUG
       
       if (!currentUser) {
@@ -37,10 +47,14 @@ const Spotlight = () => {
         return;
       }
 
-      // Build params with status filter and author filter
-      const params = {
-        author: currentUser.username, // Filter by current user's username (backend filters by username)
-      };
+      // Build params with status filter
+      const params = {};
+
+      // Only filter by author if NOT a LEO user
+      // LEO users should see all posts for cases they have access to
+      if (currentUser.account_type !== 'leo') {
+        params.author = currentUser.username;
+      }
 
       console.log('Params being sent:', params); // DEBUG
 
@@ -106,12 +120,15 @@ const Spotlight = () => {
             <option value="scheduled">Scheduled</option>
             <option value="draft">Drafts</option>
           </select>
-          <button 
-            className="btn-create-post"
-            onClick={() => setIsCreating(true)}
-          >
-            Create Post
-          </button>
+          {/* Only show Create Post button if NOT LEO */}
+          {!isLEO && (
+            <button 
+              className="btn-create-post"
+              onClick={() => setIsCreating(true)}
+            >
+              Create Post
+            </button>
+          )}
         </div>
       </div>
 
