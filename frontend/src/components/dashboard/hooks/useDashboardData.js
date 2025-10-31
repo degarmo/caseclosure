@@ -120,13 +120,31 @@ export function useDashboardData(user, permissions, options = {}) {
         );
       }
 
-      // Fetch spotlight posts - filter by current user if not admin
+      // Fetch spotlight posts - filter by current user if not admin or LEO
       const spotlightParams = {};
-      if (user && !permissions.isAdmin() && user.account_type !== 'leo') {
+      
+      // DEBUG: Log user and permissions info
+      console.log('Dashboard spotlight fetch - User:', user?.username, 'account_type:', user?.account_type);
+      console.log('Dashboard spotlight fetch - isAdmin:', permissions.isAdmin());
+      console.log('Dashboard spotlight fetch - Role:', permissions.getRole?.());
+      
+      // Check if user should see all posts (admin or LEO)
+      const userRole = permissions.getRole ? permissions.getRole() : null;
+      const isLEOorAdmin = permissions.isAdmin() || 
+                          userRole === 'leo' || 
+                          userRole === 'police' || 
+                          userRole === 'detective' ||
+                          user?.account_type === 'leo';
+      
+      console.log('Dashboard spotlight fetch - isLEOorAdmin:', isLEOorAdmin);
+      
+      if (user && !isLEOorAdmin) {
         // Regular users only see their own posts
         spotlightParams.author = user.username;
+        console.log('Dashboard spotlight fetch - Adding author filter:', user.username);
+      } else {
+        console.log('Dashboard spotlight fetch - NO author filter (admin or LEO)');
       }
-      // Admin users see all posts (no filter)
       
       promises.push(
         api.get('/spotlight/', { params: spotlightParams })
