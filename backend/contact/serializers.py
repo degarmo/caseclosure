@@ -31,8 +31,11 @@ class TipSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'submitted_at', 'created_at', 'updated_at']
     
     def create(self, validated_data):
+        from cases.models import Case
+        
         case_id = validated_data.pop('case_id')
-        validated_data['case_id'] = case_id
+        # Get actual Case object, not just ID
+        validated_data['case'] = Case.objects.get(id=case_id)
         
         # If anonymous, clear personal info
         if validated_data.get('is_anonymous', True):
