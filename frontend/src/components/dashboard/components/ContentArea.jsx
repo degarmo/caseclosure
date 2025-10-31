@@ -113,7 +113,7 @@ export default function ContentArea({
       onRefresh(['spotlight']);
       
     } catch (error) {
-      console.error('Error saving post:', error);
+  
       const errorMessage = error.response?.data?.error || 
                           error.response?.data?.detail || 
                           'Failed to save post';
