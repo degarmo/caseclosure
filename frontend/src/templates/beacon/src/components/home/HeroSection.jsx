@@ -1,5 +1,6 @@
-import React from "react";
-import { Heart, Share2 } from "lucide-react";
+import React, { useState } from "react";
+import { Heart, Share2, Check } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 import { EditableImage } from '@/components/CaseCreator/views/CustomizationView/components/EditableSection';
 
 export default function HeroSection({ 
@@ -12,16 +13,57 @@ export default function HeroSection({
   displayName,
   lastUpdate
 }) {
+  const navigate = useNavigate();
+  const [shareSuccess, setShareSuccess] = useState(false);
+  
+  // Handle Share a Tip button - navigate to contact form
+  const handleShareTip = () => {
+    navigate('/contact');
+  };
+  
+  // Handle Share Story button - use Web Share API or copy link
+  const handleShareStory = async () => {
+    const shareData = {
+      title: `Help Find ${displayName}`,
+      text: `Please help share information about ${displayName}'s case`,
+      url: window.location.href
+    };
+    
+    // Try Web Share API first (mobile friendly)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // User cancelled or error - fall back to copy link
+        if (err.name !== 'AbortError') {
+          copyLinkToClipboard();
+        }
+      }
+    } else {
+      // Fallback: copy link to clipboard
+      copyLinkToClipboard();
+    }
+  };
+  
+  // Copy current URL to clipboard
+  const copyLinkToClipboard = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setShareSuccess(true);
+      setTimeout(() => setShareSuccess(false), 3000);
+    }).catch(err => {
+      console.error('Failed to copy link:', err);
+    });
+  };
   
   const getHeroImage = () => {
   console.log('🖼️ HERO IMAGE DEBUG:', {
-    'customizations?.customizations?.hero_image': customizations?.customizations?.hero_image,
+    'customizations.hero_image': customizations?.hero_image,
     'primaryPhotoUrl': primaryPhotoUrl
   });
   
-  // PRIORITY 1: Check customizations.customizations first (where uploads are saved)
-  if (customizations?.customizations?.hero_image) {
-    return customizations.customizations.hero_image;
+  // PRIORITY 1: Check customizations.hero_image (where uploads are saved)
+  if (customizations?.hero_image) {
+    return customizations.hero_image;
   }
   
   // PRIORITY 2: Check primaryPhotoUrl prop
@@ -176,42 +218,55 @@ export default function HeroSection({
               
               {/* Call to Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-4">
-                <button className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-slate-800 font-semibold rounded-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                <button 
+                  onClick={handleShareTip}
+                  className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-slate-800 font-semibold rounded-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                >
                   <Heart className="w-5 h-5" />
                   Share a Tip
                 </button>
-                <button className="flex items-center justify-center gap-2 px-8 py-3 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white font-semibold rounded-lg hover:bg-white/20 transition-all duration-300">
-                  <Share2 className="w-5 h-5" />
-                  Share Story
+                <button 
+                  onClick={handleShareStory}
+                  className="flex items-center justify-center gap-2 px-8 py-3 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white font-semibold rounded-lg hover:bg-white/20 transition-all duration-300"
+                >
+                  {shareSuccess ? (
+                    <>
+                      <Check className="w-5 h-5" />
+                      Link Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-5 h-5" />
+                      Share Story
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* RIGHT SIDE - Portrait Photo (Smaller with very rounded edges) */}
+            {/* RIGHT SIDE - Portrait Photo (No frame, just rotated image) */}
             <div className="flex justify-center lg:justify-end">
-              <EditableImage
-                sectionId="hero_image"
-                label="Hero Portrait Photo"
-                isEditing={isEditing}
-                onEdit={onEditSection}
-                customizations={customizations?.customizations || {}}
-                defaultImage={getHeroImage()}
-                fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='250' viewBox='0 0 150 250'%3E%3Crect width='150' height='250' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='16' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E"
+              <div 
+                className="shadow-2xl"
+                style={{ 
+                  width: '340px', 
+                  height: '480px', 
+                  borderRadius: '5px',
+                  transform: 'rotate(1deg)',
+                  overflow: 'hidden'
+                }}
               >
-                <div className="relative">
-                  {/* Smaller portrait photo with very rounded corners */}
-                  <div className="w-[150px] h-[250px] rounded-[33px] overflow-hidden shadow-2xl transform transition-all duration-300 hover:scale-105 hover:shadow-3xl bg-white p-3">
-                    <img 
-                      src={getHeroImage()} 
-                      alt={displayName}
-                      className="w-full h-full object-cover rounded-[26px]"
-                    />
-                  </div>
-                  
-                  {/* Decorative frame effect */}
-                  <div className="absolute inset-0 rounded-[33px] border-4 border-white/20 pointer-events-none"></div>
-                </div>
-              </EditableImage>
+                <EditableImage
+                  sectionId="hero_image"
+                  label="Hero Portrait Photo"
+                  isEditing={isEditing}
+                  onEdit={onEditSection}
+                  customizations={customizations || {}}
+                  defaultImage={getHeroImage()}
+                  className="w-full h-full object-cover"
+                  fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='200' viewBox='0 0 120 200'%3E%3Crect width='120' height='200' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='14' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E"
+                />
+              </div>
             </div>
 
           </div>

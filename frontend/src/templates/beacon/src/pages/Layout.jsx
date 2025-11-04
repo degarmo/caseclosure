@@ -2,7 +2,7 @@
 // Complete dynamic layout with CMS integration
 
 import React, { useState } from "react";
-import { Heart, Home, User, Phone, Share2, Mail, Calendar, Clock, Plus } from "lucide-react";
+import { Heart, Home, User, Phone, Share2, Mail, Calendar, Clock, Plus, LogIn } from "lucide-react";
 
 // Predefined logo options - map to your actual logo files
 const LOGO_OPTIONS = {
@@ -223,12 +223,13 @@ export default function Layout({
                   </button>
                 );
               })}
-              <button 
+              <a 
+                href="https://caseclosure.org/login"
                 className="gold-gradient text-slate-800 px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-all duration-200 flex items-center gap-2"
               >
-                <Share2 className="w-4 h-4" />
-                Share
-              </button>
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </a>
             </div>
 
             {/* Mobile Menu Button */}

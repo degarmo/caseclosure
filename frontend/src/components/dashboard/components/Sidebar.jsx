@@ -74,7 +74,9 @@ export default function Sidebar({
           id: 'cases-create',
           label: 'Create Case',
           icon: PlusIcon,
-          show: permissions.can('create_cases') && !permissions.isReadOnly(),
+          show: permissions.can('create_cases') && 
+                !permissions.isReadOnly() && 
+                user?.account_type !== 'leo',  // Hide for LEO users
           action: onOpenCaseModal
         },
         {
@@ -102,7 +104,7 @@ export default function Sidebar({
           id: 'spotlight-create',
           label: 'Create Post',
           icon: PlusIcon,
-          show: !permissions.isReadOnly()
+          show: !permissions.isReadOnly() && user?.account_type !== 'leo'  // Hide for LEO users
         },
         {
           id: 'spotlight-posts',

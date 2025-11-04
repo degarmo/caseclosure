@@ -1,6 +1,6 @@
 // @/templates/beacon/src/pages/Home.jsx
 import React from "react";
-import { MapPin, Calendar, User, AlertCircle, Heart, Share2, Phone, Search } from "lucide-react";
+import { MapPin, Calendar, User, AlertCircle, Heart, Share2 } from "lucide-react";
 import EditableSection, { EditableImage, EditableText } from '@/components/CaseCreator/views/CustomizationView/components/EditableSection';
 import HeroSection from '../components/home/HeroSection';
 
@@ -78,6 +78,7 @@ export default function Home({
         caseData={caseData}
         customizations={customizations}
         isEditing={isEditing}
+        onEditSection={onEditSection}
         onCustomizationChange={onCustomizationChange}
         primaryPhotoUrl={getPrimaryPhotoUrl()}
         displayName={displayName}
@@ -266,17 +267,6 @@ export default function Home({
               )}
             </p>
           </EditableText>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="bg-slate-800 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-slate-700 transition-all transform hover:scale-105 shadow-lg">
-              <Phone className="w-5 h-5 inline mr-2" />
-              Call Tip Line
-            </button>
-            <button className="bg-white text-slate-800 px-8 py-4 rounded-lg font-bold text-lg hover:bg-slate-50 transition-all transform hover:scale-105 shadow-lg">
-              <Search className="w-5 h-5 inline mr-2" />
-              Submit Online Tip
-            </button>
-          </div>
           
           {caseData.reward_amount && parseFloat(caseData.reward_amount) > 0 && (
             <EditableText
