@@ -222,14 +222,9 @@ export default function About({
   };
 
   const getPrimaryPhotoUrl = () => {
-    console.log('📸 About Main Image Debug:', {
-      'customizations?.customizations?.about_main_image': customizations?.customizations?.about_main_image,
-      'all customizations keys': Object.keys(customizations)
-    });
-    
-    // PRIORITY 1: Check template_data.customizations (where uploads are saved)
-    if (customizations?.customizations?.about_main_image) {
-      return customizations.customizations.about_main_image;
+    // PRIORITY 1: Check customizations.about_main_image (where uploads are saved)
+    if (customizations?.about_main_image) {
+      return customizations.about_main_image;
     }
     
     // Then check case data fallbacks...
@@ -351,7 +346,7 @@ export default function About({
                 label="About Main Image"
                 isEditing={isEditing}
                 onEdit={onEditSection}
-                customizations={globalCustomizations}
+                customizations={customizations}
                 className="w-full h-96 lg:h-[500px] object-cover rounded-lg shadow-md"
                 fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='500' viewBox='0 0 400 500'%3E%3Crect width='400' height='500' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='20' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E"
               />
