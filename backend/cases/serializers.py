@@ -427,7 +427,8 @@ class CaseListSerializer(serializers.ModelSerializer):
             'incident_state',  # NEW FIELD
             'full_incident_location',  # NEW COMPUTED FIELD
             'created_at',
-            'updated_at'
+            'updated_at',
+            'template_data'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'primary_photo_url', 'full_incident_location']
     
