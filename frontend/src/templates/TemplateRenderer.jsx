@@ -76,7 +76,9 @@ export default function TemplateRenderer() {
       }
       
       setCaseData(response.data);
-      
+      console.log('📦 API Response template_data:', response.data.template_data);
+      console.log('📦 Full case data:', response.data);
+
       const templateId = response.data.template_id || 'beacon';
       
       let template;
