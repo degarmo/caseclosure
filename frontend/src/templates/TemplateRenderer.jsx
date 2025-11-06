@@ -76,8 +76,6 @@ export default function TemplateRenderer() {
       }
       
       setCaseData(response.data);
-      console.log('📦 API Response template_data:', response.data.template_data);
-      console.log('📦 Full case data:', response.data);
 
       const templateId = response.data.template_id || 'beacon';
       
@@ -177,7 +175,7 @@ export default function TemplateRenderer() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-6">
-            <div className="text-6xl mb-4">📍</div>
+            <div className="text-6xl mb-4">🔍</div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Site Not Found</h1>
             <p className="text-lg text-gray-600">{error || 'This memorial page could not be found.'}</p>
           </div>
@@ -222,7 +220,7 @@ export default function TemplateRenderer() {
   return (
     <Layout 
       caseData={caseData}
-      customizations={caseData.template_data}
+      customizations={caseData.template_data?.customizations || {}}
       isEditing={isEditing}
       onCustomizationChange={handleUpdate}
     >
@@ -235,10 +233,10 @@ export default function TemplateRenderer() {
             components.home ? (
               <components.home 
                 caseData={caseData}
-                customizations={caseData.template_data || {}}
+                customizations={caseData.template_data?.customizations || {}}
                 globalCustomizations={caseData.template_data?.customizations || {}} 
                 isEditing={isEditing}
-                onCustomizationChange={(field, value) => handleUpdate(`pages.home.${field}`, value)}
+                onCustomizationChange={(field, value) => handleUpdate(`customizations.${field}`, value)}
               />
             ) : <div>Home page not found</div>
           } 
@@ -250,15 +248,9 @@ export default function TemplateRenderer() {
             element={
               <components.about 
                 caseData={caseData}
-                customizations={caseData.template_data || {}}
+                customizations={caseData.template_data?.customizations || {}}
                 isEditing={isEditing}
-                onCustomizationChange={(field, value) => {
-                  if (field === 'about_main_image' || field.startsWith('gallery_')) {
-                    handleUpdate(`customizations.${field}`, value);
-                  } else {
-                    handleUpdate(`pages.about.${field}`, value);
-                  }
-                }}
+                onCustomizationChange={(field, value) => handleUpdate(`customizations.${field}`, value)}
               />
             } 
           />
