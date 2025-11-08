@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     'cloudinary_storage',
     'cloudinary',
     'contact',
+    'caseboard',
 ]
 
 # Registration Settings

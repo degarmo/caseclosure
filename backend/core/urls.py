@@ -39,7 +39,7 @@ urlpatterns = [
     path('api/dashboard/', include('dashboard.urls')),
     path('api/', include('spotlight.urls')),  # OLD: Main site spotlight
     path('api/', include('contact.urls')),
-    
+    path('api/caseboard/', include('caseboard.urls')),
     # Django-allauth URLs for Google OAuth
     path('accounts/', include('allauth.urls')),
     
