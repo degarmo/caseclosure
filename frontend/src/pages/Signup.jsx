@@ -41,11 +41,9 @@ export default function Signup() {
   const checkBetaMode = async () => {
     try {
       const response = await api.get('/auth/settings/public/invite-status/');
-      console.log('Beta mode response:', response.data);
       // Use is_invite_only or fall back to can_register logic
       setBetaMode(response.data.is_invite_only === true);
     } catch (error) {
-      console.error('Error checking beta mode:', error);
       // Default to invite-only if API fails
       setBetaMode(true);
     }
@@ -145,7 +143,6 @@ export default function Signup() {
         registrationData.invite_code = formData.invite_code.toUpperCase().trim();
       }
 
-      console.log('Registration data:', registrationData);
 
       const response = await api.post("auth/register/", registrationData, {
         headers: { "Content-Type": "application/json" },
@@ -169,7 +166,6 @@ export default function Signup() {
         
         // NEW: If case invitation signup, redirect to the specific case
         if (response.data.case_id) {
-          console.log('Redirecting to case:', response.data.case_id);
           setTimeout(() => {
             navigate(`/cases/${response.data.case_id}`);
           }, 1500);
@@ -191,7 +187,6 @@ export default function Signup() {
         }, 1500);
       }
     } catch (err) {
-      console.error("Registration error:", err);
       
       if (err.response?.data) {
         const errorData = err.response.data;
@@ -255,7 +250,6 @@ export default function Signup() {
 
   const handleGoogleSignup = () => {
     // TODO: Implement Google OAuth
-    console.log("Google signup clicked");
   };
 
   if (betaMode === null) {

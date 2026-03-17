@@ -36,7 +36,6 @@ export const DashboardProvider = ({ children }) => {
         setConfig(configResponse.data);
         setStats(statsResponse.data);
       } catch (err) {
-        console.error('Dashboard load error:', err);
         setError(err.message || 'Failed to load dashboard');
       } finally {
         setLoading(false);
@@ -52,7 +51,6 @@ export const DashboardProvider = ({ children }) => {
       const response = await dashboardAPI.getModuleData(moduleName, params);
       return response.data;
     } catch (err) {
-      console.error(`Error fetching ${moduleName} data:`, err);
       throw err;
     }
   };

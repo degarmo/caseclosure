@@ -32,7 +32,6 @@ const EditorWrapper = () => {
       try {
         setLoading(true);
         const data = await getCaseById(caseId);
-        console.log('Loaded case data:', data);
         
         setCaseData(data);
         
@@ -46,7 +45,6 @@ const EditorWrapper = () => {
         
         setLoading(false);
       } catch (err) {
-        console.error('Failed to load case:', err);
         setError('Failed to load case data');
         setLoading(false);
       }
@@ -61,7 +59,6 @@ const EditorWrapper = () => {
   };
 
   const handleNext = (data) => {
-    console.log('Moving to next step with data:', data);
     // Handle moving to next step (deployment, preview, etc.)
     navigate('/dashboard');
   };

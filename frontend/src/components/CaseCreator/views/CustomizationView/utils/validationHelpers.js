@@ -578,7 +578,6 @@ export const isDeploymentNeeded = (currentData, lastDeployedData) => {
     try {
       return JSON.stringify(data, Object.keys(data).sort());
     } catch (e) {
-      console.error('Error normalizing data for comparison:', e);
       return '';
     }
   };

@@ -36,7 +36,6 @@ export default function RequestAccount() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Sending data:', formData);
         // ADD EMAIL VALIDATION
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
@@ -63,7 +62,6 @@ export default function RequestAccount() {
       const response = await api.post('/auth/account-request/', formData);
       setSubmitted(true);
         } catch (error) {
-      console.error('Error submitting account request:', error);
       
       if (error.response?.data?.error) {
         const errorMessage = error.response.data.error;

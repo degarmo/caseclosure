@@ -490,8 +490,8 @@ const NavbarCustomizer = ({ isOpen, onClose, customizations, onCustomizationChan
     try {
       const url = await uploadImage(file);
       onCustomizationChange('navbar_logo', url);
-    } catch (error) {
-      console.error('Failed to upload logo:', error);
+    } catch (e) {
+      // silently handled
     } finally {
       setUploadingLogo(false);
     }
@@ -669,16 +669,13 @@ const CustomizationView = ({
       if (caseId) {
         try {
           const response = await api.get(`/cases/${caseId}/`);
-          console.log('=== LOADING CASE DATA ===');
-          console.log('Template data:', response.data?.template_data);
           
           if (response.data?.template_data?.customizations) {
             const loadedCustomizations = response.data.template_data.customizations;
-            console.log('Setting customizations from DB:', Object.keys(loadedCustomizations).length, 'fields');
             setCustomizations(loadedCustomizations);
           }
-        } catch (error) {
-          console.error('Failed to load case data:', error);
+        } catch (e) {
+      // silently handled
         }
       }
     };
@@ -731,7 +728,6 @@ const CustomizationView = ({
         setTemplateComponent(() => WrappedComponent);
         setLoading(false);
       } catch (error) {
-        console.error('Failed to load template:', error);
         setLoading(false);
       }
     };
@@ -740,9 +736,6 @@ const CustomizationView = ({
 
   // Handle customization changes with better logging
   const handleCustomizationChange = useCallback((path, value) => {
-    console.log(`Customization change - Path: ${path}, Type: ${typeof value}, Length: ${
-      typeof value === 'string' ? value.length : 'N/A'
-    }`);
     
     setCustomizations(prev => {
       const updated = {
@@ -755,7 +748,6 @@ const CustomizationView = ({
       const homeCount = Object.keys(updated).filter(k => k.startsWith('hero_')).length;
       const aboutCount = Object.keys(updated).filter(k => k.startsWith('about_')).length;
       
-      console.log(`Total customizations: ${Object.keys(updated).length} (Gallery: ${galleryCount}, Home: ${homeCount}, About: ${aboutCount})`);
       
       return updated;
     });
@@ -765,7 +757,6 @@ const CustomizationView = ({
 
   // Handle edit section
   const handleEditSection = useCallback((sectionData) => {
-    console.log('Edit section clicked:', sectionData);
     
     const currentContent = customizations[sectionData.sectionId] || sectionData.currentValue || '';
     
@@ -788,21 +779,17 @@ const CustomizationView = ({
 
   // Save handlers
   const handleTextSave = useCallback((value, sectionId) => {
-    console.log('Saving text for section:', sectionId);
     handleCustomizationChange(sectionId, value);
     setTextEditor({ isOpen: false, sectionId: '', label: '', value: '' });
   }, [handleCustomizationChange]);
 
   const handleImageSave = useCallback((value, sectionId) => {
-    console.log('Saving image for section:', sectionId, 'URL:', value);
     handleCustomizationChange(sectionId, value);
     setImageSelector({ isOpen: false, sectionId: '', label: '', value: '' });
   }, [handleCustomizationChange]);
 
   // Handle save to database - IMPROVED VERSION
   const handleSave = useCallback(async () => {
-    console.log('=== SAVING ALL CUSTOMIZATIONS ===');
-    console.log('Total customization keys:', Object.keys(customizations).length);
     
     // Clean up null/undefined values before saving
     const cleanedCustomizations = Object.entries(customizations).reduce((acc, [key, value]) => {
@@ -813,14 +800,12 @@ const CustomizationView = ({
       return acc;
     }, {});
     
-    console.log('Cleaned customizations:', Object.keys(cleanedCustomizations).length, 'fields');
     
     // Log breakdown by section
     const galleryCount = Object.keys(cleanedCustomizations).filter(k => k.startsWith('gallery_image_')).length;
     const homeCount = Object.keys(cleanedCustomizations).filter(k => k.startsWith('hero_') || k.startsWith('quick_facts_') || k.startsWith('cta_')).length;
     const aboutCount = Object.keys(cleanedCustomizations).filter(k => k.startsWith('about_')).length;
     
-    console.log(`Saving - Gallery: ${galleryCount}, Home: ${homeCount}, About: ${aboutCount}`);
     
     setSaving(true);
     setSaveError(null);
@@ -831,10 +816,8 @@ const CustomizationView = ({
           customizations: cleanedCustomizations
         };
         
-        console.log('Sending payload to server...');
         const response = await api.post(`/cases/${caseId}/save_customizations/`, payload);
         
-        console.log('Save response:', response.data);
         
         if (response.data.success) {
           // Update local state with cleaned customizations
@@ -844,17 +827,13 @@ const CustomizationView = ({
           setUnsavedChanges(false);
           
           // Verify save
-          console.log('Save successful! Stats:', response.data.stats || {});
           
           setTimeout(() => setSaveStatus(null), 3000);
         }
       } else {
-        console.log('No caseId yet, customizations will be saved on case creation');
         setUnsavedChanges(false);
       }
     } catch (error) {
-      console.error('Error saving customizations:', error);
-      console.error('Error details:', error.response?.data);
       setSaveStatus('error');
       setSaveError(error.response?.data?.error || error.message || 'Failed to save customizations');
       

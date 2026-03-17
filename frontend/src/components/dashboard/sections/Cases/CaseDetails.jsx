@@ -27,7 +27,7 @@ export default function CaseDetails() {
       try {
         setUser(JSON.parse(userStr));
       } catch (e) {
-        console.error('Error parsing user:', e);
+      // silently handled
       }
     }
   }, []);
@@ -46,7 +46,6 @@ export default function CaseDetails() {
       setCaseData(response.data);
       setError(null);
     } catch (err) {
-      console.error('Error loading case:', err);
       setError('Failed to load case data');
     } finally {
       setLoading(false);
@@ -60,7 +59,6 @@ export default function CaseDetails() {
       setSuccessMessage('Case saved successfully!');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
-      console.error('Error saving case:', err);
       setError('Failed to save case');
     } finally {
       setSaving(false);
@@ -83,7 +81,6 @@ export default function CaseDetails() {
       await api.delete(`/cases/${caseId}/`);
       navigate('/dashboard');
     } catch (err) {
-      console.error('Error deleting case:', err);
       setError('Failed to delete case');
     }
   };
@@ -597,7 +594,6 @@ function DeploymentTab({ caseData, caseId, onRefresh }) {
         onRefresh();
       }
     } catch (err) {
-      console.error('Deploy error:', err);
       alert(err.response?.data?.error || 'Deployment failed');
     } finally {
       setDeploying(false);

@@ -45,7 +45,6 @@ const ContactForm = ({
     
     // Honeypot check - if filled, it's a bot
     if (formData.honeypot) {
-      console.warn('Bot detected');
       return;
     }
 

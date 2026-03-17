@@ -40,7 +40,6 @@ const GalleryManager = ({ customizations, onCustomizationChange, isEditing, onEd
 
   // Remove image
   const handleRemoveImage = (indexToRemove) => {
-    console.log(`Removing gallery image at index ${indexToRemove}`);
     
     // Build new customizations object with shifted images
     const updatedCustomizations = {};
@@ -77,7 +76,6 @@ const GalleryManager = ({ customizations, onCustomizationChange, isEditing, onEd
       }
     }
     
-    console.log(`Gallery updated: ${newIndex} images remaining`);
   };
 
   // Update caption

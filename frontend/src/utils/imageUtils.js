@@ -1,4 +1,5 @@
 // @/utils/imageUtils.js
+import { getAPIBaseURL } from '@/api/config';
 
 /**
  * Get a safe image URL with fallback
@@ -11,19 +12,19 @@ export const getSafeImageUrl = (url, type = 'default') => {
   if (!url) {
     return getPlaceholderImage(type);
   }
-  
+
   // Check if it's a valid URL
   if (isValidImageUrl(url)) {
     return url;
   }
-  
+
   // Check if it's a relative path that needs base URL
   if (url.startsWith('/')) {
     // Assuming your images are served from your Django backend
-    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    const baseUrl = getAPIBaseURL().replace(/\/api\/?$/, '');
     return `${baseUrl}${url}`;
   }
-  
+
   // Return placeholder for invalid URLs
   return getPlaceholderImage(type);
 };

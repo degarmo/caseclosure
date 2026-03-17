@@ -56,7 +56,6 @@ export default function ProfileSettings({ user, currentCase, onClose }) {
       setProfile(response.data);
     } catch (err) {
       setError('Failed to load profile');
-      console.error('Profile fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -67,7 +66,6 @@ export default function ProfileSettings({ user, currentCase, onClose }) {
       const response = await api.get(`/cases/${currentCase.id}/members/`);
       setFamilyMembers(response.data || []);
     } catch (err) {
-      console.error('Failed to load family members:', err);
       setFamilyMembers([]);
     }
   };
@@ -97,7 +95,6 @@ export default function ProfileSettings({ user, currentCase, onClose }) {
       
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update profile');
-      console.error('Profile update error:', err);
     } finally {
       setSaving(false);
     }

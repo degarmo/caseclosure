@@ -16,10 +16,8 @@ export default function Spotlight() {
     setError(null);
     try {
       const response = await apiMethods.spotlight.list({ status: 'published' });
-      console.log('Posts loaded:', response.data);
       setPosts(response.data);
     } catch (error) {
-      console.error('Error loading posts:', error);
       setError(error.response?.data?.detail || error.message);
       setPosts([]);
     } finally {

@@ -38,8 +38,8 @@ export default function Timeline() {
     try {
       const data = await TimelineEvent.list("-date");
       setEvents(data);
-    } catch (error) {
-      console.error("Error loading timeline events:", error);
+    } catch (e) {
+      // silently handled
     }
     setLoading(false);
   };

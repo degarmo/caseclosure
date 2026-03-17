@@ -53,7 +53,6 @@ export default function AdminRequestsManager() {
       setRequests(response.data);
     } catch (err) {
       setError('Failed to load requests');
-      console.error(err);
     }
     setLoading(false);
   };
@@ -97,7 +96,6 @@ export default function AdminRequestsManager() {
       setTimeout(() => setMessage(''), 5000);
     } catch (err) {
       setError('Failed to approve request: ' + (err.response?.data?.error || err.message));
-      console.error(err);
     }
     setProcessingId(null);
   };
@@ -127,7 +125,6 @@ export default function AdminRequestsManager() {
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setError('Failed to reject request');
-      console.error(err);
     }
     setProcessingId(null);
   };

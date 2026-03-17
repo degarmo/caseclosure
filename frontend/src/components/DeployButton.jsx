@@ -17,8 +17,8 @@ const DeployButton = ({ caseId, caseData }) => {
     try {
       const status = await getCaseDeploymentStatus(caseId);
       setDeploymentStatus(status);
-    } catch (error) {
-      console.error('Error fetching deployment status:', error);
+    } catch (e) {
+      // silently handled
     } finally {
       setLoading(false);
     }

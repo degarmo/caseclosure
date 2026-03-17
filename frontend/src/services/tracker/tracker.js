@@ -1,19 +1,20 @@
 /**
  * Case Tracking System - Frontend Tracker
  * Location: frontend/src/services/tracker/tracker.js
- * 
+ *
  * This is the main tracking service that monitors user behavior
  * and sends data to the Django backend
  */
 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import { v4 as uuidv4 } from 'uuid';
+import { getAPIBaseURL } from '@/api/config';
 
 class CaseTracker {
   constructor(config = {}) {
     // Configuration
     this.config = {
-      apiEndpoint: config.apiEndpoint || import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+      apiEndpoint: config.apiEndpoint || getAPIBaseURL(),
       trackingEndpoint: config.trackingEndpoint || '/track',
       batchEndpoint: config.batchEndpoint || '/track/batch',
       sessionCookieName: config.sessionCookieName || 'tracking_session_id',

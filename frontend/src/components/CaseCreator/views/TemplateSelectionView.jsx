@@ -41,9 +41,7 @@ const TemplateSelectionView = ({
       }
       setLoading(false);
     } catch (err) {
-      console.error('Failed to fetch templates:', err);
       // Use fallback templates instead of showing error
-      console.log('Using fallback templates');
       setTemplates(fallbackTemplates);
       setLoading(false);
       // Don't set error, just use fallbacks

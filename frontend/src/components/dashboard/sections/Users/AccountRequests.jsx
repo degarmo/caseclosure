@@ -39,7 +39,6 @@ export default function AccountRequests({ requests = [], onRefresh }) {
       const response = await api.get(endpoint);
       setAllRequests(response.data);
     } catch (err) {
-      console.error('Error fetching requests:', err);
       setError('Failed to load requests');
     }
     setLoading(false);
@@ -79,7 +78,6 @@ export default function AccountRequests({ requests = [], onRefresh }) {
       setTimeout(() => setMessage(''), 5000);
     } catch (err) {
       setError('Failed to approve request');
-      console.error(err);
     }
     setProcessingId(null);
   };
@@ -106,7 +104,6 @@ export default function AccountRequests({ requests = [], onRefresh }) {
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setError('Failed to reject request');
-      console.error(err);
     }
     setProcessingId(null);
   };

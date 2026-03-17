@@ -91,7 +91,6 @@ export default function CasesList({
       await api.patch(`/cases/${caseId}/`, { is_disabled: !isDisabled });
       if (onRefresh) onRefresh();
     } catch (error) {
-      console.error('Error toggling case status:', error);
       alert('Failed to update case status');
     }
     setLoading(false);
@@ -108,7 +107,6 @@ export default function CasesList({
       await api.delete(`/cases/${caseId}/`);
       if (onRefresh) onRefresh();
     } catch (error) {
-      console.error('Error deleting case:', error);
       alert('Failed to delete case');
     }
     setLoading(false);
@@ -142,7 +140,6 @@ export default function CasesList({
       setSelectedCases([]);
       if (onRefresh) onRefresh();
     } catch (error) {
-      console.error('Error performing bulk action:', error);
       alert('Some operations failed');
     }
     setLoading(false);

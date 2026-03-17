@@ -60,7 +60,6 @@ export function useDashboardData(user, permissions, options = {}) {
               results.cases = Array.isArray(res.data) ? res.data : (res.data?.results || []);
             })
             .catch(err => {
-              console.error('Error fetching cases:', err);
               results.cases = [];
             })
         );
@@ -72,7 +71,6 @@ export function useDashboardData(user, permissions, options = {}) {
               results.userCase = res.data?.[0] || null;
             })
             .catch(err => {
-              console.error('Error fetching user cases:', err);
               results.cases = [];
             })
         );
@@ -86,7 +84,6 @@ export function useDashboardData(user, permissions, options = {}) {
               results.messages = res.data?.data || res.data || [];
             })
             .catch(err => {
-              console.error('Error fetching messages:', err);
               results.messages = [];
             })
         );
@@ -100,7 +97,6 @@ export function useDashboardData(user, permissions, options = {}) {
               results.pendingRequests = res.data || [];
             })
             .catch(err => {
-              console.error('Error fetching account requests:', err);
               results.pendingRequests = [];
             })
         );
@@ -114,7 +110,6 @@ export function useDashboardData(user, permissions, options = {}) {
               results.users = Array.isArray(res.data) ? res.data : (res.data?.results || []);
             })
             .catch(err => {
-              console.error('Error fetching users:', err);
               results.users = [];
             })
         );
@@ -124,9 +119,6 @@ export function useDashboardData(user, permissions, options = {}) {
       const spotlightParams = {};
       
       // DEBUG: Log user and permissions info
-      console.log('Dashboard spotlight fetch - User:', user?.username, 'account_type:', user?.account_type);
-      console.log('Dashboard spotlight fetch - isAdmin:', permissions.isAdmin());
-      console.log('Dashboard spotlight fetch - Role:', permissions.getRole?.());
       
       // Check if user should see all posts (admin or LEO)
       const userRole = permissions.getRole ? permissions.getRole() : null;
@@ -136,14 +128,11 @@ export function useDashboardData(user, permissions, options = {}) {
                           userRole === 'detective' ||
                           user?.account_type === 'leo';
       
-      console.log('Dashboard spotlight fetch - isLEOorAdmin:', isLEOorAdmin);
       
       if (user && !isLEOorAdmin) {
         // Regular users only see their own posts
         spotlightParams.author = user.username;
-        console.log('Dashboard spotlight fetch - Adding author filter:', user.username);
       } else {
-        console.log('Dashboard spotlight fetch - NO author filter (admin or LEO)');
       }
       
       promises.push(
@@ -152,7 +141,6 @@ export function useDashboardData(user, permissions, options = {}) {
             results.spotlightPosts = res.data || [];
           })
           .catch(err => {
-            console.error('Error fetching spotlight posts:', err);
             results.spotlightPosts = [];
           })
       );
@@ -224,7 +212,6 @@ export function useDashboardData(user, permissions, options = {}) {
       setData(results);
       setError(null);
     } catch (err) {
-      console.error('Dashboard data fetch error:', err);
       setError(err.message);
     } finally {
       if (!silent) setLoading(false);

@@ -62,8 +62,8 @@ const DeploymentModal = ({
       await navigator.clipboard.writeText(deploymentUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch (e) {
+      // silently handled
     }
   };
 

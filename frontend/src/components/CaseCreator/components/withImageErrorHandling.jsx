@@ -55,7 +55,7 @@ const withImageErrorHandling = (WrappedComponent) => {
           img.src = placeholders[placeholderType];
           
           // Log in development only
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.debug(`Image failed to load, using ${placeholderType} placeholder`);
           }
         }

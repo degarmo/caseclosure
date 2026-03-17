@@ -144,7 +144,6 @@ export default function CaseCreator({
       setInitialDataLoaded(true);
       
     } catch (error) {
-      console.error('Error loading case data:', error);
       const errorMessage = parseAPIError(error);
       setApiError(`Failed to load case data: ${errorMessage}`);
       
@@ -232,7 +231,6 @@ export default function CaseCreator({
       }
       setTemplateComponents(components);
     } catch (error) {
-      console.error('Failed to load template components:', error);
       setApiError('Failed to load template preview');
     } finally {
       setPreviewLoading(false);
@@ -348,37 +346,26 @@ export default function CaseCreator({
   
   // Handle view navigation - Navigate to editor
   const handleViewChange = async (view) => {
-    console.log('handleViewChange called:', { 
-      from: activeView, 
-      to: view, 
-      mode, 
-      caseId,
-      editCaseId 
-    });
     
     // Validate form before leaving it
     if (activeView === 'form' && view !== 'form') {
       if (!validateSection()) {
-        console.log('Form validation failed');
         return;
       }
     }
     
     // EDIT MODE: Skip template selection and go straight to editor
     if (mode === 'edit' && activeView === 'form' && view === 'template') {
-      console.log('Edit mode - skipping template selection, going to editor');
       setSaving(true);
       setApiError('');
       
       try {
         // Save the updated case data
         const result = await saveCase();
-        console.log('Save result:', result);
         
         const finalCaseId = result?.id || caseId || editCaseId;
         
         if (finalCaseId) {
-          console.log('Navigating to editor with ID:', finalCaseId);
           // Navigate directly to the website editor
           window.location.href = `/editor/${finalCaseId}`;
           // Don't call onClose here - let the navigation happen
@@ -387,7 +374,6 @@ export default function CaseCreator({
           setSaving(false);
         }
       } catch (error) {
-        console.error('Error saving changes:', error);
         setApiError(`Failed to save changes: ${error.message}`);
         setSaving(false);
       }
@@ -396,36 +382,28 @@ export default function CaseCreator({
     
     // CREATE MODE: Moving from template selection to customize
     if (mode === 'create' && activeView === 'template' && view === 'customize') {
-      console.log('Moving from template to customize');
       
       // Make sure we have a template selected
       if (!selectedTemplate) {
-        console.log('No template selected');
         setApiError('Please select a template first');
         return;
       }
       
-      console.log('Selected template:', selectedTemplate);
       setSaving(true);
       setApiError('');
       
       try {
-        console.log('Calling saveCase...');
         const result = await saveCase();
-        console.log('Save result:', result);
         
         if (result?.id) {
-          console.log('Navigating to editor with ID:', result.id);
           // Navigate to the editor route
           window.location.href = `/editor/${result.id}`;
           // Don't call onClose here - let the navigation happen
         } else {
-          console.log('Save failed - no ID in result');
           setApiError('Failed to save case. Please try again.');
           setSaving(false);
         }
       } catch (error) {
-        console.error('Error in handleViewChange:', error);
         setApiError(`Failed to save case: ${error.message}`);
         setSaving(false);
       }

@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   resolve: {
     alias: {
@@ -26,10 +26,22 @@ export default defineConfig({
         secure: false
       }
     },
-    // Add this to bypass host check
-    middlewareMode: false,
-    fs: {
-      strict: false
-    }
   },
-})
+  build: {
+    outDir: 'dist',
+    sourcemap: mode !== 'production',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['lucide-react', '@headlessui/react'],
+          charts: ['recharts'],
+          editor: [
+            '@tiptap/react',
+            '@tiptap/starter-kit',
+          ],
+        },
+      },
+    },
+  },
+}))

@@ -100,8 +100,8 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
           if (availableSubdomains.length >= 3) {
             break;
           }
-        } catch (error) {
-          console.error('Error checking subdomain availability:', error);
+        } catch (e) {
+      // silently handled
         }
       }
     }
@@ -118,8 +118,8 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
             label: 'Alternative'
           });
         }
-      } catch (error) {
-        console.error('Error checking numbered subdomain:', error);
+      } catch (e) {
+      // silently handled
       }
       counter++;
     }
@@ -275,7 +275,6 @@ const DeploymentModal = ({ caseId, caseData, currentDeployment, onClose, onDeplo
           setStep(2);
         }
       } catch (error) {
-        console.error('Error polling deployment status:', error);
         pollAttempts += 5;
         
         if (pollAttempts >= maxPollAttempts) {

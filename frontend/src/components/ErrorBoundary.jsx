@@ -43,7 +43,7 @@ class ErrorBoundary extends React.Component {
             <p className="text-sm text-gray-600 text-center mb-4">
               {this.props.message || 'An error occurred while loading this content.'}
             </p>
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <details className="mt-4 p-4 bg-gray-50 rounded text-xs">
                 <summary className="cursor-pointer text-gray-700 font-medium">
                   Error details (development only)

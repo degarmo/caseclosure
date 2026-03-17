@@ -60,7 +60,6 @@ class DashboardService {
       
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching dashboard:', error);
       throw error;
     }
   }
@@ -79,7 +78,6 @@ class DashboardService {
       );
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching visitor metrics:', error);
       throw error;
     }
   }
@@ -98,7 +96,6 @@ class DashboardService {
       );
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching suspicious activity:', error);
       throw error;
     }
   }
@@ -117,7 +114,6 @@ class DashboardService {
       );
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching geographic map:', error);
       throw error;
     }
   }
@@ -136,7 +132,6 @@ class DashboardService {
       );
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching activity timeline:', error);
       throw error;
     }
   }
@@ -155,7 +150,6 @@ class DashboardService {
       );
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching engagement metrics:', error);
       throw error;
     }
   }
@@ -174,7 +168,6 @@ class DashboardService {
       );
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching alerts:', error);
       throw error;
     }
   }
@@ -193,7 +186,6 @@ class DashboardService {
       );
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching realtime activity:', error);
       throw error;
     }
   }
@@ -212,7 +204,6 @@ class DashboardService {
       );
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Error fetching realtime metrics:', error);
       throw error;
     }
   }
@@ -228,8 +219,8 @@ class DashboardService {
       try {
         const metrics = await this.fetchRealtimeMetrics(caseSlug);
         callback(metrics);
-      } catch (error) {
-        console.error('Polling error:', error);
+      } catch (e) {
+      // silently handled
       }
     };
 
@@ -292,7 +283,6 @@ class DashboardService {
         alerts
       };
     } catch (error) {
-      console.error('Error fetching all widgets:', error);
       throw error;
     }
   }

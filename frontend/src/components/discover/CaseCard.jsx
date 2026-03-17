@@ -8,10 +8,6 @@ const CaseCard = ({ caseData }) => {
   
   // Debug: Log the case data to see what we're working with
   React.useEffect(() => {
-    console.log('CaseCard received data:', caseData);
-    console.log('Photos array:', caseData.photos);
-    console.log('Primary photo URL:', caseData.primary_photo_url);
-    console.log('Victim photo URL:', caseData.victim_photo_url);
   }, [caseData]);
   
   // Format the location string

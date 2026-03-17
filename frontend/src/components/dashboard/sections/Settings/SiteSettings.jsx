@@ -28,8 +28,6 @@ export default function SiteSettings({ onRefresh }) {
         require_invite_code: response.data.invite_only_mode || response.data.beta_mode_enabled || false
       });
     } catch (error) {
-      console.error('Error fetching settings:', error);
-      console.error('Full error response:', error.response);
       setSettings({
         beta_mode_enabled: true,
         require_invite_code: true
@@ -70,8 +68,6 @@ export default function SiteSettings({ onRefresh }) {
       
       if (onRefresh) onRefresh();
     } catch (error) {
-      console.error('Error updating settings:', error);
-      console.error('Full error response:', error.response);
       
       let errorText = 'Failed to update settings';
       if (error.response?.status === 403) {

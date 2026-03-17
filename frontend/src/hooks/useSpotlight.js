@@ -79,7 +79,6 @@ export function useSpotlight(options = {}) {
       
       return allPosts;
     } catch (err) {
-      console.error('Error fetching spotlight posts:', err);
       setError(err.response?.data?.detail || err.message);
       return [];
     } finally {
@@ -138,7 +137,6 @@ export function useSpotlight(options = {}) {
       
       return { success: true, data: response.data };
     } catch (err) {
-      console.error('Error creating spotlight post:', err);
       const errorMessage = err.response?.data?.detail || 
                           err.response?.data?.error ||
                           Object.values(err.response?.data || {}).flat().join(', ') ||
@@ -178,7 +176,6 @@ export function useSpotlight(options = {}) {
       
       return { success: true, data: response.data };
     } catch (err) {
-      console.error('Error updating spotlight post:', err);
       const errorMessage = err.response?.data?.detail || err.message;
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -199,7 +196,6 @@ export function useSpotlight(options = {}) {
       await fetchPosts();
       return { success: true };
     } catch (err) {
-      console.error('Error deleting spotlight post:', err);
       const errorMessage = err.response?.data?.detail || err.message;
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -214,8 +210,8 @@ export function useSpotlight(options = {}) {
   const incrementViewCount = useCallback(async (postId) => {
     try {
       await api.post(`/spotlight/${postId}/increment_view/`);
-    } catch (err) {
-      console.error('Error incrementing view count:', err);
+    } catch (e) {
+      // silently handled
     }
   }, []);
 

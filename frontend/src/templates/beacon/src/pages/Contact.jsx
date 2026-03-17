@@ -39,7 +39,6 @@ export default function Contact({ caseData, customizations, isPreview }) {
     
     // Honeypot spam protection
     if (formData.honeypot) {
-      console.warn('Bot detected via honeypot');
       return;
     }
     
@@ -83,7 +82,6 @@ export default function Contact({ caseData, customizations, isPreview }) {
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to submit tip. Please try again.';
       setError(errorMessage);
-      console.error("Error submitting tip:", err);
     } finally {
       setIsSubmitting(false);
     }

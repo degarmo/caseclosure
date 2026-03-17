@@ -25,11 +25,9 @@ const TemplatePreview = memo(({
 
   // Track mount/unmount - should only happen once
   useEffect(() => {
-    console.log('TemplatePreview mounted');
     mountedRef.current = true;
     
     return () => {
-      console.log('TemplatePreview unmounting');
       mountedRef.current = false;
     };
   }, []); // Empty dependency array - only run once
@@ -43,7 +41,6 @@ const TemplatePreview = memo(({
       return false;
     }
     
-    console.error('Template preview error:', event);
     if (mountedRef.current) {
       setHasError(true);
       setErrorMessage(event.message || 'An error occurred in the preview');

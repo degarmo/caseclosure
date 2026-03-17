@@ -63,7 +63,6 @@ const Footer = ({
     if (typeof onNavigate === 'function') {
       onNavigate('customize');
     } else {
-      console.error('onNavigate is not a function:', onNavigate);
     }
   };
   

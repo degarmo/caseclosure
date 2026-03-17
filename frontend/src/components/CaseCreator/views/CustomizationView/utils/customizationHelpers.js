@@ -66,7 +66,6 @@ export const hasUnsavedChanges = (current, saved) => {
   try {
     return JSON.stringify(current) !== JSON.stringify(saved);
   } catch (error) {
-    console.error('Error comparing customizations:', error);
     return false;
   }
 };
@@ -208,7 +207,6 @@ export const getCustomizationValue = (customizations, path, defaultValue = null)
     
     return current;
   } catch (error) {
-    console.error('Error getting customization value:', error);
     return defaultValue;
   }
 };

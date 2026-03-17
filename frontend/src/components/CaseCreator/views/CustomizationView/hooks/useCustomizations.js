@@ -81,7 +81,6 @@ export const useCustomizations = (initialData, templateId = 'beacon', onAutoSave
 
   // Handle customization change with history
   const handleCustomizationChange = useCallback((path, value) => {
-    console.log('Customization change:', path, '=', value);
 
     setCustomizations(prev => {
       const updated = updateCustomization(prev, path, value);

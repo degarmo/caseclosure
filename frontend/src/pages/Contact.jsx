@@ -38,7 +38,6 @@ export default function Contact() {
     
     // Honeypot spam protection
     if (formData.honeypot) {
-      console.warn('Bot detected via honeypot');
       return;
     }
 
@@ -60,7 +59,6 @@ export default function Contact() {
       });
     } catch (err) {
       setError(err.message || 'Failed to submit inquiry. Please try again.');
-      console.error('Error submitting form:', err);
     } finally {
       setIsSubmitting(false);
     }

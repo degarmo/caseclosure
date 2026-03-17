@@ -10,7 +10,6 @@ import ENV from "@/config/environment";
 export const submitContactInquiry = async (data) => {
   try {
     if (ENV.enableDebugLogging) {
-      console.log('[DEV] Contact inquiry submission:', data);
     }
 
     const response = await api.post('/contact/inquiry', {
@@ -25,12 +24,10 @@ export const submitContactInquiry = async (data) => {
     });
 
     if (ENV.enableDebugLogging) {
-      console.log('[DEV] Contact inquiry response:', response.data);
     }
 
     return response.data;
   } catch (error) {
-    console.error('Error submitting contact inquiry:', error);
     throw new Error(
       error.response?.data?.message || 
       'Failed to submit inquiry. Please try again.'
@@ -47,7 +44,6 @@ export const submitContactInquiry = async (data) => {
 export const submitTip = async (data, caseId) => {
   try {
     if (ENV.enableDebugLogging) {
-      console.log('[DEV] Tip submission:', { data, caseId });
     }
 
     const response = await api.post('/contact/tip', {
@@ -62,12 +58,10 @@ export const submitTip = async (data, caseId) => {
     });
 
     if (ENV.enableDebugLogging) {
-      console.log('[DEV] Tip response:', response.data);
     }
 
     return response.data;
   } catch (error) {
-    console.error('Error submitting tip:', error);
     throw new Error(
       error.response?.data?.message || 
       'Failed to submit tip. Please try again.'
@@ -94,7 +88,6 @@ export const getContactMessages = async (filters = {}) => {
 
     return response.data;
   } catch (error) {
-    console.error('Error fetching contact messages:', error);
     throw error;
   }
 };
@@ -113,7 +106,6 @@ export const updateMessageStatus = async (messageId, status) => {
 
     return response.data;
   } catch (error) {
-    console.error('Error updating message status:', error);
     throw error;
   }
 };

@@ -59,7 +59,6 @@ export default function SignIn() {
       const from = location.state?.from?.pathname || "/dashboard";
       navigate(from, { replace: true });
     } catch (err) {
-      console.error("OAuth success handler error:", err);
       setError("Authentication successful but failed to load user data.");
     }
   };
@@ -107,14 +106,12 @@ export default function SignIn() {
       }
 
       // Log successful login for debugging
-      console.log("Login successful, tokens stored");
 
       // Redirect to dashboard or intended page
       const from = location.state?.from?.pathname || "/dashboard";
       navigate(from, { replace: true });
       
     } catch (err) {
-      console.error("Login error:", err);
       
       // Handle different error types
       if (err.response?.status === 401) {

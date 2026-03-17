@@ -77,7 +77,6 @@ export const useSaveHandler = (caseId, customizations, caseData, options = {}) =
 
     // Prevent multiple simultaneous saves
     if (isSaving) {
-      console.log('Save already in progress');
       return { success: false, error: 'Save already in progress' };
     }
 
@@ -98,7 +97,6 @@ export const useSaveHandler = (caseId, customizations, caseData, options = {}) =
         }
       }
 
-      console.log('Saving customizations:', customizations);
 
       // Save customizations
       let response;
@@ -126,11 +124,9 @@ export const useSaveHandler = (caseId, customizations, caseData, options = {}) =
         onSaveSuccess(response);
       }
 
-      console.log('Save successful:', response);
       return { success: true, data: response };
 
     } catch (error) {
-      console.error('Save failed:', error);
       
       setSaveStatus(SAVE_STATUS.ERROR);
       setSaveError(error.message || 'Failed to save customizations');
@@ -164,7 +160,6 @@ export const useSaveHandler = (caseId, customizations, caseData, options = {}) =
 
     // Check if deployment is needed
     if (!force && !isDeploymentNeeded({ customizations, caseData }, null)) {
-      console.log('No changes to deploy');
       return { success: false, error: 'No changes to deploy' };
     }
 
@@ -224,7 +219,6 @@ export const useSaveHandler = (caseId, customizations, caseData, options = {}) =
       // Prepare deployment config
       const deploymentConfig = formatDeploymentConfig(caseData, customizations);
       
-      console.log('Deploying with config:', deploymentConfig);
 
       // Deploy with retry logic if enabled
       let deployResult;
@@ -292,7 +286,6 @@ export const useSaveHandler = (caseId, customizations, caseData, options = {}) =
       };
 
     } catch (error) {
-      console.error('Deployment failed:', error);
       
       const formattedError = formatDeploymentError(error);
       setDeploymentStatus(DEPLOYMENT_STATUS.FAILED);

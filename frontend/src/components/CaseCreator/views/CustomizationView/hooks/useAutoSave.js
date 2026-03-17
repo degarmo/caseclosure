@@ -93,7 +93,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
       
       return oldStr !== newStr;
     } catch (error) {
-      console.error('[useAutoSave] Error comparing data:', error);
       // If comparison fails, assume data has changed to be safe
       return true;
     }
@@ -105,13 +104,11 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
   const performSave = useCallback(async () => {
     // Prevent concurrent saves
     if (saveInProgressRef.current || !isMountedRef.current) {
-      console.log('[useAutoSave] Skipping save - already in progress or unmounted');
       return false;
     }
 
     // Check if data has actually changed
     if (!hasDataChanged(lastSavedDataRef.current, dataRef.current)) {
-      console.log('[useAutoSave] Skipping save - no changes detected');
       setHasUnsavedChanges(false);
       return false;
     }
@@ -120,7 +117,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
     if (validateBeforeSave) {
       const validation = validateBeforeSave(dataRef.current);
       if (validation && !validation.valid) {
-        console.log('[useAutoSave] Skipping save - validation failed:', validation.errors);
         setAutoSaveError('Validation failed: ' + validation.errors.join(', '));
         return false;
       }
@@ -131,7 +127,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
     setAutoSaveError(null);
 
     try {
-      console.log('[useAutoSave] Saving data...');
       
       // Call the save function with current data
       await saveFunctionRef.current(dataRef.current);
@@ -144,7 +139,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
         setHasUnsavedChanges(false);
         retryCountRef.current = 0;
         
-        console.log('[useAutoSave] Save successful');
         
         if (onSuccess) {
           onSuccess(dataRef.current);
@@ -153,7 +147,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
       
       return true;
     } catch (error) {
-      console.error('[useAutoSave] Save failed:', error);
       
       if (isMountedRef.current) {
         setAutoSaveError(error.message || 'Save failed');
@@ -161,7 +154,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
         // Retry logic
         if (retryCountRef.current < maxRetries) {
           retryCountRef.current++;
-          console.log(`[useAutoSave] Retrying save (${retryCountRef.current}/${maxRetries})...`);
           
           // Exponential backoff for retries
           setTimeout(() => {
@@ -170,7 +162,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
             }
           }, Math.min(1000 * Math.pow(2, retryCountRef.current), 10000));
         } else {
-          console.error('[useAutoSave] Max retries reached, giving up');
           if (onError) {
             onError(error);
           }
@@ -318,7 +309,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
    * Manual trigger for auto-save
    */
   const triggerAutoSave = useCallback(async () => {
-    console.log('[useAutoSave] Manual save triggered');
     const saved = await performSave();
     if (saved) {
       scheduleNextSave();
@@ -330,7 +320,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
    * Pause auto-save
    */
   const pauseAutoSave = useCallback(() => {
-    console.log('[useAutoSave] Pausing auto-save');
     setIsPaused(true);
     
     // Clear scheduled saves
@@ -351,7 +340,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
    * Resume auto-save
    */
   const resumeAutoSave = useCallback(() => {
-    console.log('[useAutoSave] Resuming auto-save');
     setIsPaused(false);
     scheduleNextSave();
   }, [scheduleNextSave]);
@@ -360,7 +348,6 @@ export const useAutoSave = (saveFunction, data, options = {}) => {
    * Reset auto-save state
    */
   const resetAutoSave = useCallback(() => {
-    console.log('[useAutoSave] Resetting auto-save');
     lastSavedDataRef.current = null;
     setLastAutoSaveTime(null);
     setAutoSaveCount(0);

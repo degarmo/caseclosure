@@ -73,7 +73,6 @@ export default function ContentArea({
         await api.delete(`/spotlight/${postId}/`);
         onRefresh(['spotlight']);
       } catch (error) {
-        console.error('Error deleting post:', error);
         alert('Failed to delete post');
       }
     }
@@ -81,7 +80,6 @@ export default function ContentArea({
 
   const handleSubmitPost = async (postData) => {
     try {
-      console.log('Submitting spotlight post:', postData);
       
       // Extract plain text from HTML content
       const tempDiv = document.createElement('div');
@@ -99,7 +97,6 @@ export default function ContentArea({
         delete finalData.case;
       }
       
-      console.log('Final spotlight data:', finalData);
       
       // Create or update post
       if (editingPost) {

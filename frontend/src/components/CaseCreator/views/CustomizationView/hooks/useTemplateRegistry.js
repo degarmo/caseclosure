@@ -51,7 +51,6 @@ export const useTemplateRegistry = (templateId = 'beacon', initialPage = 'Home')
   // FIXED: Get current page component with stable reference
   const getCurrentPageComponent = useCallback(() => {
     if (!currentTemplate || !currentTemplate.pages[currentPage]) {
-      console.warn(`Page "${currentPage}" not found in template "${currentTemplateId}"`);
       return null;
     }
 
@@ -71,7 +70,6 @@ export const useTemplateRegistry = (templateId = 'beacon', initialPage = 'Home')
     componentCacheRef.current[cacheKey] = component;
     currentComponentRef.current = component;
     
-    console.log(`Cached component for ${cacheKey}`);
     return component;
   }, [currentTemplate, currentPage, currentTemplateId]);
 
@@ -89,12 +87,10 @@ export const useTemplateRegistry = (templateId = 'beacon', initialPage = 'Home')
   // Change current page with validation
   const changePage = useCallback((newPage) => {
     if (!isValidPage(newPage)) {
-      console.error(`Page "${newPage}" does not exist in template "${currentTemplateId}"`);
       setTemplateError(`Page "${newPage}" not found`);
       return false;
     }
 
-    console.log(`Changing page from ${currentPage} to ${newPage}`);
     setCurrentPage(newPage);
     setTemplateError(null);
 
@@ -175,7 +171,6 @@ export const useTemplateRegistry = (templateId = 'beacon', initialPage = 'Home')
 
       return true;
     } catch (error) {
-      console.error('Failed to change template:', error);
       setTemplateError(error.message);
       return false;
     } finally {
@@ -239,9 +234,8 @@ export const useTemplateRegistry = (templateId = 'beacon', initialPage = 'Home')
         }
       }
       
-      console.log(`All pages for template "${currentTemplateId}" preloaded and cached`);
-    } catch (error) {
-      console.error('Failed to preload template pages:', error);
+    } catch (e) {
+      // silently handled
     }
   }, [currentTemplate, currentTemplateId]);
 

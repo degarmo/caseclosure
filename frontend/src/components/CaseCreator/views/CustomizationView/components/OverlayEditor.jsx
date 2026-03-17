@@ -191,8 +191,8 @@ const OverlayEditor = ({
         }
       };
       reader.readAsDataURL(file);
-    } catch (error) {
-      console.error('Upload failed:', error);
+    } catch (e) {
+      // silently handled
     }
   }, [galleryImages, onCustomizationChange]);
 
@@ -205,8 +205,8 @@ const OverlayEditor = ({
       } else if (caseId) {
         await saveCustomizations(caseId, customizations);
       }
-    } catch (error) {
-      console.error('Save failed:', error);
+    } catch (e) {
+      // silently handled
     } finally {
       setIsSaving(false);
     }

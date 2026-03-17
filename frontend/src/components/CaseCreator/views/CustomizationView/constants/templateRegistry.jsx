@@ -12,7 +12,6 @@ const loadTemplatePage = (templateName, pageName) => {
         default: module[`${pageName}Page`] || module.default
       }))
       .catch(error => {
-        console.error(`Failed to load ${templateName}/${pageName}:`, error);
         // Fallback component with JSX
         return {
           default: () => (

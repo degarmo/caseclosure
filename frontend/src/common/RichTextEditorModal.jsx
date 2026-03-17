@@ -150,7 +150,6 @@ export const RichTextFieldWithModal = ({
   const plainTextPreview = getPlainTextPreview(value || '');
 
   // Debug logging
-  console.log('RichTextFieldWithModal - value:', value);
 
   return (
     <div>
@@ -162,7 +161,6 @@ export const RichTextFieldWithModal = ({
         <div 
           className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors min-h-[100px] whitespace-pre-wrap"
           onClick={() => {
-            console.log('Opening modal for:', label);
             setIsModalOpen(true);
           }}
           style={{ minHeight: `${rows * 1.5}rem` }}
@@ -175,7 +173,6 @@ export const RichTextFieldWithModal = ({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Edit button clicked for:', label);
             setIsModalOpen(true);
           }}
           className="absolute top-2 right-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
@@ -192,11 +189,9 @@ export const RichTextFieldWithModal = ({
       <RichTextEditorModal
         isOpen={isModalOpen}
         onClose={() => {
-          console.log('Closing modal');
           setIsModalOpen(false);
         }}
         onSave={(newContent) => {
-          console.log('Saving content:', newContent);
           onChange(newContent);
         }}
         title={`Edit ${label}`}

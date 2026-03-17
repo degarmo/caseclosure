@@ -54,8 +54,8 @@ export default function Spotlight({ caseData, customizations, isPreview, isEditi
           text: shareText,
           url: shareUrl
         });
-      } catch (err) {
-        console.log('Share cancelled');
+      } catch (e) {
+      // silently handled
       }
     } else {
       navigator.clipboard.writeText(shareUrl);

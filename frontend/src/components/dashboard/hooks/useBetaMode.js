@@ -11,7 +11,6 @@ export function useBetaMode() {
         const response = await api.get('/settings/public/beta-status/');
         setBetaMode(response.data.beta_mode_enabled);
       } catch (error) {
-        console.error('Error checking beta mode:', error);
         setBetaMode(false);
       } finally {
         setLoading(false);

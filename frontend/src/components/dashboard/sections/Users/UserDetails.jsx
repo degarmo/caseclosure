@@ -34,12 +34,10 @@ export default function UserDetails({ userId, onBack }) {
       const userRes = await api.get(`/auth/admin/users/${userId}/`);
       setUser(userRes.data);
       setFormData(userRes.data);
-      console.log('User data loaded:', userRes.data);
 
       // Fetch user's cases separately
       fetchUserCases();
     } catch (error) {
-      console.error('Error fetching user details:', error);
       setError('Failed to load user details');
     }
     setLoading(false);
@@ -50,9 +48,7 @@ export default function UserDetails({ userId, onBack }) {
     try {
       const casesRes = await api.get(`/auth/admin/users/${userId}/cases/`);
       setUserCases(casesRes.data);
-      console.log(`Loaded ${casesRes.data.length} cases for user ${userId}`);
     } catch (err) {
-      console.log('Cases endpoint not available or no cases found:', err.message);
       setUserCases([]);
     }
     setCasesLoading(false);
@@ -70,7 +66,6 @@ export default function UserDetails({ userId, onBack }) {
       setSuccess('User updated successfully');
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      console.error('Error updating user:', error);
       setError(error.response?.data?.error || 'Failed to update user');
     }
   };
@@ -87,7 +82,6 @@ export default function UserDetails({ userId, onBack }) {
       setSuccess(`User ${res.data.is_active ? 'activated' : 'deactivated'} successfully`);
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      console.error('Error toggling user status:', error);
       setError('Failed to update user status');
     }
   };
@@ -102,7 +96,6 @@ export default function UserDetails({ userId, onBack }) {
       setSuccess('User deleted successfully');
       setTimeout(() => onBack(), 1500);
     } catch (error) {
-      console.error('Error deleting user:', error);
       setError(error.response?.data?.error || 'Failed to delete user');
     }
   };
@@ -133,7 +126,6 @@ export default function UserDetails({ userId, onBack }) {
       setSuccess('Password reset successfully');
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      console.error('Error resetting password:', error);
       setError('Failed to reset password');
     }
   };

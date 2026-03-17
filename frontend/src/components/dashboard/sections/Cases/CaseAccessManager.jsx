@@ -27,7 +27,6 @@ export default function CaseAccessManager({ caseId, caseName, permissions, onRef
       const response = await axios.get(`/cases/${caseId}/access_list/`);
       setAccessList(response.data.access_list || []);
     } catch (err) {
-      console.error('Error fetching access list:', err);
       setError('Failed to load access list');
     } finally {
       setLoading(false);
@@ -49,7 +48,6 @@ export default function CaseAccessManager({ caseId, caseName, permissions, onRef
       
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error('Error revoking access:', err);
       setError(err.response?.data?.error || 'Failed to revoke access');
     } finally {
       setRevoking(null);

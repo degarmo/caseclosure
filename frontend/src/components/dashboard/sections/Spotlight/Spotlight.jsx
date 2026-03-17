@@ -18,7 +18,6 @@ const Spotlight = () => {
   const [filter, setFilter] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
 
-  console.log('Spotlight component mounted'); // DEBUG
 
   // Get current user on mount
   useEffect(() => {
@@ -30,7 +29,6 @@ const Spotlight = () => {
   const isLEO = currentUser?.account_type === 'leo';
 
   useEffect(() => {
-    console.log('useEffect triggered with filter:', filter); // DEBUG
     if (currentUser) {
       fetchPosts();
     }
@@ -39,10 +37,8 @@ const Spotlight = () => {
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      console.log('Current user:', currentUser); // DEBUG
       
       if (!currentUser) {
-        console.error('No current user found');
         setLoading(false);
         return;
       }
@@ -56,7 +52,6 @@ const Spotlight = () => {
         params.author = currentUser.username;
       }
 
-      console.log('Params being sent:', params); // DEBUG
 
       // Add status filter if not 'all'
       if (filter !== 'all') {
@@ -64,10 +59,9 @@ const Spotlight = () => {
       }
 
       const response = await apiMethods.spotlight.list(params);
-      console.log('Response data:', response.data); // DEBUG
       setPosts(response.data);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
+    } catch (e) {
+      // silently handled
     } finally {
       setLoading(false);
     }
@@ -78,8 +72,8 @@ const Spotlight = () => {
       const response = await apiMethods.spotlight.create(postData);
       setPosts([response.data, ...posts]);
       setIsCreating(false);
-    } catch (error) {
-      console.error('Error creating post:', error);
+    } catch (e) {
+      // silently handled
     }
   };
 
@@ -91,8 +85,8 @@ const Spotlight = () => {
           ? { ...post, is_liked: response.data.liked, likes_count: response.data.likes_count }
           : post
       ));
-    } catch (error) {
-      console.error('Error liking post:', error);
+    } catch (e) {
+      // silently handled
     }
   };
 
@@ -104,8 +98,8 @@ const Spotlight = () => {
           ? { ...post, comments: [...post.comments, response.data], comments_count: post.comments_count + 1 }
           : post
       ));
-    } catch (error) {
-      console.error('Error commenting on post:', error);
+    } catch (e) {
+      // silently handled
     }
   };
 

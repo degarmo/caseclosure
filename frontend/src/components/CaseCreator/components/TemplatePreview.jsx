@@ -39,13 +39,11 @@ const TemplatePreview = ({
       
       // Track image errors but don't treat as component errors
       imageErrorCountRef.current += 1;
-      console.log(`Image load failed (${imageErrorCountRef.current} total), replaced with placeholder`);
       
       return false; // Prevent default error handling
     }
     
     // For non-image errors, handle as component error
-    console.error('Template preview component error:', event);
     setHasError(true);
     setErrorMessage(event.message || 'An error occurred in the preview');
     
@@ -209,7 +207,7 @@ const TemplatePreview = ({
       )}
 
       {/* Image error counter (development only) */}
-      {process.env.NODE_ENV === 'development' && imageErrorCountRef.current > 0 && (
+      {import.meta.env.DEV && imageErrorCountRef.current > 0 && (
         <div className="fixed top-20 right-4 bg-yellow-100 text-yellow-800 px-3 py-2 rounded-lg shadow-md z-50 text-xs">
           {imageErrorCountRef.current} image(s) failed to load
         </div>

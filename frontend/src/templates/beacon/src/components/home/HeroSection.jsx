@@ -51,15 +51,10 @@ export default function HeroSection({
       setShareSuccess(true);
       setTimeout(() => setShareSuccess(false), 3000);
     }).catch(err => {
-      console.error('Failed to copy link:', err);
     });
   };
   
   const getHeroImage = () => {
-  console.log('🖼️ HERO IMAGE DEBUG:', {
-    'customizations.hero_image': customizations?.hero_image,
-    'primaryPhotoUrl': primaryPhotoUrl
-  });
   
   // PRIORITY 1: Check customizations.hero_image (where uploads are saved)
   if (customizations?.hero_image) {

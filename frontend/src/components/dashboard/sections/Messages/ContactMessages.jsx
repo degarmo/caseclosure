@@ -23,8 +23,8 @@ export default function ContactMessages({ onRefresh, filterType, caseId }) {
       
       const response = await api.get('/contact/messages', { params });
       setMessages(response.data.data || []);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
+    } catch (e) {
+      // silently handled
     }
     setLoading(false);
   };
@@ -34,8 +34,8 @@ export default function ContactMessages({ onRefresh, filterType, caseId }) {
       await api.patch(`/contact/messages/${messageId}`, { status: newStatus });
       fetchMessages();
       if (onRefresh) onRefresh();
-    } catch (error) {
-      console.error('Error updating status:', error);
+    } catch (e) {
+      // silently handled
     }
   };
 

@@ -22,11 +22,10 @@ export default function SignOut() {
             });
           } catch (error) {
             // If backend logout fails, continue with local logout
-            console.error('Backend logout failed:', error);
           }
         }
-      } catch (error) {
-        console.error('Logout error:', error);
+      } catch (e) {
+      // silently handled
       } finally {
         // Clear all auth data from localStorage
         localStorage.removeItem('access');

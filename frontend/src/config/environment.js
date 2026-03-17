@@ -1,16 +1,17 @@
 // src/config/environment.js
+import { getAPIBaseURL } from '@/api/config';
 
-const isDevelopment = import.meta.env.DEV || process.env.NODE_ENV === 'development';
-const isProduction = import.meta.env.PROD || process.env.NODE_ENV === 'production';
+const isDevelopment = import.meta.env.DEV;
+const isProduction = import.meta.env.PROD;
 
 const config = {
   development: {
-    apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+    apiUrl: getAPIBaseURL(),
     enableDebugLogging: true,
     enableAnalytics: false,
   },
   production: {
-    apiUrl: import.meta.env.VITE_API_URL || 'https://api.yourapp.com/api',
+    apiUrl: getAPIBaseURL(),
     enableDebugLogging: false,
     enableAnalytics: true,
   }

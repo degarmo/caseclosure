@@ -49,7 +49,6 @@ export default function TemplateRenderer() {
         try {
           response = await api.get(url);
         } catch (apiError) {
-          console.error('API Error:', apiError);
           throw new Error(`API Error (${apiError.response?.status}): ${apiError.response?.data?.error || apiError.message}`);
         }
       } else {
@@ -83,7 +82,6 @@ export default function TemplateRenderer() {
       try {
         template = getTemplate(templateId);
       } catch (templateError) {
-        console.error('Template Error:', templateError);
         throw new Error(`Template "${templateId}" not found`);
       }
       
@@ -99,8 +97,8 @@ export default function TemplateRenderer() {
         try {
           const module = await loader();
           loadedComponents[key] = module.default;
-        } catch (compError) {
-          console.error(`Failed to load component ${key}:`, compError);
+        } catch (e) {
+      // silently handled
         }
       }
       
@@ -111,7 +109,6 @@ export default function TemplateRenderer() {
       setComponents(loadedComponents);
       
     } catch (err) {
-      console.error('Fatal Error:', err);
       setError(err.message || 'Failed to load case');
     } finally {
       setLoading(false);
@@ -123,8 +120,8 @@ export default function TemplateRenderer() {
       const url = `/spotlight/?case_id=${caseData.id}&status=published`;
       const response = await api.get(url);
       setSpotlightPosts(Array.isArray(response.data) ? response.data : response.data.results || []);
-    } catch (err) {
-      console.error('Error fetching spotlight posts:', err);
+    } catch (e) {
+      // silently handled
     }
   };
 
@@ -151,8 +148,8 @@ export default function TemplateRenderer() {
         ...caseData,
         template_data: updatedData
       });
-    } catch (err) {
-      console.error('Failed to save update:', err);
+    } catch (e) {
+      // silently handled
     }
   };
 

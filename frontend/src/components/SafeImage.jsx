@@ -22,7 +22,6 @@ const SafeImage = ({
   }, [src]);
 
   const handleError = (e) => {
-    console.warn(`Failed to load image: ${imageSrc}`);
     
     if (!hasError) {
       setHasError(true);

@@ -39,7 +39,6 @@ export default function PoliceCaseDetail({ caseId, permissions, onRefresh }) {
         const tipsResponse = await axios.get(`/messages/?case_id=${caseId}&message_type=tip`);
         setTips(Array.isArray(tipsResponse.data) ? tipsResponse.data : tipsResponse.data.results || []);
       } catch (err) {
-        console.error('Error fetching tips:', err);
         setTips([]);
       }
 
@@ -48,11 +47,9 @@ export default function PoliceCaseDetail({ caseId, permissions, onRefresh }) {
         const postsResponse = await axios.get(`/spotlight-posts/?case_id=${caseId}&status=published`);
         setSpotlightPosts(Array.isArray(postsResponse.data) ? postsResponse.data : postsResponse.data.results || []);
       } catch (err) {
-        console.error('Error fetching spotlight posts:', err);
         setSpotlightPosts([]);
       }
     } catch (err) {
-      console.error('Error fetching case details:', err);
       setError('Failed to load case details');
     } finally {
       setLoading(false);
@@ -74,7 +71,6 @@ export default function PoliceCaseDetail({ caseId, permissions, onRefresh }) {
       element.click();
       document.body.removeChild(element);
     } catch (err) {
-      console.error('Error downloading metrics:', err);
       alert('Failed to download metrics');
     } finally {
       setDownloadingMetrics(false);

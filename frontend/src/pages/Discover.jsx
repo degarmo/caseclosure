@@ -53,18 +53,11 @@ export default function Discover() {
       
       // Log to see what fields are actually available
       if (cases.length > 0) {
-        console.log('Sample case data:', cases[0]);
-        console.log('Available location fields:', {
-          incident_city: cases[0].incident_city,
-          incident_state: cases[0].incident_state,
-          full_incident_location: cases[0].full_incident_location
-        });
       }
       
       setAllCases(cases);
       setFilteredCases(cases);
     } catch (error) {
-      console.error('Failed to load cases:', error);
       setAllCases([]);
       setFilteredCases([]);
     }

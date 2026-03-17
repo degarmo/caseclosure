@@ -59,13 +59,10 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
       
       // Filter to only show cases owned by current user
       const userCases = casesData.filter(c => c.user === user?.id);
-      console.log('User cases:', userCases);
-      console.log('Case object keys:', userCases.length > 0 ? Object.keys(userCases[0]) : 'no cases');
       
       setCases(userCases);
       setError(null);
     } catch (err) {
-      console.error('Error fetching cases:', err);
       setError('Failed to load your cases');
     } finally {
       setLoading(false);
@@ -111,13 +108,9 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
         invited_by: user?.id
       };
 
-      console.log('Sending invitation data:', invitationData);
 
       const response = await axios.post('/case-invitations/', invitationData);
 
-      console.log('Full API Response:', response);
-      console.log('Response Status:', response.status);
-      console.log('Response Data:', response.data);
 
       // Store debug info for troubleshooting
       setDebugInfo({
@@ -129,7 +122,6 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
 
       // Check if email_sent is explicitly false
       if (response.data.email_sent === false) {
-        console.error('Email failed to send!', response.data);
         setError(`Invitation created but email failed: ${response.data.email_error || 'Unknown error'}`);
       } else {
         setSuccess(true);
@@ -153,8 +145,6 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
         setDebugInfo(null);
       }, 5000);
     } catch (err) {
-      console.error('Error sending invitation:', err);
-      console.error('Error response:', err.response?.data);
       
       setDebugInfo({
         errorStatus: err.response?.status,

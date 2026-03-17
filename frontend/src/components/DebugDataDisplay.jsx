@@ -8,7 +8,7 @@ const DebugDataDisplay = ({ caseData, customizations, show = true }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
   
-  if (!show || process.env.NODE_ENV === 'production') {
+  if (!show || import.meta.env.PROD) {
     return null;
   }
 

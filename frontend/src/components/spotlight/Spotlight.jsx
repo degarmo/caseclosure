@@ -25,8 +25,8 @@ const Spotlight = () => {
     try {
       const response = await spotlightAPI.getPosts({ status: filter });
       setPosts(response.data);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
+    } catch (e) {
+      // silently handled
     } finally {
       setLoading(false);
     }
@@ -37,8 +37,8 @@ const Spotlight = () => {
       const response = await spotlightAPI.createPost(postData);
       setPosts([response.data, ...posts]);
       setIsCreating(false);
-    } catch (error) {
-      console.error('Error creating post:', error);
+    } catch (e) {
+      // silently handled
     }
   };
 
@@ -50,8 +50,8 @@ const Spotlight = () => {
           ? { ...post, is_liked: response.data.liked, likes_count: response.data.likes_count }
           : post
       ));
-    } catch (error) {
-      console.error('Error liking post:', error);
+    } catch (e) {
+      // silently handled
     }
   };
 
@@ -63,8 +63,8 @@ const Spotlight = () => {
           ? { ...post, comments: [...post.comments, response.data], comments_count: post.comments_count + 1 }
           : post
       ));
-    } catch (error) {
-      console.error('Error commenting on post:', error);
+    } catch (e) {
+      // silently handled
     }
   };
 

@@ -76,9 +76,7 @@ const TemplatePreviewWrapper = () => {
       }
 
       try {
-        console.log('Loading case data for ID:', caseId);
         const data = await getCaseById(caseId);
-        console.log('Loaded case data:', data);
         
         setCaseData(data);
         setCustomizations(data.template_data?.customizations || {});
@@ -92,7 +90,6 @@ const TemplatePreviewWrapper = () => {
         setLoading(false);
         setError(null);
       } catch (err) {
-        console.error('Failed to load case:', err);
         setError('Failed to load case data');
         setLoading(false);
       }
@@ -105,7 +102,6 @@ const TemplatePreviewWrapper = () => {
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.data.type === 'PREVIEW_DATA') {
-        console.log('Received preview data:', event.data);
         const newCaseData = event.data.caseData || {};
         const newCustomizations = event.data.customizations || {};
         
@@ -204,7 +200,6 @@ const TemplatePreviewWrapper = () => {
         </Suspense>
       );
     } catch (err) {
-      console.error('Component render error:', err);
       setComponentError(err.message);
       return <TemplateFallback caseData={caseData || dataRef.current.caseData} error={err.message} />;
     }
@@ -229,14 +224,6 @@ const TemplatePreviewWrapper = () => {
   }
 
   // Log current state for debugging
-  console.log('TemplatePreviewWrapper Render:', {
-    caseId,
-    page,
-    templateId,
-    hasCaseData: !!caseData,
-    caseType: caseData?.case_type || caseData?.crime_type,
-    dataRefCaseType: dataRef.current.caseData?.case_type || dataRef.current.caseData?.crime_type
-  });
 
   return (
     <div className="template-preview-wrapper">

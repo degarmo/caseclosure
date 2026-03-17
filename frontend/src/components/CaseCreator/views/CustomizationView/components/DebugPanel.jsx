@@ -52,8 +52,8 @@ const DebugPanel = ({
       await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
       setCopiedSection(section);
       setTimeout(() => setCopiedSection(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch (e) {
+      // silently handled
     }
   };
 

@@ -39,7 +39,6 @@ export default function UsersList({
       const response = await api.get('/auth/admin/users/');
       setLocalUsers(response.data);
     } catch (err) {
-      console.error('Error fetching users:', err);
       setError('Failed to load users. Please try again.');
     }
     setLoading(false);

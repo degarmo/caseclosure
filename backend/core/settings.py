@@ -217,6 +217,24 @@ else:
         }
     }
 
+# Channel Layers (WebSocket support via Django Channels)
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [REDIS_URL],
+            },
+        },
+    }
+else:
+    # In-memory channel layer for local dev (single-process only)
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -383,7 +401,7 @@ SITE_URL = config('SITE_URL', default='http://localhost:8000')
 
 # Security Settings for Production
 if not DEBUG:
-    SECURE_SSL_REDIRECT = False
+    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
@@ -451,10 +469,13 @@ TRACKING_RATE_LIMITS = {
     'auth': (5, 300),
 }
 
-from celery.schedules import crontab
-CELERY_BEAT_SCHEDULE = {
-    'publish-scheduled-spotlight-posts': {
-        'task': 'spotlight.tasks.publish_scheduled_posts',
-        'schedule': crontab(minute='*/5'),  # Every 5 minutes
-    },
-}
+try:
+    from celery.schedules import crontab
+    CELERY_BEAT_SCHEDULE = {
+        'publish-scheduled-spotlight-posts': {
+            'task': 'spotlight.tasks.publish_scheduled_posts',
+            'schedule': crontab(minute='*/5'),  # Every 5 minutes
+        },
+    }
+except ImportError:
+    CELERY_BEAT_SCHEDULE = {}

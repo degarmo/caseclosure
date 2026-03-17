@@ -38,8 +38,8 @@ export default function PoliceCaseSelector({ selectedCaseId, onSelectCase, permi
       if (!selectedCaseId && caseList.length > 0) {
         onSelectCase(caseList[0].id);
       }
-    } catch (err) {
-      console.error('Error fetching cases:', err);
+    } catch (e) {
+      // silently handled
     } finally {
       setLoading(false);
     }
