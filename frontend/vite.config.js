@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    // Allow *.localhost subdomains for local memorial site testing
+    // e.g. http://john-smith.localhost:5173
+    allowedHosts: ['localhost', '.localhost'],
     hmr: {
       protocol: 'ws',
       host: 'localhost',

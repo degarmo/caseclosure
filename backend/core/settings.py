@@ -131,7 +131,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    # 'core.middleware.SubdomainCaseMiddleware',  # Enable when subdomains are configured
+    'core.middleware.SubdomainCaseMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -279,8 +279,10 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.caseclosure\.org$",  # ✅ ADD THIS - Allows all subdomains
-    r"^http://.*\.caseclosure\.org:8000$",  # Local dev with proxy
+    r"^https://.*\.caseclosure\.org$",          # Production: all subdomains
+    r"^https://.*\.caseclosure\.com$",          # Alt domain subdomains
+    r"^http://.*\.localhost:\d+$",              # Local dev: *.localhost:5173
+    r"^http://.*\.caseclosure\.org:\d+$",       # Local dev with custom hosts
 ]
 
 # CORS Settings
@@ -372,7 +374,7 @@ ADMINS = [('Admin', ADMIN_EMAIL)]
 ACCOUNT_EMAIL_VERIFICATION = 'optional' if DEBUG else 'mandatory'
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
 ACCOUNT_UNIQUE_EMAIL = True
 LOGIN_REDIRECT_URL = '/dashboard'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/'

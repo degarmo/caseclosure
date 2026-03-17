@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { TimelineEvent } from "../api/entities";
-import { Card, CardContent } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
-import { 
-  Calendar, 
-  MapPin, 
-  ExternalLink, 
+// src/templates/beacon/src/pages/Timeline.jsx
+import React from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Calendar,
+  MapPin,
+  ExternalLink,
   AlertTriangle,
   Shield,
   Gavel,
@@ -26,48 +26,10 @@ const eventTypeConfig = {
   other: { color: "bg-slate-500", icon: Star, label: "Other" }
 };
 
-export default function Timeline() {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadEvents();
-  }, []);
-
-  const loadEvents = async () => {
-    try {
-      const data = await TimelineEvent.list("-date");
-      setEvents(data);
-    } catch (e) {
-      // silently handled
-    }
-    setLoading(false);
-  };
-
-  if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="space-y-8">
-          {Array(5).fill(0).map((_, i) => (
-            <div key={i} className="flex gap-8 animate-pulse">
-              <div className="w-32 h-6 bg-slate-200 rounded"></div>
-              <div className="flex-1">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-3">
-                      <div className="h-6 bg-slate-200 rounded w-3/4"></div>
-                      <div className="h-4 bg-slate-200 rounded"></div>
-                      <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+export default function Timeline({ caseData = {}, customizations = {}, isEditing = false }) {
+  // Timeline events come from caseData (passed via TemplateRenderer)
+  const events = caseData?.timeline_events || [];
+  const displayName = caseData?.first_name || 'this person';
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -75,7 +37,7 @@ export default function Timeline() {
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-slate-800 mb-4">Case Timeline</h1>
         <p className="text-xl text-slate-600">
-          A chronological overview of events in Sarah's case
+          A chronological overview of events in {displayName}'s case
         </p>
       </div>
 
@@ -96,10 +58,10 @@ export default function Timeline() {
               </CardContent>
             </Card>
           ) : (
-            events.map((event, index) => {
-              const config = eventTypeConfig[event.event_type];
+            events.map((event) => {
+              const config = eventTypeConfig[event.event_type] || eventTypeConfig.other;
               const Icon = config.icon;
-              
+
               return (
                 <div key={event.id} className="relative">
                   {/* Date badge (mobile) */}
@@ -155,15 +117,15 @@ export default function Timeline() {
                               )}
                             </div>
                           </div>
-                          
+
                           <h3 className="text-lg font-semibold text-slate-800 mb-3">
                             {event.title}
                           </h3>
-                          
+
                           <p className="text-slate-600 leading-relaxed mb-4">
                             {event.description}
                           </p>
-                          
+
                           <div className="flex flex-wrap gap-4 text-sm text-slate-500">
                             {event.location && (
                               <div className="flex items-center gap-1">
@@ -199,7 +161,7 @@ export default function Timeline() {
         <CardContent className="p-8 text-center">
           <h3 className="text-2xl font-bold text-slate-800 mb-4">Help Complete the Timeline</h3>
           <p className="text-slate-700 mb-6">
-            If you have information about any events related to Sarah's case, please share it with us. Every detail matters.
+            If you have information about any events related to {displayName}'s case, please share it with us. Every detail matters.
           </p>
           <Button size="lg" className="bg-slate-800 text-white hover:bg-slate-700">
             <Shield className="w-5 h-5 mr-2" />

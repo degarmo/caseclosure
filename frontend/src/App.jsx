@@ -126,29 +126,26 @@ function AppContent() {
   const [currentCase, setCurrentCase] = useState(null);
   const [editingCaseId, setEditingCaseId] = useState(null);
 
-  // Determine if this is a memorial site
+  // Determine if this is a memorial site based on subdomain detection
   const hostname = window.location.hostname;
   const isMemorialSite = React.useMemo(() => {
+    // Preview routes are never memorial sites
     if (location.pathname.startsWith('/preview/')) {
       return false;
     }
-    
-    if (hostname.includes('.caseclosure.org') || hostname.includes('.caseclosure.com')) {
-      const sub = hostname.split('.')[0];
-      return sub && sub !== 'www' && sub !== 'app' && sub !== 'caseclosure';
+
+    // If getSubdomain() detects a valid subdomain, this is a memorial site
+    if (subdomain) {
+      return true;
     }
-    
-    if (hostname.includes('.localhost')) {
-      const sub = hostname.split('.')[0];
-      return sub && sub !== 'www' && sub !== 'app';
-    }
-    
+
+    // On localhost without a subdomain, /memorial/:caseId routes are memorial previews
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return location.pathname.startsWith('/memorial/');
     }
-    
-    return !hostname.includes('caseclosure');
-  }, [hostname, location.pathname]);
+
+    return false;
+  }, [subdomain, hostname, location.pathname]);
 
   // Logout handler
   const handleLogout = () => {

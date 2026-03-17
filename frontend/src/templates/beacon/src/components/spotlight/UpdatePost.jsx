@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardHeader } from "../ui/card";
-import { Button } from "../ui/button";
-import { Avatar, AvatarFallback } from "../ui/avatar";
-import { 
-  Heart, 
-  MessageCircle, 
-  Send, 
-  Bookmark, 
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Heart,
+  MessageCircle,
+  Send,
+  Bookmark,
   MoreHorizontal,
   Copy,
   Check,
@@ -16,29 +16,31 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "../ui/popover";
+} from "@/components/ui/popover";
 import { formatDistanceToNow } from "date-fns";
 
-export default function UpdatePost({ update, onLike }) {
+export default function UpdatePost({ update, onLike, caseData = {} }) {
   const [isLiked, setIsLiked] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleLikeClick = () => {
     setIsLiked(!isLiked);
-    onLike(update);
+    if (onLike) onLike(update);
   };
-  
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const displayName = caseData?.first_name && caseData?.last_name
+    ? `${caseData.first_name} ${caseData.last_name}`
+    : caseData?.first_name || 'Family';
+  const author = `${displayName} Family`;
+  const avatarFallback = author.split(" ").map(n => n[0]).join("").slice(0, 2);
   const shareUrl = window.location.href;
-  const shareText = `An update on the case of Sarah Johnson: ${update.title}`;
-
-  const author = "Sarah Johnson Family";
-  const avatarFallback = author.split(" ").map(n => n[0]).join("");
+  const shareText = `An update on the case of ${displayName}: ${update.title}`;
 
   return (
     <Card className="w-full bg-white rounded-lg shadow-md overflow-hidden border border-slate-200">

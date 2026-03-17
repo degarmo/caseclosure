@@ -42,14 +42,20 @@ export default function TemplateRenderer() {
       setDebugInfo(debug);
       
       let response;
-      
-      if (subdomain) {
-        const url = `/cases/by-subdomain/${subdomain}/`;
-        
+
+      if (subdomain && subdomain !== '__custom_domain__') {
+        // Standard subdomain lookup: john-smith.caseclosure.org
         try {
-          response = await api.get(url);
+          response = await api.get(`/cases/by-subdomain/${subdomain}/`);
         } catch (apiError) {
           throw new Error(`API Error (${apiError.response?.status}): ${apiError.response?.data?.error || apiError.message}`);
+        }
+      } else if (subdomain === '__custom_domain__') {
+        // Custom domain lookup: remembering-john.org
+        try {
+          response = await api.get(`/cases/by-domain/${hostname}/`);
+        } catch (apiError) {
+          throw new Error(`Custom domain not found: ${hostname}`);
         }
       } else {
         const pathParts = location.pathname.split('/');
@@ -117,7 +123,7 @@ export default function TemplateRenderer() {
 
   const fetchSpotlightPosts = async () => {
     try {
-      const url = `/spotlight/?case_id=${caseData.id}&status=published`;
+      const url = `/case-spotlight/?case_id=${caseData.id}&status=published`;
       const response = await api.get(url);
       setSpotlightPosts(Array.isArray(response.data) ? response.data : response.data.results || []);
     } catch (e) {
@@ -177,26 +183,28 @@ export default function TemplateRenderer() {
             <p className="text-lg text-gray-600">{error || 'This memorial page could not be found.'}</p>
           </div>
           
-          {/* Debug Information */}
-          <div className="mt-8 p-4 bg-gray-100 rounded-lg text-left">
-            <h3 className="font-semibold text-gray-700 mb-2">Debug Information:</h3>
-            <div className="text-sm text-gray-600 space-y-1 font-mono">
-              <div>Hostname: {debugInfo.hostname}</div>
-              <div>Subdomain: {debugInfo.subdomain || 'Not detected'}</div>
-              <div>Path: {debugInfo.pathname}</div>
-              <div>Time: {debugInfo.timestamp}</div>
-              {caseData && (
-                <>
-                  <div className="mt-2 pt-2 border-t border-gray-300">
-                    <div>Case ID: {caseData.id}</div>
-                    <div>Template: {caseData.template_id}</div>
-                    <div>Public: {caseData.is_public ? 'Yes' : 'No'}</div>
-                    <div>Status: {caseData.deployment_status}</div>
-                  </div>
-                </>
-              )}
+          {/* Debug Information - only shown in development */}
+          {import.meta.env.DEV && (
+            <div className="mt-8 p-4 bg-gray-100 rounded-lg text-left">
+              <h3 className="font-semibold text-gray-700 mb-2">Debug Information:</h3>
+              <div className="text-sm text-gray-600 space-y-1 font-mono">
+                <div>Hostname: {debugInfo.hostname}</div>
+                <div>Subdomain: {debugInfo.subdomain || 'Not detected'}</div>
+                <div>Path: {debugInfo.pathname}</div>
+                <div>Time: {debugInfo.timestamp}</div>
+                {caseData && (
+                  <>
+                    <div className="mt-2 pt-2 border-t border-gray-300">
+                      <div>Case ID: {caseData.id}</div>
+                      <div>Template: {caseData.template_id}</div>
+                      <div>Public: {caseData.is_public ? 'Yes' : 'No'}</div>
+                      <div>Status: {caseData.deployment_status}</div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
           
           <div className="mt-6 text-center">
             <a 
@@ -268,16 +276,30 @@ export default function TemplateRenderer() {
         )}
         
         {components.contact && (
-          <Route 
-            path="/contact" 
+          <Route
+            path="/contact"
             element={
-              <components.contact 
+              <components.contact
                 caseData={caseData}
                 customizations={caseData.template_data?.pages?.contact || {}}
                 isEditing={isEditing}
                 onCustomizationChange={(field, value) => handleUpdate(`pages.contact.${field}`, value)}
               />
-            } 
+            }
+          />
+        )}
+
+        {components.timeline && (
+          <Route
+            path="/timeline"
+            element={
+              <components.timeline
+                caseData={caseData}
+                customizations={caseData.template_data?.pages?.timeline || {}}
+                isEditing={isEditing}
+                onCustomizationChange={(field, value) => handleUpdate(`pages.timeline.${field}`, value)}
+              />
+            }
           />
         )}
       </Routes>

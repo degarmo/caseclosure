@@ -7,6 +7,7 @@ import Home from './Home';
 import About from './About';
 import Spotlight from './Spotlight';
 import Contact from './Contact';
+import Timeline from './Timeline';
 
 // Page components that include the Layout wrapper
 export const HomePage = (props) => (
@@ -27,10 +28,15 @@ export const SpotlightPage = (props) => (
   </Layout>
 );
 
-
 export const ContactPage = (props) => (
   <Layout {...props} currentPageName="Contact">
     <Contact {...props} />
+  </Layout>
+);
+
+export const TimelinePage = (props) => (
+  <Layout {...props} currentPageName="Timeline">
+    <Timeline {...props} />
   </Layout>
 );
 

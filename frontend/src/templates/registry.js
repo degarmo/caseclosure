@@ -83,13 +83,14 @@ const templates = {
       }
     },
     
-    // Component paths
+    // Component paths (lazy-loaded from consolidated beacon template)
     components: {
       layout: () => import('./beacon/src/pages/Layout'),
       home: () => import('./beacon/src/pages/Home'),
       about: () => import('./beacon/src/pages/About'),
       contact: () => import('./beacon/src/pages/Contact'),
       spotlight: () => import('./beacon/src/pages/Spotlight'),
+      timeline: () => import('./beacon/src/pages/Timeline'),
     }
   },
 };

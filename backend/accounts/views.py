@@ -60,40 +60,43 @@ User = get_user_model()
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Custom token serializer to include user data in response"""
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Since USERNAME_FIELD is 'email', update the fields
         if User.USERNAME_FIELD == 'email':
             self.fields[self.username_field].label = 'Email'
-    
+
     def validate(self, attrs):
         logger.info(f"Login attempt with fields: {list(attrs.keys())}")
-        
+
         try:
             data = super().validate(attrs)
-            
+
             # Add user data to response
             data['user'] = {
                 'id': self.user.id,
                 'email': self.user.email,
-                'username': self.user.username,
+                'username': getattr(self.user, 'username', '') or '',
                 'first_name': self.user.first_name,
                 'last_name': self.user.last_name,
                 'is_staff': self.user.is_staff,
             }
-            
+
             logger.info(f"Successful login for user: {self.user.email}")
             return data
-            
+
         except Exception as e:
-            logger.error(f"Login error: {str(e)}")
-            logger.error(f"Attrs received: {attrs}")
+            logger.error(f"Login validation error: {type(e).__name__}: {str(e)}")
+            import traceback as tb
+            logger.error(tb.format_exc())
             raise
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     """Custom login view that returns user data with tokens"""
     serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = ()
+    authentication_classes = ()
 
 # ============== User Registration & Management ==============
 

@@ -852,6 +852,46 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+    @action(detail=False, methods=['get'], url_path='by-domain/(?P<domain>[^/]+)',
+            permission_classes=[AllowAny])
+    def by_domain(self, request, domain=None):
+        """Get case by custom domain for public website rendering."""
+        try:
+            case = Case.objects.get(
+                custom_domain=domain,
+                is_public=True,
+                is_disabled=False,
+                deployment_status='deployed'
+            )
+
+            serializer = self.get_serializer(case)
+
+            spotlight_posts = []
+            try:
+                posts = SpotlightPost.objects.filter(
+                    case=case,
+                    status='published'
+                ).order_by('-published_at')[:10]
+                spotlight_posts = SpotlightPostSerializer(posts, many=True, context={'request': request}).data
+            except Exception:
+                pass
+
+            response_data = serializer.data
+            response_data['spotlight_posts'] = spotlight_posts
+            return Response(response_data)
+
+        except Case.DoesNotExist:
+            return Response(
+                {'error': 'No case found for this domain'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error fetching case by domain: {str(e)}")
+            return Response(
+                {'error': 'An error occurred'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def perform_destroy(self, instance):
         """When deleting a case, cleanup related data."""
         try:

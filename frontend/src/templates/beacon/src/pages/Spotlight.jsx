@@ -1,7 +1,7 @@
 // src/templates/beacon/src/pages/Spotlight.jsx
 import React from "react";
-import { Card, CardContent } from "../components/ui/card";
-import { Button } from "../components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { MessageCircle, Share2 } from "lucide-react";
 
 export default function Spotlight({ caseData, customizations, isPreview, isEditing }) {
