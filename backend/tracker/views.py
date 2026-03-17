@@ -52,7 +52,7 @@ def track_event(request):
                     case = Case.objects.get(id=int(case_id))
                 else:
                     # Try subdomain/slug
-                    case = Case.objects.get(Q(subdomain=case_id) | Q(slug=case_id))
+                    case = Case.objects.get(Q(subdomain=case_id))
             except Case.DoesNotExist:
                 # Don't fail if case not found, just track without case
                 pass
@@ -233,7 +233,7 @@ def report_suspicious(request):
         case_id = data.get('caseId')
         if case_id:
             try:
-                case = Case.objects.get(Q(slug=case_id) | Q(subdomain=case_id) | Q(id=case_id))
+                case = Case.objects.get(Q(subdomain=case_id) | Q(id=case_id))
             except Case.DoesNotExist:
                 pass
         
@@ -352,7 +352,7 @@ def dashboard_overview(request, case_slug):
         # Try to find case by slug, subdomain, or ID
         case = None
         try:
-            case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug) | Q(id=case_slug))
+            case = Case.objects.get(Q(subdomain=case_slug) | Q(id=case_slug))
         except Case.DoesNotExist:
             return JsonResponse({'error': 'Case not found'}, status=404)
         
@@ -444,7 +444,7 @@ def dashboard_realtime(request, case_slug):
     GET /api/dashboard/{case_slug}/realtime/
     """
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug) | Q(id=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug) | Q(id=case_slug))
         
         # Get last 5 minutes of activity
         since = timezone.now() - timedelta(minutes=5)
@@ -497,7 +497,7 @@ def dashboard_suspicious_users(request, case_slug):
     GET /api/dashboard/{case_slug}/suspicious/
     """
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug) | Q(id=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug) | Q(id=case_slug))
         
         # Get suspicious activities grouped by user
         suspicious_users = []
@@ -610,7 +610,7 @@ def dashboard_patterns(request, case_slug):
     GET /api/dashboard/{case_slug}/patterns/
     """
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug) | Q(id=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug) | Q(id=case_slug))
         
         # Placeholder for ML analysis
         patterns = {'clusters': [], 'suspicious_clusters': []}
@@ -648,7 +648,7 @@ def export_data(request, case_slug):
     POST /api/dashboard/{case_slug}/export/
     """
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug) | Q(id=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug) | Q(id=case_slug))
         data = json.loads(request.body)
         
         export_type = data.get('type', 'csv')  # csv, json, pdf
@@ -684,7 +684,7 @@ def export_data(request, case_slug):
 def visitor_metrics_widget(request, case_slug):
     """Get visitor metrics widget data"""
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug))
         
         now = timezone.now()
         last_24h = now - timedelta(hours=24)
@@ -707,7 +707,7 @@ def visitor_metrics_widget(request, case_slug):
 def suspicious_activity_widget(request, case_slug):
     """Get suspicious activity widget data"""
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug))
         
         activities = SuspiciousActivity.objects.filter(case=case).order_by('-created_at')[:10]
         
@@ -728,7 +728,7 @@ def suspicious_activity_widget(request, case_slug):
 def geographic_map_widget(request, case_slug):
     """Get geographic distribution data"""
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug))
         
         locations = TrackingEvent.objects.filter(case=case).values('ip_country', 'ip_city').annotate(
             count=Count('id')
@@ -743,7 +743,7 @@ def geographic_map_widget(request, case_slug):
 def activity_timeline_widget(request, case_slug):
     """Get activity timeline data"""
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug))
         hours = int(request.GET.get('hours', 24))
         
         since = timezone.now() - timedelta(hours=hours)
@@ -766,7 +766,7 @@ def activity_timeline_widget(request, case_slug):
 def engagement_metrics_widget(request, case_slug):
     """Get engagement metrics data"""
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug))
         
         metrics = {
             'avg_time_on_page': TrackingEvent.objects.filter(case=case).aggregate(avg=Avg('time_on_page'))['avg'] or 0,
@@ -784,7 +784,7 @@ def engagement_metrics_widget(request, case_slug):
 def alerts_panel_widget(request, case_slug):
     """Get alerts panel data"""
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug))
         
         alerts = Alert.objects.filter(case=case, resolved=False).order_by('-priority', '-created_at')[:10]
         
@@ -806,7 +806,7 @@ def alerts_panel_widget(request, case_slug):
 def realtime_activity_stream(request, case_slug):
     """Get real-time activity stream"""
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug))
         
         since = timezone.now() - timedelta(minutes=1)
         events = TrackingEvent.objects.filter(case=case, timestamp__gte=since).order_by('-timestamp')[:20]
@@ -828,7 +828,7 @@ def realtime_activity_stream(request, case_slug):
 def realtime_metrics(request, case_slug):
     """Get real-time metrics"""
     try:
-        case = Case.objects.get(Q(slug=case_slug) | Q(subdomain=case_slug))
+        case = Case.objects.get(Q(subdomain=case_slug))
         
         now = timezone.now()
         last_minute = now - timedelta(minutes=1)

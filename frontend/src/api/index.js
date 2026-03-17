@@ -15,7 +15,7 @@ export {
 import { authAPI } from './authAPI';
 import { casesAPI } from './casesAPI';
 import { spotlightAPI } from './spotlightAPI';
-import { analyticsAPI, trackingAPI, activityAPI, metricsAPI } from './analyticsAPI';
+import { analyticsAPI, trackingAPI, activityAPI } from './analyticsAPI';
 import { messagesAPI, notificationsAPI } from './messagesAPI';
 import { adminAPI, dashboardAPI } from './adminAPI';
 import { postsAPI, contactInquiriesAPI, accountRequestsAPI } from './postsAPI';
@@ -23,7 +23,7 @@ import { integrationsAPI } from './integrationsAPI';
 import { memorialSitesAPI } from './memorialSitesAPI';
 
 // Re-export all API modules
-export { authAPI, casesAPI, spotlightAPI, analyticsAPI, trackingAPI, activityAPI, metricsAPI, messagesAPI, notificationsAPI, adminAPI, dashboardAPI, postsAPI, contactInquiriesAPI, accountRequestsAPI, integrationsAPI, memorialSitesAPI };
+export { authAPI, casesAPI, spotlightAPI, analyticsAPI, trackingAPI, activityAPI, messagesAPI, notificationsAPI, adminAPI, dashboardAPI, postsAPI, contactInquiriesAPI, accountRequestsAPI, integrationsAPI, memorialSitesAPI };
 
 // Export convenience object with all APIs
 export const apiMethods = {
@@ -33,7 +33,7 @@ export const apiMethods = {
   analytics: analyticsAPI,
   tracking: trackingAPI,
   activity: activityAPI,
-  metrics: metricsAPI,
+
   messages: messagesAPI,
   notifications: notificationsAPI,
   admin: adminAPI,

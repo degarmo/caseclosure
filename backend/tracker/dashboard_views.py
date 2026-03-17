@@ -6,7 +6,7 @@ from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.core.cache import cache
-from django.db.models import Count, Sum, Avg, Q, F
+from django.db.models import Count, Sum, Avg, Q, F, Max
 from django.utils import timezone
 from datetime import datetime, timedelta
 import json
@@ -16,9 +16,10 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import (
-    Case, TrackingEvent, UserSession, SuspiciousActivity,
+    TrackingEvent, UserSession, SuspiciousActivity,
     DeviceFingerprint, Alert
 )
+from cases.models import Case
 from .serializers import (
     CaseSerializer, SuspiciousActivitySerializer,
     AlertSerializer, DashboardStatsSerializer
@@ -38,10 +39,10 @@ def dashboard_overview(request, case_slug):
     GET /api/dashboard/{case_slug}/overview
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         
         # Check user has permission to view this case
-        if not case.is_active and not request.user.is_staff:
+        if case.is_disabled and not request.user.is_staff:
             return Response(
                 {'error': 'Case not accessible'},
                 status=status.HTTP_403_FORBIDDEN
@@ -99,7 +100,7 @@ def visitor_metrics_widget(request, case_slug):
     GET /api/dashboard/{case_slug}/widgets/visitor-metrics
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         data = get_visitor_metrics_widget(case)
         return Response(data)
     except Case.DoesNotExist:
@@ -180,7 +181,7 @@ def suspicious_activity_widget(request, case_slug):
     GET /api/dashboard/{case_slug}/widgets/suspicious-activity
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         data = get_suspicious_activity_widget(case)
         return Response(data)
     except Case.DoesNotExist:
@@ -263,7 +264,7 @@ def geographic_map_widget(request, case_slug):
     GET /api/dashboard/{case_slug}/widgets/geographic-map
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         data = get_geographic_map_widget(case)
         return Response(data)
     except Case.DoesNotExist:
@@ -351,7 +352,7 @@ def activity_timeline_widget(request, case_slug):
     GET /api/dashboard/{case_slug}/widgets/activity-timeline
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         
         # Get time range from query params
         hours = int(request.GET.get('hours', 24))
@@ -450,7 +451,7 @@ def engagement_metrics_widget(request, case_slug):
     GET /api/dashboard/{case_slug}/widgets/engagement-metrics
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         data = get_engagement_metrics_widget(case)
         return Response(data)
     except Case.DoesNotExist:
@@ -589,7 +590,7 @@ def alerts_panel_widget(request, case_slug):
     GET /api/dashboard/{case_slug}/widgets/alerts
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         data = get_alerts_panel_widget(case)
         return Response(data)
     except Case.DoesNotExist:
@@ -638,22 +639,30 @@ def get_alerts_panel_widget(case):
 def get_device_breakdown_widget(case):
     """Helper function to get device breakdown data"""
     sessions = UserSession.objects.filter(case=case)
-    
+    total = sessions.count()
+
+    if total == 0:
+        return {
+            'device_types': [],
+            'browsers': [],
+            'operating_systems': [],
+        }
+
     breakdown = {
-        'device_types': sessions.values('device_type').annotate(
+        'device_types': list(sessions.values('device_type').annotate(
             count=Count('id'),
-            percentage=Count('id') * 100.0 / sessions.count()
-        ).order_by('-count'),
-        'browsers': sessions.values('browser').annotate(
+            percentage=Count('id') * 100.0 / total
+        ).order_by('-count')),
+        'browsers': list(sessions.values('browser').annotate(
             count=Count('id'),
-            percentage=Count('id') * 100.0 / sessions.count()
-        ).order_by('-count')[:5],
-        'operating_systems': sessions.values('os').annotate(
+            percentage=Count('id') * 100.0 / total
+        ).order_by('-count')[:5]),
+        'operating_systems': list(sessions.values('os').annotate(
             count=Count('id'),
-            percentage=Count('id') * 100.0 / sessions.count()
-        ).order_by('-count')[:5],
+            percentage=Count('id') * 100.0 / total
+        ).order_by('-count')[:5]),
     }
-    
+
     return breakdown
 
 
@@ -714,7 +723,7 @@ def realtime_activity_stream(request, case_slug):
     GET /api/dashboard/{case_slug}/realtime/activity
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         
         # Get events from last 5 minutes
         since = timezone.now() - timedelta(minutes=5)
@@ -759,7 +768,7 @@ def realtime_metrics(request, case_slug):
     GET /api/dashboard/{case_slug}/realtime/metrics
     """
     try:
-        case = Case.objects.get(slug=case_slug)
+        case = Case.objects.get(subdomain=case_slug)
         now = timezone.now()
         
         # Last 5 minutes metrics

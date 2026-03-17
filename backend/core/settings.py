@@ -137,6 +137,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'tracker.middleware.TrackingMiddleware',
+    'tracker.middleware.RateLimitMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -305,6 +307,21 @@ if not DEBUG:
     ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Allow custom headers from frontend tracker
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-session-id',
+    'x-fingerprint',
+]
 
 # REST Framework
 REST_FRAMEWORK = {

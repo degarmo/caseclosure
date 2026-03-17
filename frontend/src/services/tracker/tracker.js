@@ -15,8 +15,8 @@ class CaseTracker {
     // Configuration
     this.config = {
       apiEndpoint: config.apiEndpoint || getAPIBaseURL(),
-      trackingEndpoint: config.trackingEndpoint || '/track',
-      batchEndpoint: config.batchEndpoint || '/track/batch',
+      trackingEndpoint: config.trackingEndpoint || 'tracker/track/',
+      batchEndpoint: config.batchEndpoint || 'tracker/track/batch/',
       sessionCookieName: config.sessionCookieName || 'tracking_session_id',
       enableLogging: config.enableLogging || import.meta.env.MODE === 'development',
       batchSize: config.batchSize || 10,

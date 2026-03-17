@@ -173,7 +173,7 @@ export default function Sidebar({
       id: 'analytics',
       label: 'Analytics',
       icon: ChartBarIcon,
-      show: permissions.can('view_analytics')
+      show: permissions.can('view_analytics') || permissions.can('view_own_analytics')
     },
     {
       id: 'settings',

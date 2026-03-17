@@ -37,6 +37,9 @@ import EditorWrapper from "./components/CaseCreator/EditorWrapper";
 import TemplatePreviewWrapper from './components/CaseCreator/views/TemplatePreviewWrapper';
 import TemplateRenderer from "./templates/TemplateRenderer";
 
+// Tracking
+import { TrackingProvider } from "./components/tracking/TrackingProvider";
+
 // Utils
 import getSubdomain from "./utils/getSubdomain";
 import api from "./api/config";
@@ -400,9 +403,11 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <TrackingProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </TrackingProvider>
   );
 }
 

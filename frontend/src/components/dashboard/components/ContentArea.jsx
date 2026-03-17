@@ -12,6 +12,8 @@ import Settings from '../sections/Settings/Settings';
 import SpotlightPostsList from '../sections/Spotlight/SpotlightPostsList';
 import SpotlightEditor from '../sections/Spotlight/SpotlightEditor';
 import PoliceCaseDetail from '../sections/Cases/PoliceCaseDetail';
+import AnalyticsDashboard from '../sections/Analytics/AnalyticsDashboard';
+import AdminOverview from '../sections/Overview/AdminOverview';
 
 export default function ContentArea({ 
   activeSection, 
@@ -126,26 +128,34 @@ export default function ContentArea({
   const renderContent = () => {
     switch (activeSection) {
       case 'overview':
+        // Admin gets the full chart-rich overview; other roles get a simple stat summary
+        if (permissions.isAdmin()) {
+          return (
+            <AdminOverview
+              data={data}
+              onSectionChange={onSectionChange}
+            />
+          );
+        }
+        // LEO / family — plain cards (enough info for their context)
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
                 <h3 className="text-sm font-medium text-gray-500">Total Cases</h3>
-                <p className="text-2xl font-bold mt-2">{data.stats?.totalCases || 0}</p>
+                <p className="text-2xl font-bold mt-2 text-gray-900">{data.stats?.totalCases || 0}</p>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h3 className="text-sm font-medium text-gray-500">Total Users</h3>
-                <p className="text-2xl font-bold mt-2">{data.stats?.totalUsers || 0}</p>
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+                <h3 className="text-sm font-medium text-gray-500">Active Cases</h3>
+                <p className="text-2xl font-bold mt-2 text-green-600">{data.stats?.activeCases || 0}</p>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h3 className="text-sm font-medium text-gray-500">Pending Requests</h3>
-                <p className="text-2xl font-bold mt-2 text-amber-600">
-                  {data.stats?.pendingRequests || 0}
-                </p>
-              </div>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
                 <h3 className="text-sm font-medium text-gray-500">Messages</h3>
-                <p className="text-2xl font-bold mt-2">{data.stats?.unreadMessages || 0}</p>
+                <p className="text-2xl font-bold mt-2 text-gray-900">{data.stats?.unreadMessages || 0}</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+                <h3 className="text-sm font-medium text-gray-500">Spotlight Posts</h3>
+                <p className="text-2xl font-bold mt-2 text-gray-900">{data.stats?.totalSpotlightPosts || 0}</p>
               </div>
             </div>
           </div>
@@ -259,10 +269,11 @@ export default function ContentArea({
 
       case 'analytics':
         return (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">Analytics</h2>
-            <p className="text-gray-500">Analytics dashboard coming soon...</p>
-          </div>
+          <AnalyticsDashboard
+            user={user}
+            permissions={permissions}
+            data={data}
+          />
         );
 
       case 'settings':

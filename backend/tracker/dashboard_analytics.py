@@ -29,7 +29,8 @@ class DashboardAnalytics:
         """
         Get comprehensive overview statistics for dashboard
         """
-        from .models import Case, TrackingEvent, UserSession, SuspiciousActivity, Alert
+        from cases.models import Case
+        from .models import TrackingEvent, UserSession, SuspiciousActivity, Alert
         
         cache_key = self.get_cache_key('overview_stats')
         cached_data = cache.get(cache_key)

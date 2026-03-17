@@ -2,37 +2,54 @@
 import api from './config';
 
 /**
- * Analytics API methods
+ * Analytics/Dashboard API methods
+ * Maps to backend: /api/tracker/dashboard/<case_slug>/...
  */
 export const analyticsAPI = {
-  getDashboard: (caseId) => api.get(`/analytics/dashboard/${caseId}/`),
-  getVisitors: (caseId, params) => api.get(`/analytics/visitors/${caseId}/`, { params }),
-  getEvents: (caseId, params) => api.get(`/analytics/events/${caseId}/`, { params }),
-  getLocations: () => api.get('/analytics/locations/'),
+  getDashboard: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/`),
+  getVisitors: (caseSlug, params) => api.get(`/tracker/dashboard/${caseSlug}/suspicious/`, { params }),
+  getPatterns: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/patterns/`),
+  getRealtime: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/realtime/`),
+  exportData: (caseSlug, params) => api.post(`/tracker/dashboard/${caseSlug}/export/`, params),
+
+  // Widget endpoints
+  getVisitorMetrics: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/widgets/visitor-metrics/`),
+  getSuspiciousActivity: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/widgets/suspicious-activity/`),
+  getGeographicMap: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/widgets/geographic-map/`),
+  getActivityTimeline: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/widgets/activity-timeline/`),
+  getEngagementMetrics: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/widgets/engagement-metrics/`),
+  getAlerts: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/widgets/alerts/`),
+
+  // Realtime stream endpoints
+  getRealtimeActivity: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/realtime/activity/`),
+  getRealtimeMetrics: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/realtime/metrics/`),
 };
 
 /**
  * Tracking API methods
+ * Maps to backend: /api/tracker/track/...
  */
 export const trackingAPI = {
-  sendEvent: (data) => api.post('/track/event/', data),
-  sendBatch: (events) => api.post('/track/batch/', { events }),
+  sendEvent: (data) => api.post('/tracker/track/', data),
+  sendBatch: (events) => api.post('/tracker/track/batch/', { events }),
+  reportSuspicious: (data) => api.post('/tracker/suspicious/report/', data),
 };
 
 /**
  * Activity API methods
+ * Maps to backend: /api/tracker/activity/...
  */
 export const activityAPI = {
-  last: () => api.get('/activity/last/'),
-  feed: (params) => api.get('/activity/feed/', { params }),
-  realtime: (params) => api.get('/activity/realtime/', { params }),
+  last: () => api.get('/tracker/activity/last/'),
 };
 
 /**
- * Metrics API methods
+ * Admin tracking endpoints
+ * Maps to backend: /api/tracker/admin/...
  */
-export const metricsAPI = {
-  realtime: (params) => api.get('/metrics/realtime/', { params }),
+export const adminTrackingAPI = {
+  getAlerts: () => api.get('/tracker/admin/alerts/'),
+  flagUser: (fingerprint) => api.post(`/tracker/admin/flag/${fingerprint}/`),
 };
 
-export default { analyticsAPI, trackingAPI, activityAPI, metricsAPI };
+export default { analyticsAPI, trackingAPI, activityAPI, adminTrackingAPI };

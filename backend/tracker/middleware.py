@@ -18,8 +18,9 @@ from ipaddress import ip_address, ip_network
 
 from .models import (
     TrackingEvent, UserSession, SuspiciousActivity,
-    DeviceFingerprint, Alert, Case
+    DeviceFingerprint, Alert
 )
+from cases.models import Case
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +53,11 @@ class TrackingMiddleware(MiddlewareMixin):
             '/robots.txt',
         ]
         
-        # API endpoints that need special handling
+        # API endpoints that need special handling (skip tracking on these to avoid recursion)
         self.api_endpoints = [
-            '/api/track',
-            '/api/dashboard/',
-            '/api/suspicious/',
+            '/api/tracker/track',
+            '/api/tracker/dashboard/',
+            '/api/tracker/suspicious/',
         ]
         
         # Initialize VPN/Proxy detection lists (would be loaded from external source)
@@ -68,16 +69,26 @@ class TrackingMiddleware(MiddlewareMixin):
         # Skip excluded paths
         if self.should_exclude_path(request.path):
             return self.get_response(request)
-        
-        # Process tracking before request
-        self.process_request(request)
-        
-        # Get response
+
+        # Skip tracking API endpoints to avoid recursion
+        if any(request.path.startswith(ep) for ep in self.api_endpoints):
+            return self.get_response(request)
+
+        try:
+            # Process tracking before request
+            self.process_request(request)
+        except Exception as e:
+            logger.error(f"Tracking middleware error (pre-request): {e}")
+
+        # Get response — always succeeds even if tracking fails
         response = self.get_response(request)
-        
-        # Process tracking after response
-        self.process_response(request, response)
-        
+
+        try:
+            # Process tracking after response
+            self.process_response(request, response)
+        except Exception as e:
+            logger.error(f"Tracking middleware error (post-response): {e}")
+
         return response
     
     def process_request(self, request: HttpRequest) -> None:
@@ -777,7 +788,7 @@ class TrackingMiddleware(MiddlewareMixin):
         path_parts = request.path.strip('/').split('/')
         if len(path_parts) >= 2 and path_parts[0] == 'case':
             try:
-                return Case.objects.get(slug=path_parts[1])
+                return Case.objects.get(subdomain=path_parts[1])
             except Case.DoesNotExist:
                 pass
         
@@ -787,7 +798,7 @@ class TrackingMiddleware(MiddlewareMixin):
             subdomain = host.split('.')[0]
             if subdomain not in ['www', 'api', 'admin']:
                 try:
-                    return Case.objects.get(slug=subdomain)
+                    return Case.objects.get(subdomain=subdomain)
                 except Case.DoesNotExist:
                     pass
         
