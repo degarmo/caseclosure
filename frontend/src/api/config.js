@@ -16,22 +16,18 @@ export const getAPIBaseURL = () => {
   if (import.meta.env.DEV) {
     return "/api/";
   }
-  
-  // Production - check hostname
-  const hostname = window.location.hostname;
-  
-  // Production domains
-  if (hostname === 'caseclosure-frontend.onrender.com' || 
-      hostname === 'caseclosure.org' ||
-      hostname === 'www.caseclosure.org') {
-    return "https://caseclosure-backend.onrender.com/api/";
+
+  // Production - use VITE_API_URL env var if set (configured in render.yaml)
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
-  
-  // Any non-localhost domain should use production backend
+
+  // Fallback: any non-localhost domain uses production backend
+  const hostname = window.location.hostname;
   if (!hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
     return "https://caseclosure-backend.onrender.com/api/";
   }
-  
+
   return "/api/";
 };
 

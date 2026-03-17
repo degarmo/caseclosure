@@ -59,7 +59,8 @@ if not DEBUG:
         '.caseclosure.org',  # Allows all subdomains
         'caseclosure.org',
         'www.caseclosure.org',
-        'caseclosure.onrender.com',  # Render's default domain
+        'caseclosure-backend.onrender.com',  # Render backend domain
+        'caseclosure.onrender.com',  # Legacy Render domain
     ]
 
 # Add Render's dynamic hostname if available
@@ -300,7 +301,7 @@ if not DEBUG:
     CORS_ALLOWED_ORIGINS += [
         "https://caseclosure.org",
         "https://www.caseclosure.org",
-        "https://caseclosure.onrender.com",
+        "https://caseclosure-backend.onrender.com",
     ]
 
 CORS_ALLOW_CREDENTIALS = True

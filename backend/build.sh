@@ -15,8 +15,10 @@ User = get_user_model()
 admin_email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@caseclosure.org')
 admin_password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '')
 if admin_password and not User.objects.filter(email=admin_email).exists():
-    User.objects.create_superuser('admin', admin_email, admin_password)
-    print('Superuser created')
+    User.objects.create_superuser(email=admin_email, password=admin_password)
+    print('Superuser created: ' + admin_email)
 elif not admin_password:
     print('Skipping superuser creation: DJANGO_SUPERUSER_PASSWORD not set')
+else:
+    print('Superuser already exists: ' + admin_email)
 "
