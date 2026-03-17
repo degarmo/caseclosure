@@ -4,7 +4,7 @@ import {
   User, Mail, Lock, Save, X, Check, AlertCircle, ChevronDown,
   Shield, Users, Send, Copy, Trash2, Plus, Eye, EyeOff
 } from 'lucide-react';
-import api from '@/api/axios';
+import api from '@/api/config';
 
 export default function ProfileSettings({ user, currentCase, onClose }) {
   const [loading, setLoading] = useState(false);

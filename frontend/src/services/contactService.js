@@ -1,5 +1,5 @@
 // src/services/contactService.js
-import api from "@/utils/axios";
+import api from '@/api/config';
 import ENV from "@/config/environment";
 
 /**

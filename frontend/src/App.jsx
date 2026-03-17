@@ -39,7 +39,7 @@ import TemplateRenderer from "./templates/TemplateRenderer";
 
 // Utils
 import getSubdomain from "./utils/getSubdomain";
-import api from "./utils/axios";
+import api from "./api/config";
 
 function useAuth() {
   let user = null;

@@ -6,7 +6,7 @@ import Image from '@tiptap/extension-image';
 import SpotlightFeed from './SpotlightFeed';
 import SpotlightEditor from './SpotlightEditor';
 import SpotlightScheduler from './SpotlightScheduler';
-import { spotlightAPI } from '@/api/spotlight';
+import { spotlightAPI } from '@/api';
 import './Spotlight.css';
 
 const Spotlight = () => {

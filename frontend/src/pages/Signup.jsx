@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Lock, Mail, User, Eye, EyeOff, AlertCircle, Loader2, Shield, CheckCircle, InfoIcon, UserPlus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import api from "@/utils/axios";
+import api from '@/api/config';
 
 export default function Signup() {
   const navigate = useNavigate();

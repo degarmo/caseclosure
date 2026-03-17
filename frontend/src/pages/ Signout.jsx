@@ -1,7 +1,7 @@
 // frontend/src/pages/SignOut.jsx
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '@/api/axios';
+import api from '@/api/config';
 import { Loader2 } from 'lucide-react';
 
 // Main SignOut component - ONLY ONE DEFAULT EXPORT

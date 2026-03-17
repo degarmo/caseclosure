@@ -1,6 +1,6 @@
 // src/hooks/useSpotlight.js
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/utils/axios';
+import api from '@/api/config';
 
 /**
  * Custom hook for managing case-specific spotlight posts

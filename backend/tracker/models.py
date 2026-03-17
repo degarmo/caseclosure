@@ -2,7 +2,7 @@
 import uuid
 from django.db import models
 from django.conf import settings  # Add this import
-from django.contrib.postgres.fields import ArrayField
+# Using JSONField instead of ArrayField for cross-database compatibility
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 import json
@@ -41,7 +41,7 @@ class DeviceFingerprint(models.Model):
     color_depth = models.IntegerField()
     
     # Browser features
-    languages = ArrayField(models.CharField(max_length=10), blank=True, default=list)
+    languages = models.JSONField(blank=True, default=list)
     timezone = models.CharField(max_length=50)
     timezone_offset = models.IntegerField()
     
@@ -51,11 +51,11 @@ class DeviceFingerprint(models.Model):
     audio_fingerprint = models.TextField(blank=True)
     
     # Fonts
-    fonts = ArrayField(models.CharField(max_length=100), blank=True, default=list)
+    fonts = models.JSONField(blank=True, default=list)
     
     # Browser capabilities
-    plugins = ArrayField(models.CharField(max_length=100), blank=True, default=list)
-    mime_types = ArrayField(models.CharField(max_length=50), blank=True, default=list)
+    plugins = models.JSONField(blank=True, default=list)
+    mime_types = models.JSONField(blank=True, default=list)
     
     # Touch/Input
     touch_support = models.BooleanField(default=False)
@@ -73,7 +73,7 @@ class DeviceFingerprint(models.Model):
     is_bot = models.BooleanField(default=False)
     
     # Associated data
-    known_ips = ArrayField(models.GenericIPAddressField(), blank=True, default=list)
+    known_ips = models.JSONField(blank=True, default=list)
     associated_cases = models.ManyToManyField(Case, blank=True)
     
     # Timestamps
@@ -477,7 +477,7 @@ class Alert(models.Model):
     
     # Alert data
     data = models.JSONField(default=dict)
-    recommended_actions = ArrayField(models.TextField(), blank=True, default=list)
+    recommended_actions = models.JSONField(blank=True, default=list)
     
     # Status
     acknowledged = models.BooleanField(default=False)
@@ -545,7 +545,7 @@ class MLModel(models.Model):
     description = models.TextField(blank=True)
     algorithm = models.CharField(max_length=100)
     parameters = models.JSONField(default=dict)
-    features = ArrayField(models.CharField(max_length=100), blank=True, default=list)
+    features = models.JSONField(blank=True, default=list)
     
     # Performance metrics
     accuracy = models.FloatField(null=True, blank=True)

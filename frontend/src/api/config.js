@@ -37,38 +37,45 @@ export const getAPIBaseURL = () => {
 
 /**
  * Get access token from localStorage
+ * Uses single key: access_token (with fallbacks for legacy keys)
  */
 export const getStoredToken = () => {
-  return localStorage.getItem("access") || 
-         localStorage.getItem("authToken") || 
-         localStorage.getItem("access_token") ||
+  return localStorage.getItem("access_token") ||
+         localStorage.getItem("access") ||
+         localStorage.getItem("authToken") ||
          localStorage.getItem("token");
 };
 
 /**
  * Get refresh token from localStorage
+ * Uses single key: refresh_token (with fallbacks for legacy keys)
  */
 export const getStoredRefreshToken = () => {
-  return localStorage.getItem("refresh") || 
-         localStorage.getItem("refreshToken") || 
-         localStorage.getItem("refresh_token");
+  return localStorage.getItem("refresh_token") ||
+         localStorage.getItem("refresh") ||
+         localStorage.getItem("refreshToken");
 };
 
 /**
  * Store tokens in localStorage
+ * Now uses standardized keys: access_token and refresh_token
  */
 export const storeTokens = (accessToken, refreshToken = null) => {
   if (accessToken) {
+    // Use standard key as primary
+    localStorage.setItem("access_token", accessToken);
+    // Keep legacy keys for backward compatibility during transition
     localStorage.setItem("access", accessToken);
     localStorage.setItem("authToken", accessToken);
-    localStorage.setItem("access_token", accessToken);
     localStorage.setItem("token", accessToken);
   }
-  
+
   if (refreshToken) {
+    // Use standard key as primary
+    localStorage.setItem("refresh_token", refreshToken);
+    // Keep legacy keys for backward compatibility during transition
     localStorage.setItem("refresh", refreshToken);
     localStorage.setItem("refreshToken", refreshToken);
-    localStorage.setItem("refresh_token", refreshToken);
   }
 };
 
@@ -76,12 +83,14 @@ export const storeTokens = (accessToken, refreshToken = null) => {
  * Clear all auth data from localStorage
  */
 export const clearAuthData = () => {
+  // Clear standard keys
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  // Clear legacy keys
   localStorage.removeItem("access");
   localStorage.removeItem("refresh");
   localStorage.removeItem("authToken");
   localStorage.removeItem("refreshToken");
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
   localStorage.removeItem("token");
   localStorage.removeItem("user");
 };

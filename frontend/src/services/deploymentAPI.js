@@ -1,5 +1,5 @@
 // services/deploymentAPI.js
-import api from '@/api/axios'; // Import your authenticated axios instance
+import api from '@/api/config'; // Import your authenticated axios instance
 
 export const checkSubdomainAvailability = async (subdomain, caseId = null) => {
   try {

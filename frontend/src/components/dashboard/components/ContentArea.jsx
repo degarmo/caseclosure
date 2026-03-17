@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
-import api from '@/utils/axios';
+import api from '@/api/config';
 // Import existing components
 import CasesList from '../sections/Cases/CasesList';
 import CaseDetails from '../sections/Cases/CaseDetails';

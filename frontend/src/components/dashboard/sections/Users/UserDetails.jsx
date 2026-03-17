@@ -1,6 +1,6 @@
 // src/pages/dashboard/components/UserDetails.jsx
 import React, { useState, useEffect } from 'react';
-import api from '@/api/axios';
+import api from '@/api/config';
 import { 
   ArrowLeft, User, Mail, Phone, Calendar, Shield, 
   FileText, Clock, MapPin, Activity, Edit, Trash2,

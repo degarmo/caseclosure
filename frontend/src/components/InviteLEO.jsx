@@ -1,7 +1,7 @@
 // src/components/InviteLEO.jsx
 import React, { useState } from 'react';
 import { Shield, Copy, Mail } from 'lucide-react';
-import api from '@/utils/axios';
+import api from '@/api/config';
 
 export default function InviteLEO({ caseId }) {
   const [form, setForm] = useState({

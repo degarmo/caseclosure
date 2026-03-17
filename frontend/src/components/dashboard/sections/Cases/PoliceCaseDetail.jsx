@@ -11,7 +11,7 @@ import {
   DocumentTextIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
-import axios from '../../../../utils/axios';
+import axios from '@/api/config';
 
 export default function PoliceCaseDetail({ caseId, permissions, onRefresh }) {
   const [caseData, setCaseData] = useState(null);

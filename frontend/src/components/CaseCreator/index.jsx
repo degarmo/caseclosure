@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { INITIAL_CASE_DATA } from './constants';
 import { calculateAge, validateRequiredFields, initializeCustomizations, parseAPIError } from './utils';
 import { saveCase as saveCaseAPI, deployCaseWebsite } from '@/components/CaseCreator/services/caseAPI';
-import api from '@/utils/axios'; // or '@/api/axios' depending on your setup
+import api from '@/api/config';
 
 // Direct component imports
 import Header from './components/Header';

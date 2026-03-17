@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Layout, Loader } from 'lucide-react';
 import { getEditableZones } from '../utils';
-import api from '@/api/axios';
+import api from '@/api/config';
 
 const TemplateSelectionView = ({
   selectedTemplate,

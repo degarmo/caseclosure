@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import api from "@/api/axios";  // Fixed import path
+import api from '@/api/config';  // Fixed import path
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

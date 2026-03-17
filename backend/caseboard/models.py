@@ -7,7 +7,7 @@ Supports: Official FOIA cases, Community cases, Private paid cases
 import uuid
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.contrib.postgres.fields import ArrayField
+# Using JSONField instead of ArrayField for cross-database compatibility
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 
@@ -117,7 +117,7 @@ class Case(models.Model):
     )
     
     # Metadata
-    tags = ArrayField(models.CharField(max_length=50), blank=True, default=list)
+    tags = models.JSONField(blank=True, default=list)
     
     # Stats (aggregate from workspaces)
     total_investigators = models.IntegerField(default=0)
@@ -304,7 +304,7 @@ class OfficialEvidence(models.Model):
     transcription = models.TextField(blank=True)
     
     # Tags
-    tags = ArrayField(models.CharField(max_length=50), blank=True, default=list)
+    tags = models.JSONField(blank=True, default=list)
     
     # Who uploaded (staff for official, user for community)
     uploaded_by = models.ForeignKey(
@@ -374,7 +374,7 @@ class WorkspaceEvidence(models.Model):
     date_obtained = models.DateField(null=True, blank=True)
     
     # Tags
-    tags = ArrayField(models.CharField(max_length=50), blank=True, default=list)
+    tags = models.JSONField(blank=True, default=list)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -415,7 +415,7 @@ class WorkspaceSuspect(models.Model):
     
     # Personal information
     name = models.CharField(max_length=255)
-    aliases = ArrayField(models.CharField(max_length=100), blank=True, default=list)
+    aliases = models.JSONField(blank=True, default=list)
     age = models.IntegerField(null=True, blank=True)
     description = models.TextField(blank=True)
     
@@ -447,7 +447,7 @@ class WorkspaceSuspect(models.Model):
     )
     
     # Tags
-    tags = ArrayField(models.CharField(max_length=50), blank=True, default=list)
+    tags = models.JSONField(blank=True, default=list)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -522,7 +522,7 @@ class WorkspaceTimelineEvent(models.Model):
     )
     
     # Tags
-    tags = ArrayField(models.CharField(max_length=50), blank=True, default=list)
+    tags = models.JSONField(blank=True, default=list)
     is_key_event = models.BooleanField(default=False)
     
     # Timestamps
@@ -560,7 +560,7 @@ class WorkspaceNote(models.Model):
     
     # Metadata
     is_important = models.BooleanField(default=False)
-    tags = ArrayField(models.CharField(max_length=50), blank=True, default=list)
+    tags = models.JSONField(blank=True, default=list)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

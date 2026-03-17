@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api from '@/utils/axios';
+import api from '@/api/config';
 
 export function useDashboardData(user, permissions, options = {}) {
   const {

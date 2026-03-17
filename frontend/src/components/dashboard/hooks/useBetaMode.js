@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '@/utils/axios';
+import api from '@/api/config';
 
 export function useBetaMode() {
   const [betaMode, setBetaMode] = useState(false);

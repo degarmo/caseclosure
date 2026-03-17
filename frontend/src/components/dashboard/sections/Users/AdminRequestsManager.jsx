@@ -1,6 +1,6 @@
 // src/components/AdminRequestsManager.jsx
 import React, { useState, useEffect } from 'react';
-import api from '@/api/axios';
+import api from '@/api/config';
 import { 
   Users, 
   Check, 

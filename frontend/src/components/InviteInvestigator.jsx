@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import api from '@/utils/axios';
+import api from '@/api/config';
 
 export default function InviteInvestigator({ caseId, onComplete }) {
   const [formData, setFormData] = useState({

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import { Ring } from 'ldrs/react';
 import 'ldrs/react/Ring.css';
-import api from '@/api/axios';
+import api from '@/api/config';
 import { getTemplate } from './registry';
 import getSubdomain from '@/utils/getSubdomain';
 

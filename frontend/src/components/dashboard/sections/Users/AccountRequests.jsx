@@ -1,6 +1,6 @@
 // src/pages/dashboard/components/AccountRequests.jsx
 import React, { useState, useEffect } from 'react';
-import api from '@/api/axios';
+import api from '@/api/config';
 import { 
   Users, Check, X, Mail, Clock, Building, MapPin, 
   Copy, RefreshCw, Phone, User, FileText, ExternalLink,

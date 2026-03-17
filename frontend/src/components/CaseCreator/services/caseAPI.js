@@ -1,6 +1,6 @@
 // src/components/CaseCreator/services/caseAPI.js
 
-import api from "@/api/axios";
+import api from '@/api/config';
 
 /**
  * Upload a generic image and return its URL

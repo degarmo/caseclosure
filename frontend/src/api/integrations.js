@@ -1,5 +1,5 @@
 // integrations.js
-import api from "./axios";
+import api from './config';
 
 // You'll need to implement these functions based on what they're supposed to do
 export const Core = {

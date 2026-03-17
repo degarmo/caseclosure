@@ -1,6 +1,6 @@
 // src/pages/Spotlight.jsx - Enhanced version with Tailwind
 import React, { useState, useEffect } from "react";
-import { apiMethods } from "../utils/axios";  // Import your configured axios
+import { apiMethods } from "@/api";  // Import from centralized API module
 
 export default function Spotlight() {
   const [posts, setPosts] = useState([]);

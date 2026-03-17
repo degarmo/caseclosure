@@ -6,7 +6,7 @@ import {
   CheckCircleIcon,
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
-import axios from '../../../../utils/axios';
+import axios from '@/api/config';
 
 export default function CaseAccessManager({ caseId, caseName, permissions, onRefresh }) {
   const [accessList, setAccessList] = useState([]);

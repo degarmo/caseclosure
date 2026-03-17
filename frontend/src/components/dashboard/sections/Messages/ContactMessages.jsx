@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '@/utils/axios';
+import api from '@/api/config';
 import { MessageSquare, Shield, AlertCircle, CheckCircle, Clock, Archive, Eye, Filter, Search } from 'lucide-react';
 
 export default function ContactMessages({ onRefresh, filterType, caseId }) {

@@ -8,7 +8,7 @@ import {
   UserPlusIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import axios from '../../../../utils/axios';
+import axios from '@/api/config';
 
 export default function ShareAccess({ user, permissions, onSuccess }) {
   const [isExpanded, setIsExpanded] = useState(false);

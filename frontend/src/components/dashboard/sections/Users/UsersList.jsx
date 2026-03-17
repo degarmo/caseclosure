@@ -3,7 +3,7 @@
 // Add this enhanced UsersList with proper error handling and data fetching:
 
 import React, { useState, useEffect } from 'react';
-import api from '@/utils/axios';  // Make sure this path is correct
+import api from '@/api/config';  // Make sure this path is correct
 import { 
   Users, User, Mail, Phone, Calendar, Shield, Eye, 
   Edit, Trash2, Search, Filter, RefreshCw, CheckCircle,

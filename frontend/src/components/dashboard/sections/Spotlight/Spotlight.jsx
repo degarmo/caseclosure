@@ -6,7 +6,7 @@ import Image from '@tiptap/extension-image';
 import SpotlightFeed from './SpotlightFeed';
 import SpotlightEditor from './SpotlightEditor';
 import SpotlightScheduler from './SpotlightScheduler';
-import { apiMethods } from '@/utils/axios';
+import { apiMethods } from '@/api';
 import { getCurrentUser } from '@/utils/auth';
 import './Spotlight.css';
 

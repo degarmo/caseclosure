@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Lock, Mail, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import api, { authUtils } from "@/api/axios";
+import api, { storeTokens } from '@/api/config';
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -45,7 +45,7 @@ export default function SignIn() {
   const handleOAuthSuccess = async (accessToken, refreshToken) => {
     try {
       // Store tokens using authUtils - stores in ALL token locations
-      authUtils.setTokens(accessToken, refreshToken);
+      storeTokens(accessToken, refreshToken);
       
       // Get user info
       const userResponse = await api.get("auth/user/", {
@@ -91,7 +91,7 @@ export default function SignIn() {
       });
 
       // Store tokens using authUtils - stores in ALL token locations
-      authUtils.setTokens(response.data.access, response.data.refresh);
+      storeTokens(response.data.access, response.data.refresh);
 
       // Store user info
       if (response.data.user) {
