@@ -155,8 +155,8 @@ export function useDashboardData(user, permissions, options = {}) {
         totalUsers: results.users?.length || 0,
         pendingRequests: results.pendingRequests?.length || 0,
         totalMessages: results.messages?.length || 0,
-        unreadMessages: results.messages?.filter(m => !m.read)?.length || 0,
-        newTips: results.messages?.filter(m => m.type === 'tip' && !m.read)?.length || 0,
+        unreadMessages: results.messages?.filter(m => !m.read && m.status !== 'archived')?.length || 0,
+        newTips: results.messages?.filter(m => m.type === 'tip' && !m.read && m.status !== 'archived')?.length || 0,
         totalSpotlightPosts: results.spotlightPosts?.filter(p => p.status !== 'scheduled')?.length || 0,
         scheduledPosts: results.spotlightPosts?.filter(p => p.status === 'scheduled')?.length || 0
       };
