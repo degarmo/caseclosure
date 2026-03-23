@@ -1067,6 +1067,84 @@ def get_or_create_session(session_id, fingerprint, client_info, case):
         return None
 
 
+def _is_private_ip(ip_str):
+    """Return True if IP is private/loopback — skip geo lookup for these."""
+    try:
+        from ipaddress import ip_address, ip_network
+        addr = ip_address(ip_str)
+        private_ranges = [
+            ip_network('10.0.0.0/8'),
+            ip_network('172.16.0.0/12'),
+            ip_network('192.168.0.0/16'),
+            ip_network('127.0.0.0/8'),
+            ip_network('::1/128'),
+        ]
+        return any(addr in r for r in private_ranges)
+    except Exception:
+        return False
+
+
+def lookup_geo(ip_str):
+    """
+    Return geo dict with keys: country, region, city.
+    Strategy:
+      1. Check cache (keyed by IP, TTL 24h)
+      2. Try local MaxMind GeoLite2-City database (if GEOIP_PATH is set)
+      3. Fall back to ip-api.com free JSON endpoint
+      4. Return empty strings on any failure
+    """
+    if not ip_str or _is_private_ip(ip_str):
+        return {'country': '', 'region': '', 'city': ''}
+
+    cache_key = f'geo:{ip_str}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = {'country': '', 'region': '', 'city': ''}
+
+    # ── Strategy 1: local MaxMind GeoLite2 ──────────────────────────────────
+    from django.conf import settings as _settings
+    geoip_path = getattr(_settings, 'GEOIP_PATH', None)
+    if geoip_path:
+        try:
+            import geoip2.database
+            import os
+            db_path = os.path.join(geoip_path, 'GeoLite2-City.mmdb')
+            if os.path.exists(db_path):
+                with geoip2.database.Reader(db_path) as reader:
+                    r = reader.city(ip_str)
+                    result = {
+                        'country': r.country.iso_code or '',
+                        'region':  r.subdivisions.most_specific.name or '',
+                        'city':    r.city.name or '',
+                    }
+                cache.set(cache_key, result, 86400)
+                return result
+        except Exception as e:
+            logger.debug(f'GeoLite2 lookup failed for {ip_str}: {e}')
+
+    # ── Strategy 2: ip-api.com free endpoint ────────────────────────────────
+    try:
+        import urllib.request
+        url = f'http://ip-api.com/json/{ip_str}?fields=status,country,regionName,city,countryCode'
+        req = urllib.request.Request(url, headers={'User-Agent': 'CaseClosure/1.0'})
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            import json as _json
+            geo = _json.loads(resp.read().decode())
+            if geo.get('status') == 'success':
+                result = {
+                    'country': geo.get('countryCode', ''),
+                    'region':  geo.get('regionName', ''),
+                    'city':    geo.get('city', ''),
+                }
+    except Exception as e:
+        logger.debug(f'ip-api.com lookup failed for {ip_str}: {e}')
+
+    cache.set(cache_key, result, 86400)  # cache 24h
+    return result
+
+
 def enrich_event_data(data, client_info, session):
     """Enrich event data with additional information"""
     enriched = {}
@@ -1085,15 +1163,11 @@ def enrich_event_data(data, client_info, session):
         except:
             pass
     
-    # GeoIP lookup (placeholder - would use real GeoIP service)
-    enriched.update({
-        'country': 'US',
-        'region': 'Unknown',
-        'city': 'Unknown',
-    })
-    
+    # GeoIP lookup - try local MaxMind DB first, then free API fallback
+    enriched.update(lookup_geo(client_info.get('ip', '')))
+
     # DON'T override is_vpn, is_proxy, is_tor here - those come from request data
-    
+
     return enriched
 
 

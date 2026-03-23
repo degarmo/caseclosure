@@ -278,6 +278,10 @@ if CLOUDINARY_CLOUD_NAME:
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# GeoIP2 - path to directory containing GeoLite2-City.mmdb
+# Downloaded by build.sh when MAXMIND_LICENSE_KEY env var is present
+GEOIP_PATH = os.path.join(BASE_DIR, 'geoip')
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
