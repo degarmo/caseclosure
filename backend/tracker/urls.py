@@ -7,6 +7,7 @@ from .views import (
     # Main tracking views
     track_event,
     track_batch,
+    tracking_ping,
     report_suspicious,
 
     # Dashboard views
@@ -45,7 +46,8 @@ urlpatterns = [
     # Main tracking endpoints
     path('track/', track_event, name='track_event'),
     path('track/batch/', track_batch, name='track_batch'),
-    path('track/batch', track_batch, name='track_batch_no_slash'),  # Support both with and without trailing slash
+    path('track/batch', track_batch, name='track_batch_no_slash'),
+    path('ping/', tracking_ping, name='tracking_ping'),
     path('suspicious/report/', report_suspicious, name='report_suspicious'),
     
     # ============================================

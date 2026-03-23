@@ -1016,6 +1016,39 @@ def admin_flag_user(request, fingerprint):
 
 
 # ============================================
+# DIAGNOSTIC
+# ============================================
+
+@csrf_exempt
+def tracking_ping(request):
+    """
+    Diagnostic endpoint — no auth required.
+    GET  /api/tracker/ping/              → overall recent event count
+    GET  /api/tracker/ping/?slug=<slug>  → event count for one case
+    """
+    since = timezone.now() - timedelta(hours=24)
+    slug = request.GET.get('slug')
+
+    if slug:
+        try:
+            case = Case.objects.get(subdomain=slug)
+            total  = TrackingEvent.objects.filter(case=case).count()
+            recent = TrackingEvent.objects.filter(case=case, timestamp__gte=since).count()
+        except Case.DoesNotExist:
+            return JsonResponse({'error': f'No case with subdomain "{slug}"'}, status=404)
+    else:
+        total  = TrackingEvent.objects.count()
+        recent = TrackingEvent.objects.filter(timestamp__gte=since).count()
+
+    return JsonResponse({
+        'status': 'ok',
+        'total_events': total,
+        'events_last_24h': recent,
+        'slug': slug or '(all cases)',
+    })
+
+
+# ============================================
 # HELPER FUNCTIONS
 # ============================================
 
