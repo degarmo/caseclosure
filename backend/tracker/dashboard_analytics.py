@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 import json
 import hashlib
 from collections import defaultdict, Counter
-import numpy as np
 from typing import Dict, List, Any, Optional, Tuple
 
 
