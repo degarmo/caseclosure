@@ -153,16 +153,20 @@ export const EditableImage = ({
   className = '',
   fallbackSrc = '/placeholder-image.jpg'
 }) => {
-  const [imageSrc, setImageSrc] = useState(src || customizations[sectionId] || fallbackSrc);
+  const [imageSrc, setImageSrc] = useState(customizations[sectionId] || src || fallbackSrc);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
-    // Update image when customizations change
+    // Customizations (user uploads) take priority over the src default
     if (customizations[sectionId]) {
       setImageSrc(customizations[sectionId]);
       setImageError(false);
+    } else if (src) {
+      // Fall back to the src prop (e.g. primary_photo_url from case data)
+      setImageSrc(src);
+      setImageError(false);
     }
-  }, [customizations, sectionId]);
+  }, [customizations, sectionId, src]);
 
   const handleImageError = () => {
     setImageError(true);

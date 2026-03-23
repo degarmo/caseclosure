@@ -69,47 +69,58 @@ class ImageUploadView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        print(f"[DEBUG] Upload request from user: {request.user}")
-        
         image = request.FILES.get('image')
         if not image:
             return Response(
-                {'error': 'No image provided'}, 
+                {'error': 'No image provided'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        try:
-            print(f"[DEBUG] Uploading image: {image.name}, size: {image.size}")
-            
-            result = upload(
-                image,
-                folder="caseclosure/customizations",
-                resource_type="image",
-                allowed_formats=['jpg', 'jpeg', 'png', 'gif', 'webp'],
-                transformation=[
-                    {'quality': 'auto:good'},
-                    {'fetch_format': 'auto'}
-                ]
-            )
-            
-            print(f"[DEBUG] Cloudinary upload successful: {result['secure_url']}")
-            
-            return Response({
-                'url': result['secure_url'],
-                'public_id': result['public_id'],
-                'width': result.get('width'),
-                'height': result.get('height')
-            })
-            
-        except Exception as e:
-            print(f"[ERROR] Cloudinary upload failed: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            
-            return Response(
-                {'error': f'Upload failed: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+
+        # Try Cloudinary first (production); fall back to local storage (dev)
+        if getattr(settings, 'CLOUDINARY_CLOUD_NAME', ''):
+            try:
+                result = upload(
+                    image,
+                    folder="caseclosure/customizations",
+                    resource_type="image",
+                    allowed_formats=['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                    transformation=[
+                        {'quality': 'auto:good'},
+                        {'fetch_format': 'auto'}
+                    ]
+                )
+                return Response({
+                    'url': result['secure_url'],
+                    'public_id': result['public_id'],
+                    'width': result.get('width'),
+                    'height': result.get('height')
+                })
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return Response(
+                    {'error': f'Cloudinary upload failed: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        else:
+            # Local dev fallback — save to MEDIA_ROOT and return an absolute URL
+            try:
+                import uuid as uuid_module
+                ext = image.name.rsplit('.', 1)[-1].lower() if '.' in image.name else 'jpg'
+                filename = f"customizations/{uuid_module.uuid4()}.{ext}"
+                saved_path = default_storage.save(filename, ContentFile(image.read()))
+                file_url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
+                return Response({
+                    'url': file_url,
+                    'public_id': saved_path,
+                    'width': None,
+                    'height': None
+                })
+            except Exception as e:
+                return Response(
+                    {'error': f'Local upload failed: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
 
 class CaseViewSet(viewsets.ModelViewSet):

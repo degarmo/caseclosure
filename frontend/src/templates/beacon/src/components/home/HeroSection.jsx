@@ -257,7 +257,7 @@ export default function HeroSection({
                   isEditing={isEditing}
                   onEdit={onEditSection}
                   customizations={customizations || {}}
-                  defaultImage={getHeroImage()}
+                  src={getHeroImage()}
                   className="w-full h-full object-cover"
                   fallbackSrc="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='200' viewBox='0 0 120 200'%3E%3Crect width='120' height='200' fill='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='14' font-family='Arial'%3ENo Photo%3C/text%3E%3C/svg%3E"
                 />

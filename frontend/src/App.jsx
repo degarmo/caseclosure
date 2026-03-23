@@ -324,6 +324,7 @@ function AppContent() {
                 user={user} 
                 onLogout={handleLogout}
                 onOpenCaseModal={handleOpenCaseModal}
+                onOpenProfileSettings={handleOpenProfileSettings}
               />
             </RequireAuth>
           }

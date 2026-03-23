@@ -33,12 +33,12 @@ import {
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  indigo:  '#6366f1',
-  purple:  '#a855f7',
+  indigo:  '#0f766e',
+  purple:  '#0369a1',
   green:   '#22c55e',
   amber:   '#f59e0b',
   rose:    '#f43f5e',
-  sky:     '#0ea5e9',
+  sky:     '#1d4ed8',
   gray:    '#e5e7eb',
   slate:   '#94a3b8',
 };
@@ -58,7 +58,7 @@ function KPICard({ icon: Icon, label, value, sub, accent = 'indigo', action, onA
   return (
     <div
       className={`bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3
-        ${action ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+        ${action ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all' : ''}`}
       onClick={action ? () => onAction(action) : undefined}
     >
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${bg}`}>
@@ -75,10 +75,10 @@ function KPICard({ icon: Icon, label, value, sub, accent = 'indigo', action, onA
 
 function SectionCard({ title, icon: Icon, children, className = '' }) {
   return (
-    <div className={`bg-white rounded-xl border border-gray-100 shadow-sm p-6 ${className}`}>
+    <div className={`rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm ${className}`}>
       <div className="flex items-center gap-2 mb-5">
-        <Icon className="w-4 h-4 text-indigo-400" />
-        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+        <Icon className="w-4 h-4 text-sky-600" />
+        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
       </div>
       {children}
     </div>
@@ -179,16 +179,26 @@ export default function AdminOverview({ data, onSectionChange }) {
   return (
     <div className="space-y-6">
 
-      {/* ── Header ── */}
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">Platform Overview</h2>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Live snapshot across all cases, users, and activity
-        </p>
-      </div>
+      <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_55%,_#164e63_100%)] px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-xs uppercase tracking-[0.22em] text-sky-200/90">Platform overview</p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">Operational health at a glance</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-200">
+              Track system workload, inbound activity, and approval queues without leaving the dashboard.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <HeroStat label="Cases" value={caseTotal} />
+            <HeroStat label="Users" value={userTotal} />
+            <HeroStat label="Messages" value={msgTotal} />
+            <HeroStat label="Posts" value={spotTotal} />
+          </div>
+        </div>
+      </section>
 
       {/* ── KPI Row ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <KPICard icon={FolderOpenIcon}   label="Total Cases"       value={s.totalCases      || 0} accent="indigo" />
         <KPICard icon={CheckCircleIcon}  label="Active Cases"      value={s.activeCases     || 0} accent="green"  />
         <KPICard icon={UsersIcon}        label="Total Users"       value={s.totalUsers      || 0} accent="purple" />
@@ -450,6 +460,15 @@ export default function AdminOverview({ data, onSectionChange }) {
           )}
         </SectionCard>
       </div>
+    </div>
+  );
+}
+
+function HeroStat({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
+      <p className="text-xs uppercase tracking-[0.16em] text-sky-100/80">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   );
 }

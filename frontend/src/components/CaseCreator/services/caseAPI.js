@@ -219,9 +219,13 @@ export const createCase = async (caseData, selectedTemplate, customizations) => 
       
       try {
         const photoResult = await uploadVictimPhoto(createdCase.id, imageFile);
-        
-        // Optionally merge photo data into case response
-        createdCase.victim_photo_url = photoResult.image;
+
+        // Merge photo URL into case response so the template preview shows it immediately
+        const photoUrl = photoResult.image_url || photoResult.image;
+        createdCase.victim_photo_url = photoUrl;
+        createdCase.primary_photo_url = photoUrl;
+        if (!createdCase.photos) createdCase.photos = [];
+        createdCase.photos.push({ ...photoResult, is_primary: true });
       } catch (photoError) {
         // Don't throw - case was created successfully, photo upload is secondary
       }

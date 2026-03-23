@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   HomeIcon,
   FolderIcon,
@@ -40,6 +40,13 @@ export default function Sidebar({
   onSelectCase
 }) {
   const [expandedSections, setExpandedSections] = useState({});
+
+  useEffect(() => {
+    const rootSection = activeSection.split('-')[0];
+    setExpandedSections((prev) => (
+      prev[rootSection] ? prev : { ...prev, [rootSection]: true }
+    ));
+  }, [activeSection]);
 
   const toggleSection = (sectionId) => {
     setExpandedSections(prev => ({
@@ -185,45 +192,71 @@ export default function Sidebar({
 
   // Count total notifications
   const totalNotifications = newTips + unreadMessages + pendingRequests;
+  const primaryCaseCount = data?.cases?.length || 0;
+  const userName = user?.first_name || user?.email?.split('@')[0] || 'User';
+  const roleLabel = permissions.isAdmin() ? 'Administrator' :
+    permissions.isPolice() ? 'Law Enforcement' : 'Family Workspace';
 
   return (
     <aside className={`${
-      collapsed ? 'w-16' : 'w-64'
-    } bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 flex flex-col`}>
-      {/* Logo/Brand */}
-      <div className="h-16 px-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+      collapsed ? 'w-20' : 'w-[296px]'
+    } hidden shrink-0 border-r border-white/10 bg-slate-950/70 transition-all duration-300 md:flex md:flex-col`}>
+      <div className="h-20 px-5 flex items-center justify-between border-b border-white/10">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 via-cyan-300 to-amber-300 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/20">
               CC
             </div>
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">CaseClosure</p>
+              <span className="font-semibold text-white">
               {roleConfig?.brandText || 'CaseClosure'}
-            </span>
+              </span>
+            </div>
           </div>
         )}
         <button
           onClick={onToggleCollapse}
-          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10"
         >
           {collapsed ? <ChevronRightIcon className="w-5 h-5" /> : <ChevronLeftIcon className="w-5 h-5" />}
         </button>
       </div>
 
-      {/* Notification Alert Bar - Only show if there are notifications */}
-      {totalNotifications > 0 && !collapsed && (
-        <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-          <div className="flex items-center gap-2">
-            <BellIcon className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-              {totalNotifications} new {totalNotifications === 1 ? 'item' : 'items'} to review
-            </span>
+      {!collapsed && (
+        <div className="border-b border-white/10 px-5 py-5">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Workspace status</p>
+                <p className="mt-2 text-lg font-semibold text-white">{userName}</p>
+                <p className="text-sm text-slate-400">{roleLabel}</p>
+              </div>
+              <div className="rounded-2xl bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
+                Online
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-slate-900/70 p-3">
+                <p className="text-xs text-slate-400">Cases</p>
+                <p className="mt-1 text-xl font-semibold text-white">{primaryCaseCount}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-900/70 p-3">
+                <p className="text-xs text-slate-400">Attention</p>
+                <p className="mt-1 text-xl font-semibold text-white">{totalNotifications}</p>
+              </div>
+            </div>
+            {totalNotifications > 0 && (
+              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">
+                <BellIcon className="h-4 w-4 shrink-0" />
+                <span>{totalNotifications} item{totalNotifications === 1 ? '' : 's'} waiting for review</span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto px-4 py-5 space-y-2">
         {navItems.map(item => (
           <NavItem
             key={item.id}
@@ -247,8 +280,8 @@ export default function Sidebar({
 
       {/* Police Case Selector - Only show for police/detectives with case access */}
       {!collapsed && permissions.isPolice && permissions.canViewAllCases && (
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+        <div className="p-5 border-t border-white/10">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
             Cases You Can Access
           </h3>
           <PoliceCaseSelector 
@@ -261,18 +294,17 @@ export default function Sidebar({
 
       {/* User Profile Section */}
       {!collapsed && (
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+        <div className="p-5 border-t border-white/10">
+          <div className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-cyan-300 font-medium text-slate-950 shadow-lg shadow-sky-500/20">
               {user?.first_name?.[0] || user?.email?.[0] || 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              <p className="truncate text-sm font-medium text-white">
                 {user?.first_name || user?.email}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {permissions.isAdmin() ? 'Administrator' :
-                 permissions.isPolice() ? 'Law Enforcement' : 'User'}
+              <p className="text-xs text-slate-400">
+                {roleLabel}
               </p>
             </div>
           </div>
@@ -305,10 +337,10 @@ function NavItem({
             onClick();
           }
         }}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors group relative ${
+        className={`w-full flex items-center justify-between rounded-2xl px-3 py-3 transition-all group relative ${
           isActive 
-            ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' 
-            : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+            ? 'bg-gradient-to-r from-sky-400/15 via-white/10 to-transparent text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-sky-300/20' 
+            : 'text-slate-300 hover:bg-white/8 hover:text-white'
         }`}
       >
         <div className="flex items-center gap-3">
@@ -320,7 +352,7 @@ function NavItem({
             )}
           </div>
           {!collapsed && (
-            <span className="font-medium">{item.label}</span>
+            <span className="font-medium tracking-[0.01em]">{item.label}</span>
           )}
         </div>
         {!collapsed && (
@@ -331,8 +363,8 @@ function NavItem({
                 item.alert
                   ? 'bg-red-500 text-white animate-pulse'
                   : isActive 
-                    ? 'bg-indigo-600 text-white' 
-                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
+                    ? 'bg-white text-slate-900' 
+                    : 'bg-white/10 text-slate-200'
               }`}>
                 {item.badge}
               </span>
@@ -348,7 +380,7 @@ function NavItem({
 
       {/* Sub Items */}
       {!collapsed && item.expandable && isExpanded && item.subItems && (
-        <div className="ml-5 mt-1 space-y-1">
+        <div className="ml-5 mt-2 space-y-1.5 border-l border-white/10 pl-4">
           {item.subItems.map(subItem => (
             <button
               key={subItem.id}
@@ -359,10 +391,10 @@ function NavItem({
                   onSubItemClick(subItem.id);
                 }
               }}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-sm ${
+              className={`w-full flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm transition-colors ${
                 activeSection === subItem.id
-                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+                  ? 'bg-white/10 text-white ring-1 ring-white/10'
+                  : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -375,8 +407,8 @@ function NavItem({
                   subItem.alert
                     ? 'bg-red-500 text-white animate-pulse'
                     : activeSection === subItem.id
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
+                      ? 'bg-white text-slate-900'
+                      : 'bg-white/10 text-slate-200'
                 }`}>
                   {subItem.badge}
                 </span>

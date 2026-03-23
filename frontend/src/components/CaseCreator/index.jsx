@@ -117,28 +117,26 @@ export default function CaseCreator({
         
         // Template
         template_id: data.template_id || 'beacon',
+
+        // Photos — needed so the template preview can display the primary photo
+        photos: data.photos || [],
+        primary_photo_url: data.primary_photo_url || data.victim_photo_url || null,
+        victim_photo_url: data.victim_photo_url || data.primary_photo_url || null,
+        victim_photo_preview: data.victim_photo_url || data.primary_photo_url || null,
       };
-      
+
       setCaseData(loadedCaseData);
       setCaseId(id);
-      
+
       // If there's template data, load it
       if (data.template_id) {
         // You might need to load the template here
         // setSelectedTemplate(findTemplateById(data.template_id));
       }
-      
+
       // If there's customization data, load it
       if (data.template_data && data.template_data.customizations) {
         setCustomizations(data.template_data.customizations);
-      }
-      
-      // Handle victim photo if it exists
-      if (data.victim_photo_url || data.primary_photo_url) {
-        setCaseData(prev => ({
-          ...prev,
-          victim_photo_preview: data.victim_photo_url || data.primary_photo_url
-        }));
       }
       
       setInitialDataLoaded(true);

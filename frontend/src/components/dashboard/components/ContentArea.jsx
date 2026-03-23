@@ -48,9 +48,12 @@ export default function ContentArea({
 
   if (loading) {
     return (
-      <main className="flex-1 p-6 overflow-y-auto">
-        <div className="flex items-center justify-center h-full">
-          <ArrowPathIcon className="w-12 h-12 animate-spin text-indigo-600" />
+      <main className="flex-1 overflow-y-auto bg-transparent px-5 py-6 md:px-8 md:py-8">
+        <div className="flex h-full min-h-[420px] items-center justify-center rounded-[28px] border border-slate-200 bg-white/85 shadow-sm">
+          <div className="text-center">
+            <ArrowPathIcon className="mx-auto h-12 w-12 animate-spin text-sky-600" />
+            <p className="mt-4 text-sm font-medium text-slate-700">Loading dashboard workspace</p>
+          </div>
         </div>
       </main>
     );
@@ -140,22 +143,46 @@ export default function ContentArea({
         // LEO / family — plain cards (enough info for their context)
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <h3 className="text-sm font-medium text-gray-500">Total Cases</h3>
-                <p className="text-2xl font-bold mt-2 text-gray-900">{data.stats?.totalCases || 0}</p>
+            <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-[linear-gradient(135deg,_#0f172a_0%,_#132238_46%,_#164e63_100%)] px-6 py-7 text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] md:px-8">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-2xl">
+                  <p className="text-xs uppercase tracking-[0.22em] text-sky-200/90">Executive snapshot</p>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
+                    Everything important is in one place.
+                  </h2>
+                  <p className="mt-3 text-sm leading-6 text-slate-200">
+                    Monitor case progress, inbound communication, and spotlight activity from a single operational view.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <OverviewBadge label="Cases" value={data.stats?.totalCases || 0} />
+                  <OverviewBadge label="Active" value={data.stats?.activeCases || 0} />
+                  <OverviewBadge label="Messages" value={data.stats?.unreadMessages || 0} />
+                  <OverviewBadge label="Posts" value={data.stats?.totalSpotlightPosts || 0} />
+                </div>
               </div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <h3 className="text-sm font-medium text-gray-500">Active Cases</h3>
-                <p className="text-2xl font-bold mt-2 text-green-600">{data.stats?.activeCases || 0}</p>
+            </section>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-medium text-slate-500">Total Cases</h3>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{data.stats?.totalCases || 0}</p>
+                <p className="mt-2 text-sm text-slate-500">All cases currently accessible in your workspace.</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <h3 className="text-sm font-medium text-gray-500">Messages</h3>
-                <p className="text-2xl font-bold mt-2 text-gray-900">{data.stats?.unreadMessages || 0}</p>
+              <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-medium text-slate-500">Active Cases</h3>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-emerald-600">{data.stats?.activeCases || 0}</p>
+                <p className="mt-2 text-sm text-slate-500">Cases that remain active and available for current work.</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <h3 className="text-sm font-medium text-gray-500">Spotlight Posts</h3>
-                <p className="text-2xl font-bold mt-2 text-gray-900">{data.stats?.totalSpotlightPosts || 0}</p>
+              <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-medium text-slate-500">Unread Messages</h3>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{data.stats?.unreadMessages || 0}</p>
+                <p className="mt-2 text-sm text-slate-500">Communication awaiting review or follow-up.</p>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-medium text-slate-500">Spotlight Posts</h3>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{data.stats?.totalSpotlightPosts || 0}</p>
+                <p className="mt-2 text-sm text-slate-500">Published updates currently visible to the public.</p>
               </div>
             </div>
           </div>
@@ -297,8 +324,13 @@ export default function ContentArea({
 
   return (
     <>
-      <main className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 overflow-y-auto bg-transparent px-5 py-6 md:px-8 md:py-8">
+        <div className="mx-auto max-w-7xl space-y-5">
+          {error && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Some dashboard data could not be refreshed. Existing content is still available.
+            </div>
+          )}
           {renderContent()}
         </div>
       </main>
@@ -323,5 +355,14 @@ export default function ContentArea({
         />
       )}
     </>
+  );
+}
+
+function OverviewBadge({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
+      <p className="text-xs uppercase tracking-[0.16em] text-sky-100/80">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
+    </div>
   );
 }
