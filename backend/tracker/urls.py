@@ -8,14 +8,14 @@ from .views import (
     track_event,
     track_batch,
     report_suspicious,
-    
+
     # Dashboard views
     dashboard_overview,
     dashboard_realtime,
     dashboard_suspicious_users,
     dashboard_patterns,
     export_data,
-    
+
     # Additional dashboard views
     visitor_metrics_widget,
     suspicious_activity_widget,
@@ -25,14 +25,15 @@ from .views import (
     alerts_panel_widget,
     realtime_activity_stream,
     realtime_metrics,
-    
+
     # Admin views
     admin_alerts,
     admin_flag_user,
-    
+
     # Activity views
     last_activity,
 )
+from .dashboard_views import family_analytics
 
 app_name = 'tracker'
 
@@ -99,9 +100,15 @@ urlpatterns = [
          name='realtime_metrics'),
     
     # ============================================
+    # FAMILY ANALYTICS ENDPOINT
+    # ============================================
+
+    path('family-analytics/<str:case_slug>/', family_analytics, name='family_analytics'),
+
+    # ============================================
     # ADMIN ENDPOINTS
     # ============================================
-    
+
     path('admin/alerts/', admin_alerts, name='admin_alerts'),
     path('admin/flag/<str:fingerprint>/', admin_flag_user, name='admin_flag_user'),
 ]

@@ -14,6 +14,7 @@ import SpotlightEditor from '../sections/Spotlight/SpotlightEditor';
 import PoliceCaseDetail from '../sections/Cases/PoliceCaseDetail';
 import AnalyticsDashboard from '../sections/Analytics/AnalyticsDashboard';
 import AdminOverview from '../sections/Overview/AdminOverview';
+import FamilyOverview from '../sections/Overview/FamilyOverview';
 
 export default function ContentArea({ 
   activeSection, 
@@ -131,7 +132,7 @@ export default function ContentArea({
   const renderContent = () => {
     switch (activeSection) {
       case 'overview':
-        // Admin gets the full chart-rich overview; other roles get a simple stat summary
+        // Admin → rich chart overview
         if (permissions.isAdmin()) {
           return (
             <AdminOverview
@@ -140,25 +141,42 @@ export default function ContentArea({
             />
           );
         }
-        // LEO / family — plain cards (enough info for their context)
+
+        // Family → warm analytics KPI overview
+        if (user?.account_type !== 'leo') {
+          const userCase   = data?.userCase;
+          const caseSlug   = userCase?.subdomain || null;
+          const caseName   = userCase
+            ? (userCase.case_title || `${userCase.first_name || ''} ${userCase.last_name || ''}`.trim())
+            : null;
+          return (
+            <FamilyOverview
+              caseSlug={caseSlug}
+              caseName={caseName}
+              onSectionChange={onSectionChange}
+            />
+          );
+        }
+
+        // LEO — operational stat cards
         return (
           <div className="space-y-6">
             <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-[linear-gradient(135deg,_#0f172a_0%,_#132238_46%,_#164e63_100%)] px-6 py-7 text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] md:px-8">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-2xl">
-                  <p className="text-xs uppercase tracking-[0.22em] text-sky-200/90">Executive snapshot</p>
+                  <p className="text-xs uppercase tracking-[0.22em] text-sky-200/90">Operational snapshot</p>
                   <h2 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
                     Everything important is in one place.
                   </h2>
                   <p className="mt-3 text-sm leading-6 text-slate-200">
-                    Monitor case progress, inbound communication, and spotlight activity from a single operational view.
+                    Monitor case progress, inbound communication, and spotlight activity from a single view.
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <OverviewBadge label="Cases" value={data.stats?.totalCases || 0} />
-                  <OverviewBadge label="Active" value={data.stats?.activeCases || 0} />
-                  <OverviewBadge label="Messages" value={data.stats?.unreadMessages || 0} />
-                  <OverviewBadge label="Posts" value={data.stats?.totalSpotlightPosts || 0} />
+                  <OverviewBadge label="Cases"    value={data.stats?.totalCases         || 0} />
+                  <OverviewBadge label="Active"   value={data.stats?.activeCases         || 0} />
+                  <OverviewBadge label="Messages" value={data.stats?.unreadMessages      || 0} />
+                  <OverviewBadge label="Posts"    value={data.stats?.totalSpotlightPosts || 0} />
                 </div>
               </div>
             </section>

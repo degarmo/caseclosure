@@ -819,3 +819,167 @@ def get_time_ago(timestamp):
         return f"{diff.seconds // 60}m ago"
     else:
         return "just now"
+
+# ============================================
+# FAMILY ANALYTICS ENDPOINT
+# ============================================
+
+SOCIAL_DOMAINS = {
+    'facebook.com', 'fb.com', 'instagram.com', 'twitter.com', 'x.com',
+    'tiktok.com', 'youtube.com', 'linkedin.com', 'pinterest.com',
+    'reddit.com', 'snapchat.com', 'threads.net', 't.co', 'lnkd.in',
+}
+SEARCH_DOMAINS = {
+    'google.com', 'bing.com', 'yahoo.com', 'duckduckgo.com',
+    'baidu.com', 'yandex.com', 'ask.com', 'ecosia.org', 'brave.com',
+}
+
+
+def _classify_referrer(url):
+    """Return 'social' | 'search' | 'direct' | 'other' for a referrer URL."""
+    if not url or not url.strip():
+        return 'direct'
+    try:
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc.lower()
+        if domain.startswith('www.'):
+            domain = domain[4:]
+        if any(s in domain for s in SOCIAL_DOMAINS):
+            return 'social'
+        if any(s in domain for s in SEARCH_DOMAINS):
+            return 'search'
+        return 'other'
+    except Exception:
+        return 'other'
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def family_analytics(request, case_slug):
+    """
+    Family-safe analytics endpoint.
+    Returns visitor momentum data only — no forensic, suspicious, or IP details.
+    GET /api/tracker/family-analytics/<case_slug>/?days=30
+    """
+    from django.db.models.functions import TruncDate
+
+    try:
+        case = Case.objects.get(subdomain=case_slug)
+    except Case.DoesNotExist:
+        return Response({'error': 'Case not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Only the case owner or staff may access
+    if case.user != request.user and not request.user.is_staff:
+        return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+
+    days = max(1, min(int(request.GET.get('days', 30)), 365))
+    now = timezone.now()
+    since = now - timedelta(days=days)
+    week_ago = now - timedelta(days=7)
+    two_weeks_ago = now - timedelta(days=14)
+
+    all_events = TrackingEvent.objects.filter(case=case)
+    period_events = all_events.filter(timestamp__gte=since)
+
+    # ── KPI metrics ──────────────────────────────────────────────────────────
+    total_visits = (
+        all_events.exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+    this_week = (
+        all_events.filter(timestamp__gte=week_ago)
+        .exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+    last_week = (
+        all_events.filter(timestamp__gte=two_weeks_ago, timestamp__lt=week_ago)
+        .exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+    week_change_pct = (
+        round(((this_week - last_week) / last_week) * 100)
+        if last_week > 0 else (100 if this_week > 0 else 0)
+    )
+
+    avg_secs = (
+        period_events
+        .filter(time_on_page__isnull=False, time_on_page__gt=0)
+        .aggregate(avg=Avg('time_on_page'))['avg'] or 0
+    )
+    avg_secs = round(avg_secs)
+    avg_formatted = (
+        f"{avg_secs // 60}m {avg_secs % 60}s"
+        if avg_secs >= 60 else f"{avg_secs}s"
+    )
+
+    # ── Visits over time (daily) ──────────────────────────────────────────────
+    visits_over_time = [
+        {'date': str(row['date']), 'visits': row['visits']}
+        for row in (
+            period_events
+            .annotate(date=TruncDate('timestamp'))
+            .values('date')
+            .annotate(visits=Count('fingerprint_hash', distinct=True))
+            .order_by('date')
+        )
+    ]
+
+    # ── Top states ───────────────────────────────────────────────────────────
+    top_states = [
+        {'state': row['ip_region'], 'visitors': row['visitors']}
+        for row in (
+            period_events
+            .exclude(ip_region__in=['', None])
+            .values('ip_region')
+            .annotate(visitors=Count('fingerprint_hash', distinct=True))
+            .order_by('-visitors')[:10]
+        )
+    ]
+
+    # ── Traffic sources ───────────────────────────────────────────────────────
+    # Aggregate referrer counts at DB level, then classify in Python
+    source_counts = {'social': 0, 'search': 0, 'direct': 0, 'other': 0}
+    for row in period_events.values('referrer_url').annotate(n=Count('id')):
+        bucket = _classify_referrer(row['referrer_url'])
+        source_counts[bucket] += row['n']
+
+    total_refs = sum(source_counts.values()) or 1
+    traffic_sources = [
+        {
+            'name': label,
+            'key': key,
+            'value': source_counts[key],
+            'pct': round(source_counts[key] / total_refs * 100),
+        }
+        for key, label in [
+            ('social',  'Social Media'),
+            ('search',  'Search Engines'),
+            ('direct',  'Direct / Shared Link'),
+            ('other',   'Other'),
+        ]
+    ]
+
+    top_source = max(traffic_sources, key=lambda x: x['value'])
+    top_state = top_states[0] if top_states else None
+
+    return Response({
+        'case_name': (
+            case.case_title or
+            f"{case.first_name or ''} {case.last_name or ''}".strip() or
+            'Your Case'
+        ),
+        'period_days': days,
+        'kpi': {
+            'total_visits':    total_visits,
+            'this_week':       this_week,
+            'last_week':       last_week,
+            'week_change_pct': week_change_pct,
+            'avg_time_seconds':  avg_secs,
+            'avg_time_formatted': avg_formatted,
+        },
+        'top_state':       top_state,
+        'top_source':      top_source,
+        'visits_over_time': visits_over_time,
+        'traffic_sources': traffic_sources,
+        'top_states':      top_states,
+    })

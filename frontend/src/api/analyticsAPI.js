@@ -7,6 +7,8 @@ import api from './config';
  */
 export const analyticsAPI = {
   getDashboard: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/`),
+  getFamilyAnalytics: (caseSlug, days = 30) =>
+    api.get(`/tracker/family-analytics/${caseSlug}/`, { params: { days } }),
   getVisitors: (caseSlug, params) => api.get(`/tracker/dashboard/${caseSlug}/suspicious/`, { params }),
   getPatterns: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/patterns/`),
   getRealtime: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/realtime/`),
