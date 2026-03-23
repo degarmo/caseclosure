@@ -11,28 +11,33 @@ import {
 } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolid } from '@heroicons/react/24/solid';
 
-export default function Header({ 
-  user, 
-  onLogout, 
-  onRefresh, 
-  roleConfig, 
+export default function Header({
+  user,
+  onLogout,
+  onRefresh,
+  roleConfig,
   activeSection,
   notifications = [],
   onSearch,
   onProfileSettings,
   sectionMeta,
   lastUpdated,
-  onSectionChange
+  onSectionChange,
+  onThemeChange,
+  theme,
+  themeId,
+  themeOptions = []
 }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showThemes, setShowThemes] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const profileMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
+  const themeMenuRef = useRef(null);
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
@@ -40,6 +45,9 @@ export default function Header({
       }
       if (notificationMenuRef.current && !notificationMenuRef.current.contains(event.target)) {
         setShowNotifications(false);
+      }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(event.target)) {
+        setShowThemes(false);
       }
     };
 
@@ -65,12 +73,22 @@ export default function Header({
     ? new Date(lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     : null;
 
+  const activePillStyle = { background: theme.accent, color: theme.accentStrongText };
+  const inactivePillStyle = { background: theme.pillBackground, color: theme.pillText };
+  const controlStyle = { background: theme.inputBackground, border: `1px solid ${theme.inputBorder}` };
+
   return (
-    <header className="border-b border-slate-200/80 bg-white/85 px-5 py-5 backdrop-blur md:px-8">
+    <header
+      className="relative z-40 px-5 py-5 backdrop-blur md:px-8"
+      style={{ borderBottom: `1px solid ${theme.shellBorder}`, background: theme.shellBackground }}
+    >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-700">
+            <span
+              className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+              style={{ border: `1px solid ${theme.accentBorder}`, background: theme.accentSoft, color: theme.accentText }}
+            >
               {sectionMeta?.eyebrow || 'Workspace'}
             </span>
             {formattedLastUpdated && (
@@ -88,38 +106,29 @@ export default function Header({
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={() => onSectionChange?.('overview')}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                activeSection === 'overview'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className="rounded-full px-3 py-1.5 text-sm font-medium transition"
+              style={activeSection === 'overview' ? activePillStyle : inactivePillStyle}
             >
               Overview
             </button>
             <button
               onClick={() => onSectionChange?.('cases-all')}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                activeSection.startsWith('cases') || activeSection === 'police-case-detail'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className="rounded-full px-3 py-1.5 text-sm font-medium transition"
+              style={activeSection.startsWith('cases') || activeSection === 'police-case-detail' ? activePillStyle : inactivePillStyle}
             >
               Cases
             </button>
             <button
               onClick={() => onSectionChange?.('messages-all')}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                activeSection.startsWith('messages')
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className="rounded-full px-3 py-1.5 text-sm font-medium transition"
+              style={activeSection.startsWith('messages') ? activePillStyle : inactivePillStyle}
             >
               Messages
             </button>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 xl:min-w-[420px]">
+        <div className="flex flex-col gap-3 xl:min-w-[520px]">
           <form onSubmit={handleSearch} className="w-full">
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -128,16 +137,67 @@ export default function Header({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search cases, users, posts, or activity"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                className="w-full rounded-2xl px-11 py-3 text-sm text-slate-800 shadow-sm outline-none transition focus:ring-4 focus:ring-slate-200"
+                style={controlStyle}
               />
             </div>
           </form>
 
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
+              <div className="relative" ref={themeMenuRef}>
+                <button
+                  onClick={() => setShowThemes(!showThemes)}
+                  className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-sm transition"
+                  style={controlStyle}
+                >
+                  <Cog6ToothIcon className="h-4 w-4" />
+                  Theme
+                </button>
+                {showThemes && (
+                  <div
+                    className="absolute left-0 z-50 mt-2 w-80 overflow-hidden rounded-3xl border bg-white shadow-2xl shadow-slate-900/10"
+                    style={{ borderColor: theme.inputBorder }}
+                  >
+                    <div className="border-b px-5 py-4" style={{ borderColor: theme.inputBorder }}>
+                      <h3 className="font-semibold text-slate-900">Color Schemes</h3>
+                      <p className="mt-1 text-sm text-slate-500">Choose the dashboard palette that feels best to you.</p>
+                    </div>
+                    <div className="grid gap-2 p-3">
+                      {themeOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            onThemeChange?.(option.id);
+                            setShowThemes(false);
+                          }}
+                          className="flex items-center justify-between rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                          style={option.id === themeId ? { background: option.accentSoft, border: `1px solid ${option.accentBorder}` } : { border: '1px solid transparent' }}
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">{option.label}</p>
+                            <p className="text-xs text-slate-500">{option.id === themeId ? 'Current selection' : 'Apply this scheme'}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {option.preview.map((color) => (
+                              <span
+                                key={color}
+                                className="h-5 w-5 rounded-full border border-white shadow-sm"
+                                style={{ background: color }}
+                              />
+                            ))}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={handleRefresh}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition"
+                style={controlStyle}
                 title="Refresh data"
               >
                 <ArrowPathIcon className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -145,9 +205,10 @@ export default function Header({
               </button>
 
               <div className="relative" ref={notificationMenuRef}>
-                <button 
+                <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                  className="relative rounded-2xl p-3 text-slate-700 shadow-sm transition"
+                  style={controlStyle}
                   title="Notifications"
                 >
                   {unreadCount > 0 ? (
@@ -161,8 +222,11 @@ export default function Header({
                 </button>
 
                 {showNotifications && (
-                  <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10">
-                    <div className="border-b border-slate-200 px-5 py-4">
+                  <div
+                    className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-3xl border bg-white shadow-2xl shadow-slate-900/10"
+                    style={{ borderColor: theme.inputBorder }}
+                  >
+                    <div className="border-b px-5 py-4" style={{ borderColor: theme.inputBorder }}>
                       <h3 className="font-semibold text-slate-900">Notifications</h3>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
@@ -174,9 +238,8 @@ export default function Header({
                               setShowNotifications(false);
                               if (notif.action) onSectionChange?.(notif.action);
                             }}
-                            className={`block w-full border-b border-slate-100 px-5 py-4 text-left transition hover:bg-slate-50 ${
-                              !notif.read ? 'bg-sky-50/60' : ''
-                            }`}
+                            className="block w-full border-b border-slate-100 px-5 py-4 text-left transition hover:bg-slate-50"
+                            style={!notif.read ? { background: theme.accentSoft } : undefined}
                           >
                             <p className="text-sm font-medium text-slate-900">{notif.message}</p>
                             <p className="mt-1 text-xs text-slate-500">{notif.time}</p>
@@ -197,7 +260,8 @@ export default function Header({
             <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left shadow-sm transition"
+                style={controlStyle}
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-sm font-medium text-white">
                   {user?.first_name?.[0] || user?.email?.[0] || 'U'}
@@ -214,17 +278,20 @@ export default function Header({
               </button>
 
               {showProfileMenu && (
-                <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10">
-                  <div className="border-b border-slate-200 px-4 py-3">
+                <div
+                  className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-3xl border bg-white shadow-2xl shadow-slate-900/10"
+                  style={{ borderColor: theme.inputBorder }}
+                >
+                  <div className="border-b px-4 py-3" style={{ borderColor: theme.inputBorder }}>
                     <p className="text-sm font-medium text-slate-900">
                       {user?.email}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {user?.is_staff ? 'Administrator' : 
+                      {user?.is_staff ? 'Administrator' :
                        user?.role === 'police' ? 'Law Enforcement' : 'User Account'}
                     </p>
                   </div>
-                  
+
                   <div className="py-1">
                     <button
                       onClick={() => {
@@ -236,7 +303,7 @@ export default function Header({
                       <UserCircleIcon className="h-4 w-4" />
                       Profile Settings
                     </button>
-                    
+
                     <button
                       onClick={() => {
                         setShowProfileMenu(false);
@@ -247,8 +314,8 @@ export default function Header({
                       Security
                     </button>
                   </div>
-                  
-                  <div className="border-t border-slate-200 py-1">
+
+                  <div className="border-t py-1" style={{ borderColor: theme.inputBorder }}>
                     <button
                       onClick={() => {
                         setShowProfileMenu(false);

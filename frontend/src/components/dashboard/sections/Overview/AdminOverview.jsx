@@ -104,7 +104,7 @@ const tipStyle = { borderRadius: 8, fontSize: 12, border: '1px solid #e5e7eb' };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function AdminOverview({ data, onSectionChange }) {
+export default function AdminOverview({ data, onSectionChange, theme }) {
   const s = data?.stats || {};
   const cases    = data?.cases    || [];
   const users    = data?.users    || [];
@@ -179,20 +179,23 @@ export default function AdminOverview({ data, onSectionChange }) {
   return (
     <div className="space-y-6">
 
-      <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_55%,_#164e63_100%)] px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+      <section
+        className="overflow-hidden rounded-[30px] border px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.16)]"
+        style={{ background: theme?.heroGradient, borderColor: theme?.accentBorder }}
+      >
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <p className="text-xs uppercase tracking-[0.22em] text-sky-200/90">Platform overview</p>
+            <p className="text-xs uppercase tracking-[0.22em]" style={{ color: theme?.heroSubtext }}>Platform overview</p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">Operational health at a glance</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-200">
+            <p className="mt-3 text-sm leading-6" style={{ color: theme?.heroSubtext }}>
               Track system workload, inbound activity, and approval queues without leaving the dashboard.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <HeroStat label="Cases" value={caseTotal} />
-            <HeroStat label="Users" value={userTotal} />
-            <HeroStat label="Messages" value={msgTotal} />
-            <HeroStat label="Posts" value={spotTotal} />
+            <HeroStat label="Cases" value={caseTotal} theme={theme} />
+            <HeroStat label="Users" value={userTotal} theme={theme} />
+            <HeroStat label="Messages" value={msgTotal} theme={theme} />
+            <HeroStat label="Posts" value={spotTotal} theme={theme} />
           </div>
         </div>
       </section>
@@ -464,10 +467,10 @@ export default function AdminOverview({ data, onSectionChange }) {
   );
 }
 
-function HeroStat({ label, value }) {
+function HeroStat({ label, value, theme }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-      <p className="text-xs uppercase tracking-[0.16em] text-sky-100/80">{label}</p>
+    <div className="rounded-2xl border px-4 py-3 backdrop-blur" style={{ background: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.18)' }}>
+      <p className="text-xs uppercase tracking-[0.16em]" style={{ color: theme?.heroSubtext }}>{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   );

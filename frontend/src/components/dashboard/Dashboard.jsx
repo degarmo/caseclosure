@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import ContentArea from './components/ContentArea';
 import { RealtimeProvider } from './providers/RealtimeProvider';
+import { DASHBOARD_THEMES, DEFAULT_DASHBOARD_THEME, getDashboardTheme } from './config/themes';
 
 const SECTION_META = {
   overview: {
@@ -80,6 +81,7 @@ export default function Dashboard({ user, onLogout, onOpenCaseModal, onOpenProfi
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds default
   const [selectedCaseId, setSelectedCaseId] = useState(null); // NEW: Track selected case for police
+  const [themeId, setThemeId] = useState(() => localStorage.getItem('dashboard_theme') || DEFAULT_DASHBOARD_THEME);
   
   // Get permissions and role configuration
   const permissions = usePermissions(user);
@@ -125,12 +127,18 @@ export default function Dashboard({ user, onLogout, onOpenCaseModal, onOpenProfi
     title: roleConfig?.title || 'Dashboard',
     description: roleConfig?.subtitle || 'Manage activity and operations from a single workspace.'
   };
+  const theme = useMemo(() => getDashboardTheme(themeId), [themeId]);
+
+  const handleThemeChange = useCallback((nextThemeId) => {
+    setThemeId(nextThemeId);
+    localStorage.setItem('dashboard_theme', nextThemeId);
+  }, []);
 
   // Clean layout with fixed sidebar and scrollable content
   return (
     <RealtimeProvider refreshInterval={refreshInterval}>
-      <div className="h-screen overflow-hidden bg-slate-950 text-slate-100">
-        <div className="flex h-full bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.16),_transparent_24%),radial-gradient(circle_at_top_right,_rgba(245,158,11,0.12),_transparent_22%),linear-gradient(180deg,_#08111f_0%,_#0f172a_48%,_#e8edf3_48%,_#f4f7fb_100%)]">
+      <div className="h-screen overflow-hidden text-slate-100" style={{ background: theme.pageBackground }}>
+        <div className="flex h-full" style={{ backgroundImage: theme.pageOverlay }}>
           <Sidebar
             user={user}
             permissions={permissions}
@@ -143,10 +151,18 @@ export default function Dashboard({ user, onLogout, onOpenCaseModal, onOpenProfi
             onOpenCaseModal={onOpenCaseModal}
             selectedCaseId={selectedCaseId}
             onSelectCase={handleSelectCase}
+            theme={theme}
           />
 
           <div className="flex-1 overflow-hidden px-3 py-3 md:px-4 md:py-4">
-            <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-white/72 shadow-[0_24px_80px_rgba(15,23,42,0.28)] backdrop-blur-xl ring-1 ring-slate-900/5">
+            <div
+              className="flex h-full flex-col overflow-visible rounded-[28px] backdrop-blur-xl ring-1 ring-slate-900/5"
+              style={{
+                background: theme.shellBackground,
+                border: `1px solid ${theme.shellBorder}`,
+                boxShadow: theme.panelShadow,
+              }}
+            >
               <Header
                 user={user}
                 onLogout={onLogout}
@@ -158,6 +174,10 @@ export default function Dashboard({ user, onLogout, onOpenCaseModal, onOpenProfi
                 lastUpdated={data.lastUpdated}
                 onSectionChange={handleSectionChange}
                 onProfileSettings={onOpenProfileSettings}
+                onThemeChange={handleThemeChange}
+                theme={theme}
+                themeId={themeId}
+                themeOptions={DASHBOARD_THEMES}
               />
 
               <ContentArea
@@ -171,6 +191,7 @@ export default function Dashboard({ user, onLogout, onOpenCaseModal, onOpenProfi
                 onOpenCaseModal={onOpenCaseModal}
                 onSectionChange={handleSectionChange}
                 selectedCaseId={selectedCaseId}
+                theme={theme}
               />
             </div>
           </div>
