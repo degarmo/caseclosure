@@ -18,10 +18,17 @@ from .models import (
     TrackingEvent, UserSession, SuspiciousActivity,
     Alert, Case, DeviceFingerprint
 )
-from .ml_analyzer import CriminalMLAnalyzer
 from .apps import get_detection_system
 
 logger = logging.getLogger(__name__)
+
+try:
+    from .ml_analyzer import CriminalMLAnalyzer
+    ML_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"ML packages not installed ({e}). ML analysis tasks will be skipped.")
+    CriminalMLAnalyzer = None
+    ML_AVAILABLE = False
 
 
 # ============================================================================

@@ -1,29 +1,42 @@
 # enhanced_ml_analyzer.py - Advanced ML Analysis for Criminal Investigation Cases
 # Location: tracker/ml_analyzer.py
 
-import pandas as pd
-import numpy as np
-from sklearn.ensemble import IsolationForest, RandomForestClassifier, GradientBoostingClassifier
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
-from sklearn.decomposition import PCA
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.neural_network import MLPClassifier
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-import joblib
+from __future__ import annotations  # Defer annotation evaluation so keras/tf type hints don't crash on import
+
 import json
 import logging
 import hashlib
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
-from scipy import stats
-from scipy.spatial.distance import euclidean, cosine
-from scipy.signal import find_peaks
 import warnings
 warnings.filterwarnings('ignore')
+
+# Heavy ML dependencies — optional, installed separately
+try:
+    import pandas as pd
+    import numpy as np
+    from sklearn.ensemble import IsolationForest, RandomForestClassifier, GradientBoostingClassifier
+    from sklearn.preprocessing import StandardScaler, MinMaxScaler
+    from sklearn.cluster import DBSCAN, KMeans, AgglomerativeClustering
+    from sklearn.decomposition import PCA
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    from sklearn.neural_network import MLPClassifier
+    from scipy import stats
+    from scipy.spatial.distance import euclidean, cosine
+    from scipy.signal import find_peaks
+    import joblib
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    _SKLEARN_AVAILABLE = False
+
+try:
+    import tensorflow as tf
+    from tensorflow import keras
+    from tensorflow.keras import layers
+    _TF_AVAILABLE = True
+except ImportError:
+    _TF_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
