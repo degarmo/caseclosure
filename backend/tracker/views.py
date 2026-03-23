@@ -1040,12 +1040,32 @@ def tracking_ping(request):
         total  = TrackingEvent.objects.count()
         recent = TrackingEvent.objects.filter(timestamp__gte=since).count()
 
-    return JsonResponse({
+    response = {
         'status': 'ok',
         'total_events': total,
         'events_last_24h': recent,
         'slug': slug or '(all cases)',
-    })
+    }
+
+    # ?detail=1 — inspect stored values to diagnose analytics
+    if slug and request.GET.get('detail'):
+        case_obj = Case.objects.get(subdomain=slug)
+        sample = (
+            TrackingEvent.objects
+            .filter(case=case_obj)
+            .order_by('-timestamp')
+            .values('fingerprint_hash', 'ip_region', 'referrer_url',
+                    'event_type', 'time_on_page', 'timestamp')
+            .first()
+        )
+        with_fp = TrackingEvent.objects.filter(case=case_obj).exclude(fingerprint_hash='').count()
+        if sample and sample.get('timestamp'):
+            sample['timestamp'] = sample['timestamp'].isoformat()
+        response['sample_event'] = sample
+        response['with_fingerprint'] = with_fp
+        response['without_fingerprint'] = total - with_fp
+
+    return JsonResponse(response)
 
 
 # ============================================
