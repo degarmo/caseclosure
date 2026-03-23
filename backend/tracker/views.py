@@ -1,5 +1,8 @@
 # backend/tracker/views.py
 
+import logging
+logger = logging.getLogger(__name__)
+
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse, HttpResponse
@@ -118,8 +121,7 @@ def track_event(request):
             clicks_count=data.get('clicksCount', 0),
         )
         
-        # Debug logging
-        print(f"DEBUG: Event created - is_tor: {event.is_tor}, is_vpn: {event.is_vpn}")
+        logger.debug(f"Event created - is_tor: {event.is_tor}, is_vpn: {event.is_vpn}")
         
         # Initialize with defaults
         suspicious_score = 0.0
@@ -187,34 +189,102 @@ def track_event(request):
 @require_http_methods(["POST"])
 def track_batch(request):
     """
-    Endpoint for receiving batch tracking events
-    POST /api/track/batch/
+    Endpoint for receiving batch tracking events from the frontend tracker.
+    POST /api/tracker/track/batch/
+
+    Payload shape:
+      { events: [...], sessionMetadata: {...} }
+
+    Each event carries its own caseId, fingerprint, sessionId, etc.
     """
     try:
-        data = json.loads(request.body)
-        events = data.get('events', [])
-        
-        results = []
+        body = json.loads(request.body)
+        events = body.get('events', [])
+        session_metadata = body.get('sessionMetadata', {})
+
+        client_info = extract_client_info(request)
+
+        saved = 0
+        errors = 0
+
         for event_data in events:
-            # Process each event (simplified version of track_event)
             try:
-                # Create a modified request data for track_event
-                event_data['sessionId'] = data.get('sessionId')
-                event_data['caseId'] = data.get('caseId')
-                event_data['fingerprint'] = data.get('fingerprint')
-                
-                # Process the event
-                results.append({'status': 'success', 'event': event_data.get('eventType')})
+                # Resolve the case
+                case = None
+                case_id = event_data.get('caseId') or event_data.get('case_id', 'global')
+                if case_id and case_id != 'global':
+                    try:
+                        if str(case_id).isdigit():
+                            case = Case.objects.get(id=int(case_id))
+                        else:
+                            case = Case.objects.get(subdomain=case_id)
+                    except Case.DoesNotExist:
+                        pass
+
+                # Get or create session
+                session = get_or_create_session(
+                    event_data.get('sessionId'),
+                    event_data.get('fingerprint', ''),
+                    client_info,
+                    case,
+                )
+
+                enriched = enrich_event_data(event_data, client_info, session)
+
+                TrackingEvent.objects.create(
+                    case=case,
+                    session=session,
+                    session_identifier=session.session_id if session else '',
+                    fingerprint_hash=event_data.get('fingerprint', ''),
+                    event_type=event_data.get('eventType', 'page_view'),
+                    event_data=event_data.get('eventData', {}),
+                    page_url=event_data.get('url', ''),
+                    page_title=event_data.get('pageTitle', ''),
+                    referrer_url=event_data.get('referrer', ''),
+
+                    ip_address=client_info['ip'],
+                    ip_country=enriched.get('country', ''),
+                    ip_region=enriched.get('region', ''),
+                    ip_city=enriched.get('city', ''),
+                    is_vpn=event_data.get('is_vpn', False),
+                    is_proxy=event_data.get('is_proxy', False),
+                    is_tor=event_data.get('is_tor', False),
+
+                    user_agent=client_info['user_agent'],
+                    browser=enriched.get('browser', ''),
+                    browser_version=enriched.get('browser_version', ''),
+                    os=enriched.get('os', ''),
+                    os_version=enriched.get('os_version', ''),
+                    device_type=enriched.get('device_type', ''),
+
+                    screen_width=event_data.get('screenWidth'),
+                    screen_height=event_data.get('screenHeight'),
+                    viewport_width=event_data.get('viewport', {}).get('width') if isinstance(event_data.get('viewport'), dict) else None,
+                    viewport_height=event_data.get('viewport', {}).get('height') if isinstance(event_data.get('viewport'), dict) else None,
+
+                    timestamp=timezone.now(),
+                    timezone=event_data.get('timezone', ''),
+                    local_timestamp=parse_local_timestamp(event_data.get('localTime')),
+                    is_unusual_hour=event_data.get('isUnusualHour', False),
+
+                    time_on_page=event_data.get('timeOnPage'),
+                    scroll_depth=event_data.get('scrollDepth'),
+                    clicks_count=event_data.get('clicksCount', 0),
+                )
+                saved += 1
+
             except Exception as e:
-                results.append({'status': 'error', 'error': str(e)})
-        
+                logger.warning(f"track_batch: failed to save event: {e}")
+                errors += 1
+
         return JsonResponse({
             'status': 'success',
-            'processed': len(results),
-            'results': results
+            'saved': saved,
+            'errors': errors,
         })
-        
+
     except Exception as e:
+        logger.error(f"track_batch: request error: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
 
