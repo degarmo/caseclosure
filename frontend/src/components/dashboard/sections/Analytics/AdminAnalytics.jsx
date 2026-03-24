@@ -485,7 +485,7 @@ export default function AdminAnalytics({ user, data: dashboardData }) {
           )}
 
           {/* ── Identity Anomalies ── */}
-          <IdentityAnomalies caseSlug={selectedCase} />
+          <IdentityAnomalies caseSlug={selectedCase?.subdomain || selectedCase?.slug || (selectedCase?.id ? String(selectedCase.id) : null)} />
 
           <div className="flex justify-end">
             <button onClick={() => loadOverview(selectedCase)}
