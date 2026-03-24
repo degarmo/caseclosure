@@ -10,14 +10,13 @@ from .views import (
     tracking_ping,
     report_suspicious,
 
-    # Dashboard views
-    dashboard_overview,
+    # Dashboard views (legacy — realtime/suspicious/patterns/export stay in views.py)
     dashboard_realtime,
     dashboard_suspicious_users,
     dashboard_patterns,
     export_data,
 
-    # Additional dashboard views
+    # Individual widget endpoints (still served from views.py)
     visitor_metrics_widget,
     suspicious_activity_widget,
     geographic_map_widget,
@@ -34,7 +33,13 @@ from .views import (
     # Activity views
     last_activity,
 )
-from .dashboard_views import family_analytics, identity_anomalies
+# dashboard_overview, family_analytics, and identity_anomalies come from dashboard_views.py
+# dashboard_views.py version returns the full {widgets: {...}} structure that the frontend expects
+from .dashboard_views import (
+    dashboard_overview,
+    family_analytics,
+    identity_anomalies,
+)
 
 app_name = 'tracker'
 

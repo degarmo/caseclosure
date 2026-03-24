@@ -39,8 +39,15 @@ def dashboard_overview(request, case_slug):
     GET /api/dashboard/{case_slug}/overview
     """
     try:
-        case = Case.objects.get(subdomain=case_slug)
-        
+        # Look up by subdomain first; fall back to numeric ID
+        try:
+            case = Case.objects.get(subdomain=case_slug)
+        except Case.DoesNotExist:
+            if str(case_slug).isdigit():
+                case = Case.objects.get(id=int(case_slug))
+            else:
+                raise
+
         # Check user has permission to view this case
         if case.is_disabled and not request.user.is_staff:
             return Response(
@@ -55,22 +62,39 @@ def dashboard_overview(request, case_slug):
         if cached_data and not request.GET.get('refresh'):
             return Response(cached_data)
         
+        def _safe(fn, *args, default=None):
+            """Call fn safely — return default dict on any exception."""
+            try:
+                return fn(*args)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"dashboard_overview widget {fn.__name__} failed: {exc}"
+                )
+                return default if default is not None else {}
+
         # Initialize analytics
         analytics = DashboardAnalytics(str(case.id))
-        
-        # Get all dashboard data
+
+        # Case info — fall back to minimal dict if serializer fails
+        try:
+            case_data = CaseSerializer(case).data
+        except Exception:
+            case_data = {'id': str(case.id), 'subdomain': case.subdomain}
+
+        # Get all dashboard data — each widget isolated so one crash doesn't blank everything
         data = {
-            'case': CaseSerializer(case).data,
-            'stats': analytics.get_overview_stats(),
+            'case': case_data,
+            'stats': _safe(analytics.get_overview_stats),
             'widgets': {
-                'visitor_metrics': get_visitor_metrics_widget(case),
-                'suspicious_activity': get_suspicious_activity_widget(case),
-                'geographic_map': get_geographic_map_widget(case),
-                'activity_timeline': get_activity_timeline_widget(case),
-                'engagement_metrics': get_engagement_metrics_widget(case),
-                'alerts_panel': get_alerts_panel_widget(case),
-                'device_breakdown': get_device_breakdown_widget(case),
-                'referrer_sources': get_referrer_sources_widget(case),
+                'visitor_metrics':    _safe(get_visitor_metrics_widget, case),
+                'suspicious_activity': _safe(get_suspicious_activity_widget, case),
+                'geographic_map':     _safe(get_geographic_map_widget, case),
+                'activity_timeline':  _safe(get_activity_timeline_widget, case),
+                'engagement_metrics': _safe(get_engagement_metrics_widget, case),
+                'alerts_panel':       _safe(get_alerts_panel_widget, case),
+                'device_breakdown':   _safe(get_device_breakdown_widget, case),
+                'referrer_sources':   _safe(get_referrer_sources_widget, case),
             },
             'last_updated': timezone.now().isoformat()
         }

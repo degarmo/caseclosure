@@ -74,6 +74,18 @@ export function useDashboardData(user, permissions, options = {}) {
               results.cases = [];
             })
         );
+      } else if (permissions.can('view_assigned_cases')) {
+        // Police/LEO: fetch cases assigned to them via CaseAccess
+        promises.push(
+          api.get('/cases/my_cases/')
+            .then(res => {
+              results.cases = res.data || [];
+              results.userCase = res.data?.[0] || null;
+            })
+            .catch(() => {
+              results.cases = [];
+            })
+        );
       }
 
       // Fetch messages
