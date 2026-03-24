@@ -234,7 +234,6 @@ class TrackingEventAdmin(admin.ModelAdmin):
     ]
     
     date_hierarchy = 'timestamp'
-    
     list_per_page = 50
 
 
@@ -394,3 +393,61 @@ if HAS_ML_MODEL:
 admin.site.site_header = "Case Tracking System Administration"
 admin.site.site_title = "Case Tracking Admin"
 admin.site.index_title = "Welcome to Case Tracking Administration"
+
+# ============================================================================
+# ML TRAINING LABELS
+# ============================================================================
+
+from .models import MLTrainingLabel
+
+
+def _make_label_action(label_value, label_display):
+    """Factory that creates an admin action for a given label."""
+    def action(modeladmin, request, queryset):
+        from django.contrib import messages
+        updated = 0
+        for event in queryset:
+            MLTrainingLabel.objects.update_or_create(
+                fingerprint_hash=event.fingerprint_hash,
+                case=event.case,
+                defaults={
+                    'label': label_value,
+                    'labeled_by': request.user,
+                    'notes': f'Labeled via admin action on TrackingEvent {event.id}',
+                },
+            )
+            updated += 1
+        messages.success(
+            request, f'Labeled {updated} fingerprint(s) as "{label_display}".'
+        )
+    action.short_description = f'🏷 Label as: {label_display}'
+    action.__name__ = f'label_as_{label_value}'
+    return action
+
+
+label_as_suspect   = _make_label_action('suspect',   'Confirmed Suspect')
+label_as_high_risk = _make_label_action('high_risk', 'High Risk')
+label_as_innocent  = _make_label_action('innocent',  'Cleared / Innocent')
+
+
+@admin.register(MLTrainingLabel)
+class MLTrainingLabelAdmin(admin.ModelAdmin):
+    list_display  = ['fingerprint_short', 'label', 'case', 'labeled_by', 'labeled_at', 'notes_short']
+    list_filter   = ['label', 'labeled_at']
+    search_fields = ['fingerprint_hash', 'notes']
+    readonly_fields = ['labeled_at', 'cached_features']
+    ordering      = ['-labeled_at']
+
+    def fingerprint_short(self, obj):
+        return obj.fingerprint_hash[:20] + '…'
+    fingerprint_short.short_description = 'Fingerprint'
+
+    def notes_short(self, obj):
+        return obj.notes[:60] + '…' if len(obj.notes) > 60 else obj.notes
+    notes_short.short_description = 'Notes'
+
+# Attach label actions to TrackingEventAdmin after all functions are defined
+TrackingEventAdmin.label_as_suspect   = label_as_suspect
+TrackingEventAdmin.label_as_high_risk = label_as_high_risk
+TrackingEventAdmin.label_as_innocent  = label_as_innocent
+TrackingEventAdmin.actions = ['label_as_suspect', 'label_as_high_risk', 'label_as_innocent']

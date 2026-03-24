@@ -496,9 +496,35 @@ TRACKING_RATE_LIMITS = {
 try:
     from celery.schedules import crontab
     CELERY_BEAT_SCHEDULE = {
+        # ── existing ────────────────────────────────────────────────────────
         'publish-scheduled-spotlight-posts': {
             'task': 'spotlight.tasks.publish_scheduled_posts',
             'schedule': crontab(minute='*/5'),  # Every 5 minutes
+        },
+        # ── ML / tracking ────────────────────────────────────────────────────
+        # Batch-analyze any events that landed in the last hour but weren't
+        # picked up by the realtime queue (e.g. if workers were briefly down).
+        'batch-analyze-recent-events': {
+            'task': 'tracker.tasks.batch_analyze_recent_events',
+            'schedule': crontab(minute=0),          # Top of every hour
+            'options': {'queue': 'batch'},
+        },
+        # Deep per-case ML sweep: identify high-risk users, coordination, etc.
+        'daily-case-analysis': {
+            'task': 'tracker.tasks.daily_case_analysis',
+            'schedule': crontab(hour=3, minute=0),  # 3 AM daily
+            'options': {'queue': 'batch'},
+        },
+        # Prune old low-severity suspicious-activity records.
+        'cleanup-old-analyses': {
+            'task': 'tracker.tasks.cleanup_old_analyses',
+            'schedule': crontab(hour=4, minute=0),  # 4 AM daily
+            'options': {'queue': 'batch'},
+        },
+        # Celery health ping — shows up in flower / monitoring.
+        'health-check': {
+            'task': 'tracker.tasks.health_check',
+            'schedule': crontab(minute='*/10'),     # Every 10 minutes
         },
     }
 except ImportError:

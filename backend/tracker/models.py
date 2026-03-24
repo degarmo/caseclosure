@@ -584,3 +584,63 @@ class MLModel(models.Model):
     
     def __str__(self):
         return f"{self.name} v{self.version} - {self.get_model_type_display()}"
+
+# ============================================================================
+# ML TRAINING LABELS
+# ============================================================================
+
+class MLTrainingLabel(models.Model):
+    """
+    Investigator-provided ground-truth labels used to train the supervised
+    ML classifiers (GradientBoosting, RandomForest).
+
+    Each row links a browser fingerprint to a human judgment.  Once enough
+    labels exist, run:
+        python manage.py train_ml
+    to retrain the supervised models.
+    """
+
+    LABEL_CHOICES = [
+        ('suspect',   'Confirmed Suspect'),
+        ('high_risk', 'High Risk / Investigate'),
+        ('low_risk',  'Low Risk / Monitor'),
+        ('innocent',  'Cleared / Innocent'),
+    ]
+
+    fingerprint_hash = models.CharField(max_length=255, db_index=True)
+    case = models.ForeignKey(
+        Case,
+        on_delete=models.CASCADE,
+        related_name='ml_labels',
+        null=True, blank=True,
+    )
+    label = models.CharField(max_length=20, choices=LABEL_CHOICES)
+    labeled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='ml_labels_created',
+    )
+    labeled_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, help_text='Why this label was assigned')
+
+    # Optional: store the training features at label-time so retraining is
+    # reproducible even if raw events are later deleted.
+    cached_features = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = 'ml_training_labels'
+        # One label per fingerprint per case (use case=None for global labels)
+        unique_together = [['fingerprint_hash', 'case']]
+        ordering = ['-labeled_at']
+
+    def __str__(self):
+        return (
+            f"{self.label.upper()} | {self.fingerprint_hash[:16]}… "
+            f"({'global' if not self.case else self.case.case_number})"
+        )
+
+    @property
+    def is_positive(self):
+        """True for labels that map to the 'criminal' class in binary training."""
+        return self.label in ('suspect', 'high_risk')

@@ -170,7 +170,22 @@ def track_event(request):
         # Check if we need to create an alert
         if detection_result.get('threat_level') in ['HIGH', 'CRITICAL'] and case:
             create_suspicious_alert(event, suspicious_score, detection_result)
-        
+
+        # ── Async ML analysis ────────────────────────────────────────────────
+        # Queue deep ML analysis in the background.
+        # quick_risk_assessment runs in the 'realtime' queue (5-sec timeout).
+        # If risk is ≥5, it automatically chains to analyze_tracking_event.
+        # CELERY_ALWAYS_EAGER=True in dev → runs synchronously (safe fallback).
+        try:
+            from .tasks import quick_risk_assessment
+            quick_risk_assessment.apply_async(
+                args=[str(event.id)],
+                queue='realtime',
+                ignore_result=True,
+            )
+        except Exception as _celery_exc:
+            logger.debug(f"Celery dispatch skipped: {_celery_exc}")
+
         return JsonResponse({
             'status': 'success',
             'eventId': str(event.id),

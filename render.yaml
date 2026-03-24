@@ -1,26 +1,13 @@
 # render.yaml — CaseClosure full-stack deployment
 # Backend: Django REST API  |  Frontend: React (Vite) static site
+# Celery: 3 workers (realtime+ml, alerts+notify, batch+beat)
 
-databases:
-  - name: caseclosure-db
-    plan: free
-    databaseName: caseclosure_db
-    user: caseclosure_user
-
-services:
-  # ── Backend: Django API ──────────────────────────────────
-  - type: web
-    name: caseclosure-backend
-    runtime: python
-    plan: starter
-    rootDir: backend
-    buildCommand: "./build.sh"
-    startCommand: "gunicorn core.wsgi:application --bind 0.0.0.0:$PORT"
+# ── Managed Redis (required for Celery) ─────────────────────────────────────
+# Render's Redis free tier: 25MB RAM, shared.  Upgrade to "starter" ($10/mo)
+# once traffic increases or you're processing > a few thousand events/day.
+envVarGroups:
+  - name: caseclosure-shared
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: caseclosure-db
-          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
@@ -33,20 +20,14 @@ services:
         value: https://caseclosure.org
       - key: ALLOWED_HOSTS
         value: ".caseclosure.org,caseclosure.org,www.caseclosure.org,caseclosure-backend.onrender.com"
-      # Superuser — set password manually in Render dashboard
       - key: DJANGO_SUPERUSER_EMAIL
         value: admin@caseclosure.org
       - key: DJANGO_SUPERUSER_PASSWORD
         sync: false
-      # Celery synchronous mode (no Redis worker needed)
-      - key: CELERY_ALWAYS_EAGER
-        value: "True"
-      # Email — set these manually in Render dashboard
       - key: EMAIL_HOST_USER
         sync: false
       - key: EMAIL_HOST_PASSWORD
         sync: false
-      # Cloudinary — set these manually in Render dashboard
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -54,7 +35,134 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
 
-  # ── Frontend: React SPA (static site — always free on Render) ──
+databases:
+  - name: caseclosure-db
+    plan: free
+    databaseName: caseclosure_db
+    user: caseclosure_user
+
+services:
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  - type: redis
+    name: caseclosure-redis
+    plan: free          # upgrade to "starter" for persistence + more RAM
+    maxmemoryPolicy: allkeys-lru
+
+  # ── Backend: Django API ───────────────────────────────────────────────────
+  - type: web
+    name: caseclosure-backend
+    runtime: python
+    plan: starter
+    rootDir: backend
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+    envVars:
+      - fromGroup: caseclosure-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caseclosure-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: caseclosure-redis
+          type: redis
+          property: connectionString
+      # Workers are running → tasks go to the queue (not synchronous)
+      - key: CELERY_ALWAYS_EAGER
+        value: "False"
+
+  # ── Celery Worker 1: real-time + ML analysis ──────────────────────────────
+  # Handles quick_risk_assessment (≤5 s) and analyze_tracking_event (≤60 s).
+  # Queues: realtime, ml_analysis
+  - type: worker
+    name: caseclosure-worker-ml
+    runtime: python
+    plan: starter
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: >
+      celery -A core worker
+        --queues=realtime,ml_analysis
+        --concurrency=2
+        --loglevel=info
+        --hostname=ml@%h
+    envVars:
+      - fromGroup: caseclosure-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caseclosure-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: caseclosure-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_ALWAYS_EAGER
+        value: "False"
+
+  # ── Celery Worker 2: alerts + notifications ────────────────────────────────
+  # Handles generate_alert and send_alert_notifications.
+  # Kept separate so a slow email send never delays ML scoring.
+  # Queues: alerts, notifications
+  - type: worker
+    name: caseclosure-worker-alerts
+    runtime: python
+    plan: starter
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: >
+      celery -A core worker
+        --queues=alerts,notifications
+        --concurrency=2
+        --loglevel=info
+        --hostname=alerts@%h
+    envVars:
+      - fromGroup: caseclosure-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caseclosure-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: caseclosure-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_ALWAYS_EAGER
+        value: "False"
+
+  # ── Celery Worker 3: batch processing + beat scheduler ────────────────────
+  # Handles hourly/daily batch jobs AND the Celery Beat clock.
+  # Only ONE instance of beat should run across your whole deployment.
+  # Queues: batch, ml_heavy, reports  +  --beat
+  - type: worker
+    name: caseclosure-worker-batch
+    runtime: python
+    plan: starter
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: >
+      celery -A core worker
+        --queues=batch,ml_heavy,reports
+        --concurrency=1
+        --loglevel=info
+        --hostname=batch@%h
+        --beat
+    envVars:
+      - fromGroup: caseclosure-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: caseclosure-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: caseclosure-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_ALWAYS_EAGER
+        value: "False"
+
+  # ── Frontend: React SPA (static site — always free on Render) ─────────────
   - type: web
     name: caseclosure-frontend
     runtime: static
@@ -69,7 +177,6 @@ services:
         name: X-Content-Type-Options
         value: nosniff
     routes:
-      # SPA catch-all: serve index.html for all routes (React Router handles them)
       - type: rewrite
         source: /*
         destination: /index.html
@@ -78,25 +185,3 @@ services:
         value: "20"
       - key: VITE_API_URL
         value: https://caseclosure-backend.onrender.com/api/
-
-  # ── Celery Worker (uncomment when adding Redis) ──────────
-  # - type: worker
-  #   name: caseclosure-worker
-  #   runtime: python
-  #   plan: starter
-  #   rootDir: backend
-  #   buildCommand: "pip install -r requirements.txt"
-  #   startCommand: "celery -A core worker --loglevel=info --beat"
-  #   envVars:
-  #     - key: DATABASE_URL
-  #       fromDatabase:
-  #         name: caseclosure-db
-  #         property: connectionString
-  #     - key: SECRET_KEY
-  #       fromService:
-  #         name: caseclosure-backend
-  #         envVarKey: SECRET_KEY
-  #     - key: REDIS_URL
-  #       value: ""  # Set to your Redis instance URL
-  #     - key: CELERY_ALWAYS_EAGER
-  #       value: "False"

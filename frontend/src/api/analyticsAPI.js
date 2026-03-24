@@ -34,6 +34,7 @@ export const analyticsAPI = {
   exportSuspects: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/suspects/export/`, { responseType: 'blob' }),
 
   // Honeypot trigger (called by beacon when hidden element is interacted with)
+  getMLStatus: () => api.get('/tracker/ml/status/'),
   triggerHoneypot: (caseSlug, fp = '', sid = '') =>
     api.get(`/tracker/honeypot/${caseSlug}/`, { params: { fp, sid } }),
 };

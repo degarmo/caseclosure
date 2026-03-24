@@ -74,7 +74,7 @@ export default function Spotlight({ caseData, customizations, isPreview, isEditi
         </div>
 
         <div className="flex justify-center">
-          <div className="w-full max-w-2xl space-y-6">
+          <div className="w-full max-w-3xl space-y-7">
             {updates.length === 0 ? (
               <Card className="shadow-lg">
                 <CardContent className="p-12 text-center">
@@ -88,17 +88,17 @@ export default function Spotlight({ caseData, customizations, isPreview, isEditi
             ) : (
               updates.map((update) => (
                 <Card key={update.id} className="shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
+                  <CardContent className="p-7 md:p-8">
+                    <div className="mb-5 flex items-start justify-between">
                       <div className="flex items-center gap-3 flex-1">
-                        <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-slate-600 font-semibold text-sm">
+                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-200">
+                          <span className="text-base font-semibold text-slate-600">
                             {caseData?.first_name?.[0] || 'U'}
                           </span>
                         </div>
                         <div>
-                          <h3 className="font-semibold text-slate-800">{update.title}</h3>
-                          <p className="text-sm text-slate-500">
+                          <h3 className="text-xl font-semibold text-slate-800">{update.title}</h3>
+                          <p className="text-sm text-slate-500 md:text-[15px]">
                             {new Date(update.created_at || update.created_date).toLocaleDateString()}
                           </p>
                         </div>
@@ -113,7 +113,7 @@ export default function Spotlight({ caseData, customizations, isPreview, isEditi
                       </Button>
                     </div>
                     
-                    <p className="text-slate-600 mb-4 whitespace-pre-wrap">
+                    <p className="mb-5 whitespace-pre-wrap text-[17px] leading-8 text-slate-600">
                       {stripHtml(update.content || update.content_text || '')}
                     </p>
                     
@@ -121,11 +121,11 @@ export default function Spotlight({ caseData, customizations, isPreview, isEditi
                       <img 
                         src={update.image_url} 
                         alt={update.title}
-                        className="w-full rounded-lg mb-4"
+                        className="mb-5 w-full rounded-xl"
                       />
                     )}
                     
-                    <div className="flex items-center gap-4 text-sm text-slate-500">
+                    <div className="flex items-center gap-4 text-[15px] text-slate-500">
                       <span>{update.likes_count || 0} likes</span>
                       {update.view_count && <span>{update.view_count} views</span>}
                     </div>

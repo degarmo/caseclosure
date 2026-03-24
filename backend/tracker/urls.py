@@ -39,6 +39,7 @@ from .views import (
 # dashboard_overview, family_analytics, and identity_anomalies come from dashboard_views.py
 # dashboard_views.py version returns the full {widgets: {...}} structure that the frontend expects
 from .dashboard_views import (
+    get_ml_status,
     dashboard_overview,
     family_analytics,
     identity_anomalies,
@@ -128,6 +129,7 @@ urlpatterns = [
     # Suspects panel — authenticated LEO/admin only
     path('dashboard/<str:case_slug>/suspects/', get_suspects, name='get_suspects'),
     path('dashboard/<str:case_slug>/suspects/export/', export_suspects, name='export_suspects'),
+    path('ml/status/', get_ml_status, name='ml_status'),
 
     # ============================================
     # ADMIN ENDPOINTS

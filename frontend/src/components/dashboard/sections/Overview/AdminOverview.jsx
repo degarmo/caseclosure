@@ -180,18 +180,18 @@ export default function AdminOverview({ data, onSectionChange, theme }) {
     <div className="space-y-6">
 
       <section
-        className="overflow-hidden rounded-[30px] border px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.16)]"
+        className="overflow-hidden rounded-[26px] border px-5 py-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.16)] md:px-6"
         style={{ background: theme?.heroGradient, borderColor: theme?.accentBorder }}
       >
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <p className="text-xs uppercase tracking-[0.22em]" style={{ color: theme?.heroSubtext }}>Platform overview</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">Operational health at a glance</h2>
-            <p className="mt-3 text-sm leading-6" style={{ color: theme?.heroSubtext }}>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight md:text-2xl">Operational health at a glance</h2>
+            <p className="mt-2 text-sm leading-5" style={{ color: theme?.heroSubtext }}>
               Track system workload, inbound activity, and approval queues without leaving the dashboard.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <HeroStat label="Cases" value={caseTotal} theme={theme} />
             <HeroStat label="Users" value={userTotal} theme={theme} />
             <HeroStat label="Messages" value={msgTotal} theme={theme} />
@@ -469,9 +469,9 @@ export default function AdminOverview({ data, onSectionChange, theme }) {
 
 function HeroStat({ label, value, theme }) {
   return (
-    <div className="rounded-2xl border px-4 py-3 backdrop-blur" style={{ background: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.18)' }}>
+    <div className="rounded-2xl border px-3.5 py-2.5 backdrop-blur" style={{ background: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.18)' }}>
       <p className="text-xs uppercase tracking-[0.16em]" style={{ color: theme?.heroSubtext }}>{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className="mt-1.5 text-xl font-semibold">{value}</p>
     </div>
   );
 }

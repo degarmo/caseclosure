@@ -17,6 +17,7 @@ import api from '@/api/config';
 import { analyticsAPI, adminTrackingAPI } from '@/api/analyticsAPI';
 import IdentityAnomalies from './IdentityAnomalies';
 import SuspectPanel from './SuspectPanel';
+import MLStatusWidget from './MLStatusWidget';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -487,6 +488,7 @@ export default function AdminAnalytics({ user, data: dashboardData }) {
 
           {/* ── Suspect Intelligence Panel ── */}
           <SuspectPanel caseSlug={selectedCase?.subdomain || selectedCase?.slug || (selectedCase?.id ? String(selectedCase.id) : null)} />
+          <MLStatusWidget />
 
           {/* ── Identity Anomalies ── */}
           <IdentityAnomalies caseSlug={selectedCase?.subdomain || selectedCase?.slug || (selectedCase?.id ? String(selectedCase.id) : null)} />

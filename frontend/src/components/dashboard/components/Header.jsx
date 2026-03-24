@@ -79,14 +79,14 @@ export default function Header({
 
   return (
     <header
-      className="relative z-40 px-5 py-5 backdrop-blur md:px-8"
+      className="relative z-40 px-5 py-3 backdrop-blur md:px-8"
       style={{ borderBottom: `1px solid ${theme.shellBorder}`, background: theme.shellBackground }}
     >
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <span
-              className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+              className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em]"
               style={{ border: `1px solid ${theme.accentBorder}`, background: theme.accentSoft, color: theme.accentText }}
             >
               {sectionMeta?.eyebrow || 'Workspace'}
@@ -97,30 +97,30 @@ export default function Header({
               </span>
             )}
           </div>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
+          <h1 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 md:text-2xl">
             {sectionMeta?.title || roleConfig?.title || 'Dashboard'}
           </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+          <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">
             {sectionMeta?.description || roleConfig?.subtitle || 'Welcome back'}
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               onClick={() => onSectionChange?.('overview')}
-              className="rounded-full px-3 py-1.5 text-sm font-medium transition"
+              className="rounded-full px-3 py-1 text-sm font-medium transition"
               style={activeSection === 'overview' ? activePillStyle : inactivePillStyle}
             >
               Overview
             </button>
             <button
               onClick={() => onSectionChange?.('cases-all')}
-              className="rounded-full px-3 py-1.5 text-sm font-medium transition"
+              className="rounded-full px-3 py-1 text-sm font-medium transition"
               style={activeSection.startsWith('cases') || activeSection === 'police-case-detail' ? activePillStyle : inactivePillStyle}
             >
               Cases
             </button>
             <button
               onClick={() => onSectionChange?.('messages-all')}
-              className="rounded-full px-3 py-1.5 text-sm font-medium transition"
+              className="rounded-full px-3 py-1 text-sm font-medium transition"
               style={activeSection.startsWith('messages') ? activePillStyle : inactivePillStyle}
             >
               Messages
@@ -128,16 +128,16 @@ export default function Header({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 xl:min-w-[520px]">
+        <div className="flex flex-col gap-2.5 xl:min-w-[500px]">
           <form onSubmit={handleSearch} className="w-full">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search cases, users, posts, or activity"
-                className="w-full rounded-2xl px-11 py-3 text-sm text-slate-800 shadow-sm outline-none transition focus:ring-4 focus:ring-slate-200"
+                className="w-full rounded-2xl px-10 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:ring-4 focus:ring-slate-200"
                 style={controlStyle}
               />
             </div>
@@ -148,7 +148,7 @@ export default function Header({
               <div className="relative" ref={themeMenuRef}>
                 <button
                   onClick={() => setShowThemes(!showThemes)}
-                  className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-sm transition"
+                  className="inline-flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm transition"
                   style={controlStyle}
                 >
                   <Cog6ToothIcon className="h-4 w-4" />
@@ -196,7 +196,7 @@ export default function Header({
 
               <button
                 onClick={handleRefresh}
-                className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition"
+                className="inline-flex items-center gap-2 rounded-2xl px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm transition"
                 style={controlStyle}
                 title="Refresh data"
               >
@@ -207,7 +207,7 @@ export default function Header({
               <div className="relative" ref={notificationMenuRef}>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative rounded-2xl p-3 text-slate-700 shadow-sm transition"
+                  className="relative rounded-2xl p-2.5 text-slate-700 shadow-sm transition"
                   style={controlStyle}
                   title="Notifications"
                 >
@@ -260,10 +260,10 @@ export default function Header({
             <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left shadow-sm transition"
+                className="flex items-center gap-3 rounded-2xl px-3 py-2 text-left shadow-sm transition"
                 style={controlStyle}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-sm font-medium text-white">
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-sm font-medium text-white">
                   {user?.first_name?.[0] || user?.email?.[0] || 'U'}
                 </div>
                 <div className="min-w-0">
@@ -274,7 +274,7 @@ export default function Header({
                     {user?.is_staff ? 'Admin' : user?.role || 'User'}
                   </p>
                 </div>
-                <ChevronDownIcon className="h-4 w-4 text-slate-500" />
+                <ChevronDownIcon className="h-4 w-4 shrink-0 text-slate-500" />
               </button>
 
               {showProfileMenu && (
