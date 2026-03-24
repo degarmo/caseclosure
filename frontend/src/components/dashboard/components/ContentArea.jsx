@@ -87,40 +87,73 @@ export default function ContentArea({
 
   const handleSubmitPost = async (postData) => {
     try {
-      
-      // Extract plain text from HTML content
+      // Extract plain text from HTML content for search indexing
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = postData.content || '';
       const contentText = tempDiv.textContent || tempDiv.innerText || '';
-      
-      // Prepare final data with required content_text field
-      const finalData = {
+
+      // Build base data object
+      const baseData = {
         ...postData,
         content_text: contentText.trim(),
       };
-      
-      // Remove case if it's "main-website" or empty
-      if (finalData.case === 'main-website' || !finalData.case) {
-        delete finalData.case;
+
+      // Remove case if "main-website" placeholder or empty
+      if (baseData.case === 'main-website' || !baseData.case) {
+        delete baseData.case;
       }
-      
-      
-      // Create or update post
-      if (editingPost) {
-        await api.patch(`/spotlight/${editingPost.id}/`, finalData);
+
+      // If featured_image is a File, use FormData so the browser encodes it correctly.
+      // Plain JSON cannot carry binary file data.
+      let payload;
+      let axiosConfig = {};
+
+      if (baseData.featured_image instanceof File) {
+        const fd = new FormData();
+        Object.entries(baseData).forEach(([key, value]) => {
+          if (value === null || value === undefined) return;
+          if (key === 'featured_image') {
+            fd.append('featured_image', value);
+          } else if (Array.isArray(value)) {
+            // DRF expects repeated keys for arrays (e.g. tags[]=a&tags[]=b)
+            value.forEach(item => fd.append(key, item));
+          } else {
+            fd.append(key, String(value));
+          }
+        });
+        payload = fd;
+        axiosConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
       } else {
-        await api.post('/spotlight/', finalData);
+        // No file — send as JSON but strip out any File objects just in case
+        const clean = Object.fromEntries(
+          Object.entries(baseData).filter(([, v]) => !(v instanceof File))
+        );
+        payload = clean;
       }
-      
+
+      if (editingPost) {
+        await api.patch(`/spotlight/${editingPost.id}/`, payload, axiosConfig);
+      } else {
+        await api.post('/spotlight/', payload, axiosConfig);
+      }
+
       setShowSpotlightEditor(false);
       setEditingPost(null);
       onRefresh(['spotlight']);
-      
+
     } catch (error) {
-  
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.detail || 
-                          'Failed to save post';
+      // Surface the actual validation error so the user knows what went wrong
+      const data = error.response?.data;
+      const errorMessage =
+        (typeof data === 'string' ? data : null) ||
+        data?.detail ||
+        data?.error ||
+        (data && typeof data === 'object'
+          ? Object.entries(data)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+              .join('\n')
+          : null) ||
+        'Failed to save post. Please try again.';
       alert(errorMessage);
     }
   };

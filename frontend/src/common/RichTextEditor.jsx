@@ -66,16 +66,19 @@ const RichTextEditor = ({
         heading: {
           levels: [1, 2, 3]
         },
-        // Disable any extensions we're adding separately to avoid conflicts
         dropcursor: {
           color: '#DBEAFE',
           width: 4,
         },
         gapcursor: false,
+        // TipTap v3 StarterKit bundles link & underline — disable here,
+        // then add them separately below so we can pass our own config.
+        link: false,
+        underline: false,
       }),
       // Add Underline as a separate extension
       Underline,
-      // Add Link as a separate extension  
+      // Add Link as a separate extension
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {

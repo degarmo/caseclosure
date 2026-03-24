@@ -105,33 +105,38 @@ class SpotlightPostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # 🔒 AUTHORIZATION CHECK - Verify user can post to this case
         case_id = serializer.validated_data.get('case')
+        user = self.request.user
+
+        # LEO users can never post, regardless of case
+        try:
+            if getattr(user, 'profile', None) and user.profile.account_type == 'leo':
+                raise serializers.ValidationError({
+                    "case": "Law enforcement officers have view-only access."
+                })
+        except serializers.ValidationError:
+            raise
+        except Exception:
+            pass  # Profile may not exist; allow the request through
+
         if case_id:
             from cases.models import Case, CaseAccess
             from django.shortcuts import get_object_or_404
-            
+
             case = get_object_or_404(Case, id=case_id.id if hasattr(case_id, 'id') else case_id)
-            
-            # Check if user owns the case
-            if case.user != self.request.user:
-                # Check if user has CaseAccess with posting permissions
-                case_access = CaseAccess.objects.filter(
-                    case=case,
-                    user=self.request.user,
-                    accepted=True
-                ).first()
-                
-                # For now, only case owners can post
-                # TODO: Add can_post_updates field to CaseAccess model
-                if not case_access:
-                    raise serializers.ValidationError({
-                        "case": "You don't have permission to post to this case."
-                    })
-                
-                # LEO users should not be able to post
-                if self.request.user.profile.account_type == 'leo':
-                    raise serializers.ValidationError({
-                        "case": "Law enforcement officers have view-only access."
-                    })
+
+            # Staff/admin can post to any case
+            if not user.is_staff:
+                # Check if user owns the case or has CaseAccess
+                if case.user != user:
+                    case_access = CaseAccess.objects.filter(
+                        case=case,
+                        user=user,
+                        accepted=True
+                    ).first()
+                    if not case_access:
+                        raise serializers.ValidationError({
+                            "case": "You don't have permission to post to this case."
+                        })
         
         # Check user posting limits
         try:
