@@ -14,6 +14,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import transaction
 
 from .models import (
     TrackingEvent, UserSession, SuspiciousActivity,
@@ -65,12 +66,18 @@ def dashboard_overview(request, case_slug):
         widget_errors = {}
 
         def _safe(fn, *args, default=None):
-            """Call fn safely — return default dict on any exception."""
+            """Call fn safely inside a DB savepoint so a failed query
+            doesn't abort the outer transaction and cascade to all
+            subsequent widgets."""
             name = getattr(fn, '__name__', str(fn))
+            sid = transaction.savepoint()
             try:
-                return fn(*args)
+                result = fn(*args)
+                transaction.savepoint_commit(sid)
+                return result
             except Exception as exc:
                 import traceback, logging
+                transaction.savepoint_rollback(sid)
                 tb = traceback.format_exc()
                 logging.getLogger(__name__).warning(
                     f"dashboard_overview widget {name} failed: {exc}\n{tb}"
@@ -320,8 +327,7 @@ def get_geographic_map_widget(case):
     # Get visitor distribution by country
     countries = TrackingEvent.objects.filter(
         case=case,
-        ip_country__isnull=False
-    ).values('ip_country').annotate(
+    ).exclude(ip_country='').values('ip_country').annotate(
         visitor_count=Count('fingerprint_hash', distinct=True),
         total_events=Count('id'),
         suspicious_count=Count(
@@ -334,8 +340,7 @@ def get_geographic_map_widget(case):
     # Get city-level data for top countries
     cities = TrackingEvent.objects.filter(
         case=case,
-        ip_city__isnull=False
-    ).values('ip_city', 'ip_country', 'ip_latitude', 'ip_longitude').annotate(
+    ).exclude(ip_city='').values('ip_city', 'ip_country', 'ip_latitude', 'ip_longitude').annotate(
         visitor_count=Count('fingerprint_hash', distinct=True),
         suspicious_count=Count(
             'fingerprint_hash',
@@ -471,7 +476,7 @@ def get_activity_timeline_widget(case, hours=24):
         
         hourly_breakdown[hour_start.hour] = {
             'events': hour_events.count(),
-            'visitors': hour_events.distinct('fingerprint_hash').count(),
+            'visitors': hour_events.values('fingerprint_hash').distinct().count(),
             'suspicious': hour_events.filter(is_suspicious=True).count()
         }
     

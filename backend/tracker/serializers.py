@@ -40,7 +40,7 @@ class CaseSerializer(serializers.ModelSerializer):
         return UserSession.objects.filter(
             case=obj,
             created_at__gte=since
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
     
     def get_recent_activity(self, obj):
         """Check if there's been recent activity"""

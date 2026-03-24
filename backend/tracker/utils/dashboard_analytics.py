@@ -86,7 +86,7 @@ class DashboardAnalytics:
         query = UserSession.objects.filter(case=self.case)
         if since:
             query = query.filter(created_at__gte=since)
-        return query.distinct('fingerprint_hash').count()
+        return query.values('fingerprint_hash').distinct().count()
     
     def get_total_page_views(self, since: Optional[datetime] = None) -> int:
         """Get total page views"""
@@ -102,7 +102,7 @@ class DashboardAnalytics:
         """Get count of suspicious users"""
         return SuspiciousActivity.objects.filter(
             case=self.case
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
     
     def get_active_tips_count(self) -> int:
         """Get count of active tips"""
@@ -138,7 +138,7 @@ class DashboardAnalytics:
             case=self.case,
             created_at__gte=previous_period_start,
             created_at__lt=current_period_start
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
         
         if previous == 0:
             return 100.0 if current > 0 else 0.0
@@ -181,7 +181,7 @@ class DashboardAnalytics:
         return SuspiciousActivity.objects.filter(
             case=self.case,
             severity_level__gte=4
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
     
     def get_critical_alerts_count(self) -> int:
         """Get count of critical unresolved alerts"""
@@ -210,7 +210,7 @@ class DashboardAnalytics:
         return UserSession.objects.filter(
             case=self.case,
             last_activity__gte=since
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
     
     def get_latest_activity_timestamp(self) -> Optional[str]:
         """Get timestamp of latest activity"""
@@ -729,19 +729,22 @@ class DashboardAnalytics:
         recommendations = []
         
         # Check for immediate threats
-        high_risk_users = SuspiciousActivity.objects.filter(
-            case=self.case,
-            severity_level__gte=4,
-            created_at__gte=timezone.now() - timedelta(hours=24)
-        ).distinct('fingerprint_hash')
-        
-        if high_risk_users.count() > 0:
+        high_risk_fps = list(
+            SuspiciousActivity.objects.filter(
+                case=self.case,
+                severity_level__gte=4,
+                created_at__gte=timezone.now() - timedelta(hours=24)
+            ).values('fingerprint_hash').distinct()[:5]
+        )
+        high_risk_count = len(high_risk_fps)
+
+        if high_risk_count > 0:
             recommendations.append({
                 'priority': 'HIGH',
                 'type': 'immediate_attention',
                 'title': 'High-Risk Users Detected',
-                'message': f"{high_risk_users.count()} high-risk users detected in the last 24 hours",
-                'users': [u.fingerprint_hash[:16] for u in high_risk_users[:5]],
+                'message': f"{high_risk_count} high-risk users detected in the last 24 hours",
+                'users': [u['fingerprint_hash'][:16] for u in high_risk_fps],
                 'suggested_actions': [
                     'Review detailed activity logs',
                     'Consider law enforcement notification',

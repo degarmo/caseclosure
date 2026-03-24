@@ -115,7 +115,7 @@ class DashboardAnalytics:
     def _get_total_visitors(self, case) -> int:
         """Get total unique visitors"""
         from .models import UserSession
-        return UserSession.objects.filter(case=case).distinct('fingerprint_hash').count()
+        return UserSession.objects.filter(case=case).values('fingerprint_hash').distinct().count()
     
     def _get_unique_visitors(self, case, since: datetime) -> int:
         """Get unique visitors since a specific time"""
@@ -123,7 +123,7 @@ class DashboardAnalytics:
         return UserSession.objects.filter(
             case=case,
             created_at__gte=since
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
     
     def _get_avg_session_duration(self, case) -> float:
         """Calculate average session duration in seconds"""
@@ -179,7 +179,7 @@ class DashboardAnalytics:
         from .models import SuspiciousActivity
         return SuspiciousActivity.objects.filter(
             case=case
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
     
     def _get_suspicious_events(self, case, since: datetime) -> int:
         """Get count of suspicious events since a specific time"""
@@ -196,7 +196,7 @@ class DashboardAnalytics:
         return SuspiciousActivity.objects.filter(
             case=case,
             severity_level__gte=4
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
     
     def _calculate_trend(self, metric_type: str, case) -> Dict[str, Any]:
         """Calculate trend for a specific metric"""
@@ -211,14 +211,14 @@ class DashboardAnalytics:
             today_count = UserSession.objects.filter(
                 case=case,
                 created_at__gte=today_start
-            ).distinct('fingerprint_hash').count()
-            
+            ).values('fingerprint_hash').distinct().count()
+
             yesterday_count = UserSession.objects.filter(
                 case=case,
                 created_at__gte=yesterday_start,
                 created_at__lt=today_start
-            ).distinct('fingerprint_hash').count()
-            
+            ).values('fingerprint_hash').distinct().count()
+
             # Daily counts for last 7 days
             daily_counts = []
             for i in range(7):
@@ -228,7 +228,7 @@ class DashboardAnalytics:
                     case=case,
                     created_at__gte=day_start,
                     created_at__lt=day_end
-                ).distinct('fingerprint_hash').count()
+                ).values('fingerprint_hash').distinct().count()
                 daily_counts.append(count)
             
         elif metric_type == 'suspicious':
@@ -472,15 +472,15 @@ class DashboardAnalytics:
         vpn_usage = TrackingEvent.objects.filter(
             case=case,
             is_vpn=True
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
         if vpn_usage > 0:
             risk_score += min(10, vpn_usage * 2)
-        
+
         # Factor 5: Unusual hour activity (max 10 points)
         unusual_hour = TrackingEvent.objects.filter(
             case=case,
             is_unusual_hour=True
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
         if unusual_hour > 0:
             risk_score += min(10, unusual_hour)
         
@@ -546,7 +546,7 @@ class DashboardAnalytics:
         vpn_users = TrackingEvent.objects.filter(
             case=case,
             is_vpn=True
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
         if vpn_users > 0:
             risk_factors.append({
                 'factor': 'VPN/Proxy Usage',
@@ -554,12 +554,12 @@ class DashboardAnalytics:
                 'count': vpn_users,
                 'description': f'{vpn_users} users detected using VPN or proxy'
             })
-        
+
         # Check for unusual hour activity
         unusual_hour_users = TrackingEvent.objects.filter(
             case=case,
             is_unusual_hour=True
-        ).distinct('fingerprint_hash').count()
+        ).values('fingerprint_hash').distinct().count()
         if unusual_hour_users > 5:
             risk_factors.append({
                 'factor': 'Unusual Hour Activity',
