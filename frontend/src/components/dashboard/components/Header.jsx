@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   ArrowPathIcon,
   BellIcon,
-  MagnifyingGlassIcon,
   UserCircleIcon,
   Cog6ToothIcon,
   ShieldCheckIcon,
@@ -130,14 +129,13 @@ export default function Header({
 
         <div className="flex flex-col gap-2.5 xl:min-w-[500px]">
           <form onSubmit={handleSearch} className="w-full">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
+            <div>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search cases, users, posts, or activity"
-                className="w-full rounded-2xl px-10 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:ring-4 focus:ring-slate-200"
+                className="w-full rounded-2xl px-5 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:ring-4 focus:ring-slate-200"
                 style={controlStyle}
               />
             </div>
