@@ -1478,113 +1478,119 @@ def identity_anomalies(request, case_slug):
 def get_ml_status(request):
     """
     GET /api/tracker/ml/status/
-
-    Returns the health of the ML pipeline:
-    - Whether the detection system is loaded
-    - Model training metadata (last trained, sample counts)
-    - Celery queue sizes (if Redis is reachable)
-    - Recent task counts
-    - Labeled-sample counts by class
+    Never raises — all sections are individually try/excepted.
     """
     import json
+    import socket
+    import logging
     from pathlib import Path
     from django.conf import settings as django_settings
-    from .apps import get_detection_system
-    from .models import MLTrainingLabel, TrackingEvent, SuspiciousActivity
 
-    status = {
+    log = logging.getLogger(__name__)
+
+    result = {
         'detection_system_loaded': False,
         'ml_models': {},
-        'training': {},
+        'training': {'label_counts': {}, 'total_labels': 0},
         'celery': {},
         'database': {},
     }
 
-    # ── Detection system ─────────────────────────────────────────────────────
     try:
-        ds = get_detection_system()
-        status['detection_system_loaded'] = ds is not None
-    except Exception as exc:
-        status['detection_system_loaded'] = False
-        status['detection_system_error'] = str(exc)
-
-    # ── Model files ──────────────────────────────────────────────────────────
-    model_dir = Path(getattr(django_settings, 'MEDIA_ROOT', '/tmp')) / 'ml_models'
-    model_files = {
-        'isolation_forest': 'isolation_forest.joblib',
-        'gradient_boosting': 'gradient_boosting.joblib',
-        'random_forest':     'random_forest.joblib',
-        'scaler':            'scaler.joblib',
-    }
-    for name, filename in model_files.items():
-        path = model_dir / filename
-        status['ml_models'][name] = {
-            'exists': path.exists(),
-            'size_kb': round(path.stat().st_size / 1024, 1) if path.exists() else None,
-        }
-
-    # ── Training metadata ────────────────────────────────────────────────────
-    meta_path = model_dir / 'training_meta.json'
-    if meta_path.exists():
+        # ── Detection system ─────────────────────────────────────────────────
         try:
-            status['training'] = json.loads(meta_path.read_text())
-        except Exception:
-            status['training'] = {'error': 'Could not parse training_meta.json'}
-    else:
-        status['training'] = {'trained': False, 'message': 'Run: python manage.py train_ml'}
+            from .apps import get_detection_system
+            ds = get_detection_system()
+            result['detection_system_loaded'] = ds is not None
+        except Exception as exc:
+            result['detection_system_loaded'] = False
+            result['detection_system_error'] = str(exc)
 
-    # ── Label counts ─────────────────────────────────────────────────────────
-    label_counts = {}
-    for row in MLTrainingLabel.objects.values('label').annotate(
-        count=models.Count('id')
-    ):
-        label_counts[row['label']] = row['count']
+        # ── Model files ──────────────────────────────────────────────────────
+        try:
+            model_dir = Path(getattr(django_settings, 'MEDIA_ROOT', '/tmp')) / 'ml_models'
+            for name, filename in {
+                'isolation_forest': 'isolation_forest.joblib',
+                'gradient_boosting': 'gradient_boosting.joblib',
+                'random_forest':     'random_forest.joblib',
+                'scaler':            'scaler.joblib',
+            }.items():
+                path = model_dir / filename
+                result['ml_models'][name] = {
+                    'exists': path.exists(),
+                    'size_kb': round(path.stat().st_size / 1024, 1) if path.exists() else None,
+                }
 
-    status['training']['label_counts'] = label_counts
-    status['training']['total_labels'] = sum(label_counts.values())
+            meta_path = model_dir / 'training_meta.json'
+            if meta_path.exists():
+                try:
+                    result['training'].update(json.loads(meta_path.read_text()))
+                except Exception:
+                    result['training']['meta_error'] = 'Could not parse training_meta.json'
+            else:
+                result['training']['message'] = 'Run: python manage.py train_ml'
+        except Exception as exc:
+            result['ml_models_error'] = str(exc)
 
-    # ── Database stats ───────────────────────────────────────────────────────
-    try:
-        status['database'] = {
-            'total_events': TrackingEvent.objects.count(),
-            'ml_analyzed_events': TrackingEvent.objects.filter(ml_analyzed=True).count(),
-            'suspicious_events': TrackingEvent.objects.filter(is_suspicious=True).count(),
-            'suspicious_activities': SuspiciousActivity.objects.count(),
-            'honeypot_hits': SuspiciousActivity.objects.filter(
-                activity_type='honeypot_triggered'
-            ).count(),
-        }
+        # ── Label counts (needs migration 0002 to exist) ─────────────────────
+        try:
+            from .models import MLTrainingLabel
+            label_counts = {}
+            for row in MLTrainingLabel.objects.values('label').annotate(count=Count('id')):
+                label_counts[row['label']] = row['count']
+            result['training']['label_counts'] = label_counts
+            result['training']['total_labels'] = sum(label_counts.values())
+        except Exception as exc:
+            result['training']['labels_note'] = (
+                'Label table not yet available — run migrations. ' + str(exc)[:120]
+            )
+
+        # ── Database stats ───────────────────────────────────────────────────
+        try:
+            from .models import TrackingEvent, SuspiciousActivity
+            result['database'] = {
+                'total_events':      TrackingEvent.objects.count(),
+                'ml_analyzed_events': TrackingEvent.objects.filter(ml_analyzed=True).count(),
+                'suspicious_events': TrackingEvent.objects.filter(is_suspicious=True).count(),
+                'suspicious_activities': SuspiciousActivity.objects.count(),
+                'honeypot_hits': SuspiciousActivity.objects.filter(
+                    activity_type='honeypot_triggered'
+                ).count(),
+            }
+        except Exception as exc:
+            result['database'] = {'error': str(exc)[:200]}
+
+        # ── Redis / Celery — simple socket ping, no blocking inspect ─────────
+        try:
+            redis_url = getattr(django_settings, 'REDIS_URL', '') or ''
+            broker_reachable = False
+            redis_host = 'localhost'
+            redis_port = 6379
+
+            if redis_url:
+                # Parse host:port from redis://host:port/db
+                from urllib.parse import urlparse
+                parsed = urlparse(redis_url)
+                redis_host = parsed.hostname or 'localhost'
+                redis_port = parsed.port or 6379
+
+            # 0.5-second TCP connect test — never hangs the request
+            with socket.create_connection((redis_host, redis_port), timeout=0.5):
+                broker_reachable = True
+
+            result['celery'] = {
+                'broker_reachable': broker_reachable,
+                'broker_host': f'{redis_host}:{redis_port}',
+                'note': 'Workers online status requires Celery inspect (not checked here)',
+            }
+        except Exception as exc:
+            result['celery'] = {
+                'broker_reachable': False,
+                'note': 'Redis not reachable — set REDIS_URL and deploy Celery workers.',
+            }
+
     except Exception as exc:
-        status['database'] = {'error': str(exc)}
+        log.exception('get_ml_status outer error: %s', exc)
+        result['_error'] = str(exc)
 
-    # ── Celery / Redis ────────────────────────────────────────────────────────
-    try:
-        from celery.app.control import Control
-        from core.celery import app as celery_app
-
-        inspect = celery_app.control.inspect(timeout=2)
-        active  = inspect.active()   # running tasks right now
-        reserved = inspect.reserved()  # tasks waiting in worker memory
-
-        worker_names = list((active or {}).keys())
-        active_count = sum(len(v) for v in (active or {}).values())
-        reserved_count = sum(len(v) for v in (reserved or {}).values())
-
-        status['celery'] = {
-            'broker_reachable': True,
-            'workers_online': len(worker_names),
-            'worker_names': worker_names,
-            'active_tasks': active_count,
-            'reserved_tasks': reserved_count,
-        }
-    except Exception as exc:
-        status['celery'] = {
-            'broker_reachable': False,
-            'error': str(exc),
-            'note': (
-                'Celery workers are offline or Redis is not configured. '
-                'Set REDIS_URL in your environment and deploy workers.'
-            ),
-        }
-
-    return JsonResponse(status)
+    return JsonResponse(result)
