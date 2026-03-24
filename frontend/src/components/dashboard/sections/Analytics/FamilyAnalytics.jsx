@@ -115,16 +115,24 @@ export default function FamilyAnalytics({ caseSlug, caseName }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [days,    setDays]    = useState(30);
+  const [apiError, setApiError] = useState(null);
 
   const load = useCallback(async () => {
-    if (!caseSlug) return;
+    if (!caseSlug) {
+      console.warn('[FamilyAnalytics] caseSlug is null — no case loaded yet');
+      return;
+    }
     setLoading(true);
     setData(null);
+    setApiError(null);
     try {
       const r = await analyticsAPI.getFamilyAnalytics(caseSlug, days);
+      console.log('[FamilyAnalytics] response:', r.data);
       setData(r.data);
-    } catch {
-      // show empty states
+    } catch (err) {
+      const msg = err?.response?.data?.error || `HTTP ${err?.response?.status}` || err?.message || 'Unknown';
+      console.error('[FamilyAnalytics] API error:', msg, err?.response?.data);
+      setApiError(msg);
     } finally {
       setLoading(false);
     }
@@ -159,6 +167,18 @@ export default function FamilyAnalytics({ caseSlug, caseName }) {
         <p className="text-slate-500 text-sm">
           No case yet. Create a case to start seeing visitor analytics.
         </p>
+      </div>
+    );
+  }
+
+  // ── API error state ──
+  if (apiError) {
+    return (
+      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center shadow-sm">
+        <p className="text-sm font-semibold text-red-800 mb-1">Could not load analytics</p>
+        <p className="text-xs text-red-600 font-mono mb-3">{apiError}</p>
+        <p className="text-xs text-red-500">Open the browser console (F12) for more details.</p>
+        <button onClick={load} className="mt-4 text-xs text-indigo-600 underline">Try again</button>
       </div>
     );
   }

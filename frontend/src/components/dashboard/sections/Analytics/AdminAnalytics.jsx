@@ -97,13 +97,22 @@ export default function AdminAnalytics({ user, data: dashboardData }) {
   const [overview, setOverview] = useState(null);
   const [loadingCases, setLoadingCases] = useState(true);
   const [loadingOverview, setLoadingOverview] = useState(false);
+  const [overviewError, setOverviewError] = useState(null);
 
-  // Load cases list on mount
+  // Load cases list on mount; auto-select if only one case
   useEffect(() => {
     api.get('/cases/')
-      .then(r => setCases(r.data?.results || r.data || []))
-      .catch(() => {})
+      .then(r => {
+        const list = r.data?.results || r.data || [];
+        setCases(list);
+        // Auto-select the first (and only) case so the user doesn't have to click
+        if (list.length === 1) loadOverview(list[0]);
+      })
+      .catch(err => {
+        console.error('[AdminAnalytics] /cases/ failed:', err?.response?.status, err?.response?.data);
+      })
       .finally(() => setLoadingCases(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load full overview when case selected
@@ -112,11 +121,21 @@ export default function AdminAnalytics({ user, data: dashboardData }) {
     setSelectedCase(c);
     setLoadingOverview(true);
     setOverview(null);
+    setOverviewError(null);
     try {
       const r = await analyticsAPI.getDashboard(slug);
+      console.log('[AdminAnalytics] getDashboard response:', r.data);
+      if (!r.data?.widgets) {
+        console.warn('[AdminAnalytics] response missing "widgets" key:', r.data);
+      }
       setOverview(r.data);
-    } catch { /* show empty states */ }
-    finally { setLoadingOverview(false); }
+    } catch (err) {
+      const msg = err?.response?.data?.error || `HTTP ${err?.response?.status}` || err?.message || 'Unknown error';
+      console.error('[AdminAnalytics] getDashboard failed:', msg, err?.response?.data);
+      setOverviewError(msg);
+    } finally {
+      setLoadingOverview(false);
+    }
   }, []);
 
   // ── derive widgets ──
@@ -203,6 +222,18 @@ export default function AdminAnalytics({ user, data: dashboardData }) {
       {loadingOverview && (
         <div className="flex items-center justify-center py-16">
           <ArrowPathIcon className="w-7 h-7 animate-spin text-indigo-400" />
+        </div>
+      )}
+
+      {/* ── Error state ── */}
+      {overviewError && !loadingOverview && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <ExclamationTriangleIcon className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-red-800">Failed to load analytics</p>
+            <p className="text-xs text-red-600 mt-0.5 font-mono">{overviewError}</p>
+            <p className="text-xs text-red-500 mt-1">Check the browser console (F12) for more detail.</p>
+          </div>
         </div>
       )}
 

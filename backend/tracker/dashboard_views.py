@@ -132,68 +132,81 @@ def visitor_metrics_widget(request, case_slug):
 
 
 def get_visitor_metrics_widget(case):
-    """Helper function to get visitor metrics"""
+    """
+    Visitor metrics from TrackingEvent (the canonical data source).
+    Unique visitors = distinct fingerprint_hash values.
+    """
     now = timezone.now()
-    
-    # Time ranges
-    today = now.replace(hour=0, minute=0, second=0)
-    yesterday = today - timedelta(days=1)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
     last_week = now - timedelta(days=7)
     last_month = now - timedelta(days=30)
-    
-    # Current visitors (active in last 5 minutes)
-    active_visitors = UserSession.objects.filter(
-        case=case,
-        last_activity__gte=now - timedelta(minutes=5)
-    ).count()
-    
-    # Today's visitors
-    today_visitors = UserSession.objects.filter(
-        case=case,
-        created_at__gte=today
-    ).distinct('fingerprint_hash').count()
-    
-    # Yesterday's visitors for comparison
-    yesterday_visitors = UserSession.objects.filter(
-        case=case,
-        created_at__gte=yesterday,
-        created_at__lt=today
-    ).distinct('fingerprint_hash').count()
-    
-    # Calculate change
+
+    events = TrackingEvent.objects.filter(case=case)
+
+    # Active right now: any event in last 5 minutes
+    active_now = (
+        events
+        .filter(timestamp__gte=now - timedelta(minutes=5))
+        .values('fingerprint_hash')
+        .exclude(fingerprint_hash='')
+        .distinct()
+        .count()
+    )
+
+    today_visitors = (
+        events.filter(timestamp__gte=today_start)
+        .exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+    yesterday_visitors = (
+        events.filter(timestamp__gte=yesterday_start, timestamp__lt=today_start)
+        .exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+    week_total = (
+        events.filter(timestamp__gte=last_week)
+        .exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+    month_total = (
+        events.filter(timestamp__gte=last_month)
+        .exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+    all_time_total = (
+        events.exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+
     if yesterday_visitors > 0:
-        change_percentage = ((today_visitors - yesterday_visitors) / yesterday_visitors) * 100
+        change_pct = round(((today_visitors - yesterday_visitors) / yesterday_visitors) * 100, 1)
     else:
-        change_percentage = 100 if today_visitors > 0 else 0
-    
-    # Get hourly trend for sparkline
+        change_pct = 100 if today_visitors > 0 else 0
+
+    # Hourly trend for today (24 bars)
     hourly_data = []
     for i in range(24):
-        hour_start = today + timedelta(hours=i)
-        hour_end = hour_start + timedelta(hours=1)
-        count = TrackingEvent.objects.filter(
-            case=case,
-            timestamp__gte=hour_start,
-            timestamp__lt=hour_end
-        ).distinct('fingerprint_hash').count()
-        hourly_data.append(count)
-    
+        h_start = today_start + timedelta(hours=i)
+        h_end   = h_start + timedelta(hours=1)
+        cnt = (
+            events.filter(timestamp__gte=h_start, timestamp__lt=h_end)
+            .exclude(fingerprint_hash='')
+            .values('fingerprint_hash').distinct().count()
+        )
+        hourly_data.append(cnt)
+
     return {
-        'active_now': active_visitors,
-        'today': today_visitors,
-        'yesterday': yesterday_visitors,
-        'change_percentage': round(change_percentage, 1),
-        'change_direction': 'up' if change_percentage > 0 else 'down',
-        'week_total': UserSession.objects.filter(
-            case=case,
-            created_at__gte=last_week
-        ).distinct('fingerprint_hash').count(),
-        'month_total': UserSession.objects.filter(
-            case=case,
-            created_at__gte=last_month
-        ).distinct('fingerprint_hash').count(),
-        'hourly_trend': hourly_data,
-        'peak_hour': hourly_data.index(max(hourly_data)) if hourly_data else 0,
+        'active_now':         active_now,
+        'today':              today_visitors,
+        'yesterday':          yesterday_visitors,
+        'week_total':         week_total,
+        'month_total':        month_total,
+        'all_time_total':     all_time_total,
+        'change_percentage':  change_pct,
+        'change_direction':   'up' if change_pct >= 0 else 'down',
+        'hourly_trend':       hourly_data,
+        'peak_hour':          hourly_data.index(max(hourly_data)) if any(hourly_data) else 0,
     }
 
 
@@ -483,67 +496,68 @@ def engagement_metrics_widget(request, case_slug):
 
 
 def get_engagement_metrics_widget(case):
-    """Helper function to get engagement metrics"""
+    """
+    Engagement metrics derived from TrackingEvent (primary source).
+    UserSession used only for session-level aggregates when available.
+    """
     now = timezone.now()
     last_7d = now - timedelta(days=7)
-    
-    sessions = UserSession.objects.filter(
-        case=case,
-        created_at__gte=last_7d
-    )
-    
-    events = TrackingEvent.objects.filter(
-        case=case,
-        timestamp__gte=last_7d
-    )
-    
-    # Calculate metrics
-    metrics = {
-        'avg_session_duration': sessions.aggregate(
-            avg=Avg('total_duration')
-        )['avg'] or 0,
-        'avg_pages_per_session': sessions.aggregate(
-            avg=Avg('page_views')
-        )['avg'] or 0,
-        'bounce_rate': 0,
-        'engagement_rate': 0,
-        'avg_scroll_depth': events.filter(
-            scroll_depth__isnull=False
-        ).aggregate(
-            avg=Avg('scroll_depth')
-        )['avg'] or 0,
-        'interaction_rate': 0,
-        'return_visitor_rate': 0,
-    }
-    
-    # Calculate bounce rate
-    total_sessions = sessions.count()
-    if total_sessions > 0:
-        bounced = sessions.filter(page_views=1).count()
-        metrics['bounce_rate'] = (bounced / total_sessions) * 100
-    
-    # Calculate engagement rate
-    engaged_sessions = sessions.filter(
-        Q(page_views__gte=3) | Q(total_duration__gte=60)
-    ).count()
-    if total_sessions > 0:
-        metrics['engagement_rate'] = (engaged_sessions / total_sessions) * 100
-    
-    # Calculate interaction rate
-    interactive_events = events.filter(
-        event_type__in=['click', 'form_submit', 'comment', 'share']
-    ).count()
+
+    events = TrackingEvent.objects.filter(case=case, timestamp__gte=last_7d)
     total_events = events.count()
-    if total_events > 0:
-        metrics['interaction_rate'] = (interactive_events / total_events) * 100
-    
-    # Calculate return visitor rate
-    all_visitors = sessions.distinct('fingerprint_hash').count()
-    return_visitors = sessions.values('fingerprint_hash').annotate(
-        visit_count=Count('id')
-    ).filter(visit_count__gt=1).count()
-    if all_visitors > 0:
-        metrics['return_visitor_rate'] = (return_visitors / all_visitors) * 100
+
+    # Avg time on page from events directly
+    avg_time_on_page = events.filter(
+        time_on_page__isnull=False, time_on_page__gt=0
+    ).aggregate(avg=Avg('time_on_page'))['avg'] or 0
+
+    avg_scroll = events.filter(
+        scroll_depth__isnull=False
+    ).aggregate(avg=Avg('scroll_depth'))['avg'] or 0
+
+    # Interaction rate: clicks/forms/shares / total events
+    interactive = events.filter(
+        event_type__in=['click', 'form_submit', 'comment', 'share', 'copy']
+    ).count()
+    interaction_rate = (interactive / total_events * 100) if total_events else 0
+
+    # Return visitor rate: fingerprints seen on more than one calendar day
+    unique_fps = (
+        events.exclude(fingerprint_hash='')
+        .values('fingerprint_hash').distinct().count()
+    )
+    return_visitors = (
+        events.exclude(fingerprint_hash='')
+        .values('fingerprint_hash')
+        .annotate(n=Count('id'))
+        .filter(n__gt=1)
+        .count()
+    )
+    return_rate = (return_visitors / unique_fps * 100) if unique_fps else 0
+
+    # Supplement with UserSession data if it has records
+    sessions = UserSession.objects.filter(case=case, created_at__gte=last_7d)
+    total_sessions = sessions.count()
+    avg_session_duration = sessions.aggregate(avg=Avg('total_duration'))['avg'] or avg_time_on_page
+    avg_pages = sessions.aggregate(avg=Avg('page_views'))['avg'] or 1
+
+    bounce_rate = 0
+    engagement_rate = 0
+    if total_sessions > 0:
+        bounced = sessions.filter(page_views__lte=1).count()
+        bounce_rate = (bounced / total_sessions) * 100
+        engaged = sessions.filter(Q(page_views__gte=3) | Q(total_duration__gte=60)).count()
+        engagement_rate = (engaged / total_sessions) * 100
+
+    metrics = {
+        'avg_session_duration':   round(avg_session_duration or 0),
+        'avg_pages_per_session':  round(avg_pages or 1, 1),
+        'bounce_rate':            round(bounce_rate, 1),
+        'engagement_rate':        round(engagement_rate, 1),
+        'avg_scroll_depth':       round(avg_scroll or 0, 1),
+        'interaction_rate':       round(interaction_rate, 1),
+        'return_visitor_rate':    round(return_rate, 1),
+    }
     
     # Top pages
     top_pages = events.filter(
@@ -661,9 +675,9 @@ def get_alerts_panel_widget(case):
 
 
 def get_device_breakdown_widget(case):
-    """Helper function to get device breakdown data"""
-    sessions = UserSession.objects.filter(case=case)
-    total = sessions.count()
+    """Device breakdown from TrackingEvent (primary data source)."""
+    events = TrackingEvent.objects.filter(case=case).exclude(fingerprint_hash='')
+    total = events.values('fingerprint_hash').distinct().count()
 
     if total == 0:
         return {
@@ -672,22 +686,33 @@ def get_device_breakdown_widget(case):
             'operating_systems': [],
         }
 
-    breakdown = {
-        'device_types': list(sessions.values('device_type').annotate(
-            count=Count('id'),
-            percentage=Count('id') * 100.0 / total
-        ).order_by('-count')),
-        'browsers': list(sessions.values('browser').annotate(
-            count=Count('id'),
-            percentage=Count('id') * 100.0 / total
-        ).order_by('-count')[:5]),
-        'operating_systems': list(sessions.values('os').annotate(
-            count=Count('id'),
-            percentage=Count('id') * 100.0 / total
-        ).order_by('-count')[:5]),
-    }
+    # Use one event per fingerprint for device/browser/os attribution
+    device_types = list(
+        events.exclude(device_type='').values('device_type')
+        .annotate(count=Count('fingerprint_hash', distinct=True))
+        .order_by('-count')
+    )
+    browsers = list(
+        events.exclude(browser='').values('browser')
+        .annotate(count=Count('fingerprint_hash', distinct=True))
+        .order_by('-count')[:5]
+    )
+    operating_systems = list(
+        events.exclude(os='').values('os')
+        .annotate(count=Count('fingerprint_hash', distinct=True))
+        .order_by('-count')[:5]
+    )
 
-    return breakdown
+    # Add percentage field
+    for lst in (device_types, browsers, operating_systems):
+        for row in lst:
+            row['percentage'] = round(row['count'] / total * 100, 1) if total else 0
+
+    return {
+        'device_types':     device_types,
+        'browsers':         browsers,
+        'operating_systems': operating_systems,
+    }
 
 
 def get_referrer_sources_widget(case):
