@@ -15,6 +15,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { analyticsAPI, adminTrackingAPI } from '@/api/analyticsAPI';
+import IdentityAnomalies from './IdentityAnomalies';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -385,6 +386,9 @@ export default function LEOAnalytics({ caseSlug, caseName }) {
           </p>
         </Card>
       )}
+
+      {/* ── Identity Anomalies ── */}
+      <IdentityAnomalies caseSlug={caseSlug} />
 
       <div className="flex justify-end">
         <button onClick={load}

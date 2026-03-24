@@ -25,6 +25,9 @@ export const analyticsAPI = {
   // Realtime stream endpoints
   getRealtimeActivity: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/realtime/activity/`),
   getRealtimeMetrics: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/realtime/metrics/`),
+
+  // Identity anomaly detection
+  getIdentityAnomalies: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/identity-anomalies/`),
 };
 
 /**

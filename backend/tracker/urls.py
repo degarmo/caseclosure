@@ -34,7 +34,7 @@ from .views import (
     # Activity views
     last_activity,
 )
-from .dashboard_views import family_analytics
+from .dashboard_views import family_analytics, identity_anomalies
 
 app_name = 'tracker'
 
@@ -106,6 +106,7 @@ urlpatterns = [
     # ============================================
 
     path('family-analytics/<str:case_slug>/', family_analytics, name='family_analytics'),
+    path('dashboard/<str:case_slug>/identity-anomalies/', identity_anomalies, name='identity_anomalies'),
 
     # ============================================
     # ADMIN ENDPOINTS

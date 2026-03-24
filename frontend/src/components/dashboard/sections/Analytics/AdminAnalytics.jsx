@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/api/config';
 import { analyticsAPI, adminTrackingAPI } from '@/api/analyticsAPI';
+import IdentityAnomalies from './IdentityAnomalies';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -451,6 +452,9 @@ export default function AdminAnalytics({ user, data: dashboardData }) {
               </div>
             </Card>
           )}
+
+          {/* ── Identity Anomalies ── */}
+          <IdentityAnomalies caseSlug={selectedCase} />
 
           <div className="flex justify-end">
             <button onClick={() => loadOverview(selectedCase)}

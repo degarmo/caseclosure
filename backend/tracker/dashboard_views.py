@@ -983,3 +983,170 @@ def family_analytics(request, case_slug):
         'traffic_sources': traffic_sources,
         'top_states':      top_states,
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY ANOMALY DETECTION
+# Same device fingerprint seen from multiple distinct IPs (or vice versa).
+# Surfaced in the LEO / Admin analytics views.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def identity_anomalies(request, case_slug):
+    """
+    Detect visitors whose fingerprint/network identity diverges over time.
+
+    Patterns detected:
+      1. same_fp_multi_ip  — one device fingerprint seen from N distinct IPs
+                             (VPN rotation, travel, proxy hopping)
+      2. same_ip_multi_fp  — one IP seen with N distinct fingerprints
+                             (multiple users on same network, or browser
+                              switching / cookie clearing)
+
+    GET /api/tracker/dashboard/<case_slug>/identity-anomalies/
+    """
+    from django.db.models import Min, Max
+
+    try:
+        case = Case.objects.get(subdomain=case_slug)
+    except Case.DoesNotExist:
+        return Response({'error': 'Case not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if case.user != request.user and not request.user.is_staff:
+        return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+
+    events = TrackingEvent.objects.filter(case=case).exclude(fingerprint_hash='')
+
+    # ── Pattern 1: same fingerprint, multiple IPs ────────────────────────────
+    fp_rows = (
+        events
+        .values('fingerprint_hash')
+        .annotate(
+            distinct_ips=Count('ip_address', distinct=True),
+            total_events=Count('id'),
+            vpn_events=Count('id', filter=Q(is_vpn=True)),
+            proxy_events=Count('id', filter=Q(is_proxy=True)),
+            tor_events=Count('id', filter=Q(is_tor=True)),
+            first_seen=Min('timestamp'),
+            last_seen=Max('timestamp'),
+        )
+        .filter(distinct_ips__gt=1)
+        .order_by('-distinct_ips', '-total_events')[:50]
+    )
+
+    same_fp_multi_ip = []
+    for row in fp_rows:
+        fp = row['fingerprint_hash']
+        # Grab the actual IPs + regions for this fingerprint
+        ip_details = list(
+            events.filter(fingerprint_hash=fp)
+            .values('ip_address', 'ip_region', 'ip_country')
+            .annotate(
+                hits=Count('id'),
+                vpn=Count('id', filter=Q(is_vpn=True)),
+                last_seen=Max('timestamp'),
+            )
+            .order_by('-hits')[:10]
+        )
+        for d in ip_details:
+            if d['last_seen']:
+                d['last_seen'] = d['last_seen'].isoformat()
+
+        risk = (
+            'critical' if row['tor_events'] > 0 else
+            'high'     if row['vpn_events'] > 0 or row['distinct_ips'] >= 5 else
+            'medium'   if row['distinct_ips'] >= 3 else
+            'low'
+        )
+
+        same_fp_multi_ip.append({
+            'fingerprint':   fp[:16],          # truncated for display
+            'distinct_ips':  row['distinct_ips'],
+            'total_events':  row['total_events'],
+            'vpn_events':    row['vpn_events'],
+            'proxy_events':  row['proxy_events'],
+            'tor_events':    row['tor_events'],
+            'first_seen':    row['first_seen'].isoformat() if row['first_seen'] else None,
+            'last_seen':     row['last_seen'].isoformat()  if row['last_seen']  else None,
+            'ip_details':    ip_details,
+            'risk_level':    risk,
+            'pattern':       'same_fp_multi_ip',
+            'explanation':   (
+                f"Device seen from {row['distinct_ips']} different IP addresses. "
+                + ("Uses VPN/proxy. " if row['vpn_events'] or row['proxy_events'] else "")
+                + ("Uses Tor. " if row['tor_events'] else "")
+                + "May indicate identity concealment."
+            ),
+        })
+
+    # ── Pattern 2: same IP, multiple fingerprints ────────────────────────────
+    ip_rows = (
+        events
+        .exclude(ip_address__in=['', '0.0.0.0'])
+        .values('ip_address')
+        .annotate(
+            distinct_fps=Count('fingerprint_hash', distinct=True),
+            total_events=Count('id'),
+            distinct_regions=Count('ip_region', distinct=True),
+            first_seen=Min('timestamp'),
+            last_seen=Max('timestamp'),
+        )
+        .filter(distinct_fps__gt=1)
+        .order_by('-distinct_fps', '-total_events')[:50]
+    )
+
+    same_ip_multi_fp = []
+    for row in ip_rows:
+        ip = row['ip_address']
+        fp_details = list(
+            events.filter(ip_address=ip)
+            .values('fingerprint_hash', 'ip_region')
+            .annotate(
+                hits=Count('id'),
+                last_seen=Max('timestamp'),
+            )
+            .order_by('-hits')[:10]
+        )
+        for d in fp_details:
+            d['fingerprint_hash'] = d['fingerprint_hash'][:16]
+            if d['last_seen']:
+                d['last_seen'] = d['last_seen'].isoformat()
+
+        risk = (
+            'high'   if row['distinct_fps'] >= 5 else
+            'medium' if row['distinct_fps'] >= 3 else
+            'low'
+        )
+
+        same_ip_multi_fp.append({
+            'ip_address':    ip,
+            'distinct_fps':  row['distinct_fps'],
+            'total_events':  row['total_events'],
+            'first_seen':    row['first_seen'].isoformat() if row['first_seen'] else None,
+            'last_seen':     row['last_seen'].isoformat()  if row['last_seen']  else None,
+            'fp_details':    fp_details,
+            'risk_level':    risk,
+            'pattern':       'same_ip_multi_fp',
+            'explanation':   (
+                f"{row['distinct_fps']} different devices detected from IP {ip}. "
+                "Could be a shared network, or deliberate browser/cookie switching."
+            ),
+        })
+
+    # ── Summary counts ────────────────────────────────────────────────────────
+    total_anomalous_fps = len(same_fp_multi_ip)
+    critical_count = sum(1 for r in same_fp_multi_ip if r['risk_level'] == 'critical')
+    high_count     = sum(1 for r in same_fp_multi_ip if r['risk_level'] == 'high')
+
+    return Response({
+        'case_slug': case_slug,
+        'summary': {
+            'anomalous_fingerprints': total_anomalous_fps,
+            'critical': critical_count,
+            'high':     high_count,
+            'shared_ips': len(same_ip_multi_fp),
+        },
+        'same_fp_multi_ip': same_fp_multi_ip,
+        'same_ip_multi_fp': same_ip_multi_fp,
+    })
