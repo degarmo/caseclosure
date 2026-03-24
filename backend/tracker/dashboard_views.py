@@ -864,6 +864,263 @@ def realtime_metrics(request, case_slug):
 
 
 # ============================================
+# SUSPECTS / HONEYPOT SCORING
+# ============================================
+
+def _compute_suspects(case):
+    """
+    Score every unique visitor for this case and return a ranked list.
+
+    Signals and weights
+    ───────────────────
+    honeypot_triggered   +60  clicked a hidden trap — highest indicator
+    tor_detected         +20  using Tor anonymiser
+    vpn_detected         +15  using VPN / proxy
+    multiple_ips (3+)    +20  same fingerprint, 3+ different IPs
+    multiple_ips (2)     +10  same fingerprint, 2 different IPs
+    unusual_hour         +10  visited between 2–5 AM
+    high_visit_count 10+ +20  10 or more total visits
+    high_visit_count 5+  +15  5–9 total visits
+    return_visitor  3+   +10  3–4 total visits
+    suspicious_patterns  +5   per flagged SuspiciousActivity record (max 25)
+    high_severity act.   +15  at least one severity-4/5 activity
+    """
+    from django.db.models import Min
+
+    # ── Aggregate per fingerprint from TrackingEvent ─────────────────────────
+    fp_stats = list(
+        TrackingEvent.objects.filter(case=case)
+        .exclude(fingerprint_hash='')
+        .values('fingerprint_hash')
+        .annotate(
+            visit_count=Count('id'),
+            unique_ips=Count('ip_address', distinct=True),
+            unusual_hour_count=Count('id', filter=Q(is_unusual_hour=True)),
+            vpn_count=Count('id', filter=Q(is_vpn=True)),
+            tor_count=Count('id', filter=Q(is_tor=True)),
+            honeypot_hits=Count('id', filter=Q(event_type='honeypot_triggered')),
+            first_seen=Min('timestamp'),
+            last_seen=Max('timestamp'),
+        )
+    )
+
+    # ── Aggregate per fingerprint from SuspiciousActivity ────────────────────
+    sa_by_fp = {
+        row['fingerprint_hash']: row
+        for row in (
+            SuspiciousActivity.objects.filter(case=case)
+            .values('fingerprint_hash')
+            .annotate(
+                total_sa=Count('id'),
+                max_severity=Max('severity_level'),
+                hp_sa=Count('id', filter=Q(activity_type='honeypot_triggered')),
+            )
+        )
+    }
+
+    # ── Latest event per fingerprint for IP/location/device context ──────────
+    latest = {
+        row['fingerprint_hash']: row
+        for row in (
+            TrackingEvent.objects.filter(case=case)
+            .exclude(fingerprint_hash='')
+            .order_by('fingerprint_hash', '-timestamp')
+            .distinct('fingerprint_hash')
+            .values(
+                'fingerprint_hash', 'ip_address', 'ip_country',
+                'ip_city', 'browser', 'os', 'device_type',
+            )
+        )
+    }
+
+    suspects = []
+
+    for fp_data in fp_stats:
+        fp = fp_data['fingerprint_hash']
+        sa = sa_by_fp.get(fp, {})
+        latest_ev = latest.get(fp, {})
+
+        score = 0
+        signals = []
+
+        honeypot_hits = fp_data['honeypot_hits'] + sa.get('hp_sa', 0)
+        if honeypot_hits > 0:
+            score += 60
+            signals.append({
+                'type': 'honeypot_triggered',
+                'label': f'Accessed hidden trap link ({honeypot_hits}×)',
+                'weight': 60,
+            })
+
+        if fp_data['tor_count'] > 0:
+            score += 20
+            signals.append({'type': 'tor_detected', 'label': 'Tor anonymiser detected', 'weight': 20})
+
+        if fp_data['vpn_count'] > 0:
+            score += 15
+            signals.append({'type': 'vpn_detected', 'label': 'VPN / proxy detected', 'weight': 15})
+
+        if fp_data['unique_ips'] >= 3:
+            score += 20
+            signals.append({'type': 'multiple_ips', 'label': f'{fp_data["unique_ips"]} different IP addresses', 'weight': 20})
+        elif fp_data['unique_ips'] == 2:
+            score += 10
+            signals.append({'type': 'multiple_ips', 'label': '2 different IP addresses', 'weight': 10})
+
+        if fp_data['unusual_hour_count'] > 0:
+            score += 10
+            signals.append({'type': 'unusual_hour', 'label': f'Visited during 2–5 AM ({fp_data["unusual_hour_count"]}×)', 'weight': 10})
+
+        vc = fp_data['visit_count']
+        if vc >= 10:
+            score += 20
+            signals.append({'type': 'high_visit_count', 'label': f'{vc} total visits', 'weight': 20})
+        elif vc >= 5:
+            score += 15
+            signals.append({'type': 'return_visitor', 'label': f'{vc} visits (frequent returner)', 'weight': 15})
+        elif vc >= 3:
+            score += 10
+            signals.append({'type': 'return_visitor', 'label': f'{vc} visits', 'weight': 10})
+
+        sa_count = sa.get('total_sa', 0)
+        if sa_count > 0:
+            pts = min(25, sa_count * 5)
+            score += pts
+            signals.append({'type': 'suspicious_patterns', 'label': f'{sa_count} flagged behaviour patterns', 'weight': pts})
+
+        if sa.get('max_severity', 0) >= 4:
+            score += 15
+            signals.append({'type': 'high_severity', 'label': f'Severity-{sa["max_severity"]} activity on record', 'weight': 15})
+
+        score = min(100, score)
+
+        if score < 15:
+            continue  # Skip visitors with almost no signals
+
+        if score >= 70 or honeypot_hits > 0:
+            risk = 'critical'
+        elif score >= 50:
+            risk = 'high'
+        elif score >= 30:
+            risk = 'medium'
+        else:
+            risk = 'low'
+
+        suspects.append({
+            'fingerprint':         fp,
+            'fingerprint_short':   fp[:14] + '…',
+            'score':               score,
+            'risk':                risk,
+            'honeypot_triggered':  honeypot_hits > 0,
+            'honeypot_count':      honeypot_hits,
+            'signals':             sorted(signals, key=lambda s: s['weight'], reverse=True),
+            'visit_count':         fp_data['visit_count'],
+            'unique_ips':          fp_data['unique_ips'],
+            'latest_ip':           latest_ev.get('ip_address', ''),
+            'latest_country':      latest_ev.get('ip_country', ''),
+            'latest_city':         latest_ev.get('ip_city', ''),
+            'browser':             latest_ev.get('browser', ''),
+            'os':                  latest_ev.get('os', ''),
+            'device_type':         latest_ev.get('device_type', ''),
+            'first_seen':          fp_data['first_seen'].isoformat() if fp_data['first_seen'] else None,
+            'last_seen':           fp_data['last_seen'].isoformat() if fp_data['last_seen'] else None,
+            'last_seen_ago':       get_time_ago(fp_data['last_seen']) if fp_data['last_seen'] else '—',
+            'flagged_for_leo':     honeypot_hits > 0 or score >= 70,
+        })
+
+    suspects.sort(key=lambda s: (s['score'], s['honeypot_triggered']), reverse=True)
+    return suspects[:50]
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_suspects(request, case_slug):
+    """
+    Ranked suspect list for a case — scored on behavioural signals.
+    GET /api/tracker/dashboard/<case_slug>/suspects/
+    """
+    try:
+        try:
+            case = Case.objects.get(subdomain=case_slug)
+        except Case.DoesNotExist:
+            case = Case.objects.get(id=int(case_slug)) if case_slug.isdigit() else None
+            if not case:
+                raise Case.DoesNotExist
+
+        suspects = _compute_suspects(case)
+        return Response({
+            'suspects': suspects,
+            'total': len(suspects),
+            'critical_count': sum(1 for s in suspects if s['risk'] == 'critical'),
+            'honeypot_count': sum(1 for s in suspects if s['honeypot_triggered']),
+        })
+
+    except Case.DoesNotExist:
+        return Response({'error': 'Case not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_suspects(request, case_slug):
+    """
+    Export suspect list as CSV for law enforcement.
+    GET /api/tracker/dashboard/<case_slug>/suspects/export/
+    """
+    import csv as csv_module
+    from django.http import HttpResponse as DjangoHttpResponse
+
+    try:
+        try:
+            case = Case.objects.get(subdomain=case_slug)
+        except Case.DoesNotExist:
+            case = Case.objects.get(id=int(case_slug)) if case_slug.isdigit() else None
+            if not case:
+                raise Case.DoesNotExist
+
+        suspects = _compute_suspects(case)
+
+        response = DjangoHttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = (
+            f'attachment; filename="suspects-{case_slug}-{timezone.now().strftime("%Y%m%d")}.csv"'
+        )
+
+        writer = csv_module.writer(response)
+        writer.writerow([
+            'Rank', 'Suspicion Score', 'Risk Level', 'Honeypot Triggered',
+            'Fingerprint (partial)', 'Visit Count', 'Unique IPs',
+            'Latest IP', 'Country', 'City', 'Browser', 'OS', 'Device',
+            'First Seen (UTC)', 'Last Seen (UTC)', 'Key Signals',
+        ])
+
+        for i, s in enumerate(suspects, 1):
+            writer.writerow([
+                i,
+                s['score'],
+                s['risk'].upper(),
+                'YES — HIGH PRIORITY' if s['honeypot_triggered'] else 'No',
+                s['fingerprint_short'],
+                s['visit_count'],
+                s['unique_ips'],
+                s['latest_ip'],
+                s['latest_country'],
+                s['latest_city'],
+                s['browser'],
+                s['os'],
+                s['device_type'],
+                s['first_seen'],
+                s['last_seen'],
+                ' | '.join(sig['label'] for sig in s['signals']),
+            ])
+
+        return response
+
+    except Case.DoesNotExist:
+        return Response({'error': 'Case not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ============================================
 # UTILITY FUNCTIONS
 # ============================================
 

@@ -235,6 +235,9 @@ class TrackingEvent(models.Model):
         ('vpn_detected', 'VPN Detected'),
         ('suspicious_pattern', 'Suspicious Pattern'),
         ('anomaly_detected', 'Anomaly Detected'),
+
+        # Honeypot events
+        ('honeypot_triggered', 'Honeypot Triggered'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -365,6 +368,9 @@ class SuspiciousActivity(models.Model):
         ('spam_content', 'Spam Content'),
         ('harassment', 'Harassment'),
         ('suspicious_pattern', 'Suspicious Pattern'),
+
+        # Honeypot
+        ('honeypot_triggered', 'Honeypot Triggered'),
     ]
     
     SEVERITY_LEVELS = [

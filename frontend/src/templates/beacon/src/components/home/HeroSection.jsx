@@ -185,8 +185,56 @@ export default function HeroSection({
   const showReward = formatReward();
   const showStatus = true;
 
+  // ── Honeypot handler ─────────────────────────────────────────────────────
+  // This fires silently when anyone interacts with the hidden link.
+  // Normal visitors cannot see it; someone who has viewed the page source or
+  // used browser dev-tools to find hidden elements is flagged automatically.
+  const handleHoneypotClick = (e) => {
+    e.preventDefault();
+    const slug = caseData.subdomain || caseData.slug || String(caseData.id || '');
+    if (!slug) return;
+    // Grab fingerprint from global tracker state if set
+    const fp  = (typeof window !== 'undefined' && window.__tracker_fp)  || '';
+    const sid = (typeof window !== 'undefined' && window.__tracker_sid) || '';
+    fetch(`/api/tracker/honeypot/${slug}/?fp=${encodeURIComponent(fp)}&sid=${encodeURIComponent(sid)}`, {
+      method: 'GET',
+      keepalive: true,
+      credentials: 'omit',
+    }).catch(() => {}); // silent — visitor must not know
+  };
+
   return (
     <div className="relative">
+
+      {/*
+        ── HONEYPOT TRAP ────────────────────────────────────────────────────────
+        This link is intentionally hidden from normal users (positioned far
+        off-screen and aria-hidden).  Anyone who finds it by inspecting the page
+        source or using browser dev-tools and then clicks/navigates to it will
+        be silently logged as a high-suspicion visitor in the investigation panel.
+        The label is crafted to attract someone with prior knowledge of the case.
+      */}
+      <a
+        href={`/case-files/restricted/`}
+        onClick={handleHoneypotClick}
+        aria-hidden="true"
+        tabIndex={-1}
+        rel="nofollow"
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: '-9999px',
+          width: '1px',
+          height: '1px',
+          opacity: 0,
+          pointerEvents: 'auto',
+          overflow: 'hidden',
+          zIndex: -1,
+        }}
+      >
+        Case Evidence Files – Restricted Access
+      </a>
+
       {/* Hero Section with gradient background */}
       <div className="relative min-h-[600px] bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 overflow-hidden">
         {/* Decorative background pattern */}
@@ -198,7 +246,7 @@ export default function HeroSection({
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-8 lg:gap-6 items-center">
             
             {/* LEFT SIDE - Text Content */}
             <div className="space-y-8">
@@ -240,13 +288,13 @@ export default function HeroSection({
             </div>
 
             {/* RIGHT SIDE - Portrait Photo (No frame, just rotated image) */}
-            <div className="flex justify-center lg:justify-end">
+            <div className="flex justify-center lg:justify-center lg:-ml-6">
               <div 
                 className="shadow-2xl"
                 style={{ 
-                  width: '340px', 
-                  height: '480px', 
-                  borderRadius: '5px',
+                  width: '400px', 
+                  height: '540px', 
+                  borderRadius: '10px',
                   transform: 'rotate(1deg)',
                   overflow: 'hidden'
                 }}

@@ -16,6 +16,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { analyticsAPI, adminTrackingAPI } from '@/api/analyticsAPI';
 import IdentityAnomalies from './IdentityAnomalies';
+import SuspectPanel from './SuspectPanel';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -386,6 +387,9 @@ export default function LEOAnalytics({ caseSlug, caseName }) {
           </p>
         </Card>
       )}
+
+      {/* ── Suspect Intelligence Panel ── */}
+      <SuspectPanel caseSlug={caseSlug} />
 
       {/* ── Identity Anomalies ── */}
       <IdentityAnomalies caseSlug={caseSlug} />

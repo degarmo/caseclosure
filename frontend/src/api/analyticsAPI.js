@@ -28,6 +28,14 @@ export const analyticsAPI = {
 
   // Identity anomaly detection
   getIdentityAnomalies: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/identity-anomalies/`),
+
+  // Suspect scoring panel
+  getSuspects: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/suspects/`),
+  exportSuspects: (caseSlug) => api.get(`/tracker/dashboard/${caseSlug}/suspects/export/`, { responseType: 'blob' }),
+
+  // Honeypot trigger (called by beacon when hidden element is interacted with)
+  triggerHoneypot: (caseSlug, fp = '', sid = '') =>
+    api.get(`/tracker/honeypot/${caseSlug}/`, { params: { fp, sid } }),
 };
 
 /**

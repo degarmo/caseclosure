@@ -1069,6 +1069,108 @@ def tracking_ping(request):
 
 
 # ============================================
+# HONEYPOT ENDPOINT
+# ============================================
+
+@csrf_exempt
+def honeypot_trigger(request, case_slug):
+    """
+    Honeypot endpoint — silently fires when a visitor navigates to or clicks a
+    hidden decoy link embedded in the case page.  The visitor sees a plain 404;
+    we log an Emergency-level SuspiciousActivity and a TrackingEvent so the
+    suspect rises to the top of the LEO panel.
+
+    GET /api/tracker/honeypot/<case_slug>/?fp=<fingerprint>&sid=<session_id>
+    """
+    try:
+        # Resolve case (subdomain or numeric ID)
+        try:
+            case = Case.objects.get(subdomain=case_slug)
+        except Case.DoesNotExist:
+            case = Case.objects.get(id=int(case_slug)) if case_slug.isdigit() else None
+
+        client_info = extract_client_info(request)
+        ip = client_info.get('ip', '0.0.0.0')
+        user_agent_str = client_info.get('user_agent', '')
+
+        # Parse browser/OS from user-agent
+        try:
+            ua = parse(user_agent_str)
+            browser = ua.browser.family
+            os_name = ua.os.family
+            device = 'mobile' if ua.is_mobile else 'tablet' if ua.is_tablet else 'desktop'
+        except Exception:
+            browser = os_name = device = ''
+
+        # Fingerprint: prefer passed value, fall back to IP+UA hash
+        fingerprint_hash = (
+            request.GET.get('fp') or
+            request.POST.get('fp') or
+            hashlib.sha256((ip + user_agent_str).encode()).hexdigest()
+        )
+        session_identifier = (
+            request.GET.get('sid') or
+            request.POST.get('sid') or
+            str(uuid.uuid4())
+        )
+
+        sa_details = {
+            'trigger_url':  request.build_absolute_uri(),
+            'method':       request.method,
+            'referrer':     client_info.get('referer', ''),
+            'user_agent':   user_agent_str,
+            'timestamp':    timezone.now().isoformat(),
+            'note':         'Visitor accessed a hidden honeypot link — high probability of insider knowledge',
+        }
+
+        SuspiciousActivity.objects.create(
+            case=case,
+            session_identifier=session_identifier,
+            fingerprint_hash=fingerprint_hash,
+            ip_address=ip,
+            activity_type='honeypot_triggered',
+            severity_level=5,           # Emergency
+            confidence_score=1.0,
+            details=sa_details,
+            evidence={'ip': ip, 'browser': browser, 'os': os_name, 'device': device},
+            flagged_for_law_enforcement=True,
+        )
+
+        if case:
+            TrackingEvent.objects.create(
+                case=case,
+                session_identifier=session_identifier,
+                fingerprint_hash=fingerprint_hash,
+                event_type='honeypot_triggered',
+                page_url=request.build_absolute_uri(),
+                ip_address=ip,
+                is_suspicious=True,
+                suspicious_score=1.0,
+                user_agent=user_agent_str,
+                browser=browser,
+                os=os_name,
+                device_type=device,
+                flags={'honeypot': True, 'auto_flagged_leo': True},
+            )
+
+        logger.warning(
+            f"[HONEYPOT] case={case_slug} fp={fingerprint_hash[:12]} ip={ip} ua={user_agent_str[:80]}"
+        )
+
+    except Exception as exc:
+        logger.error(f"[HONEYPOT] Error logging trigger for {case_slug}: {exc}")
+
+    # Return a convincing 404 — visitor has no idea they were logged
+    return HttpResponse(
+        '<html><head><title>404 Not Found</title></head>'
+        '<body><h1>Not Found</h1>'
+        '<p>The requested URL was not found on this server.</p></body></html>',
+        status=404,
+        content_type='text/html',
+    )
+
+
+# ============================================
 # HELPER FUNCTIONS
 # ============================================
 

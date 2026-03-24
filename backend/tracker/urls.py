@@ -32,6 +32,9 @@ from .views import (
 
     # Activity views
     last_activity,
+
+    # Honeypot
+    honeypot_trigger,
 )
 # dashboard_overview, family_analytics, and identity_anomalies come from dashboard_views.py
 # dashboard_views.py version returns the full {widgets: {...}} structure that the frontend expects
@@ -39,6 +42,8 @@ from .dashboard_views import (
     dashboard_overview,
     family_analytics,
     identity_anomalies,
+    get_suspects,
+    export_suspects,
 )
 
 app_name = 'tracker'
@@ -112,6 +117,17 @@ urlpatterns = [
 
     path('family-analytics/<str:case_slug>/', family_analytics, name='family_analytics'),
     path('dashboard/<str:case_slug>/identity-anomalies/', identity_anomalies, name='identity_anomalies'),
+
+    # ============================================
+    # HONEYPOT + SUSPECTS
+    # ============================================
+
+    # Public honeypot trap — no auth required, returns a convincing 404
+    path('honeypot/<str:case_slug>/', honeypot_trigger, name='honeypot_trigger'),
+
+    # Suspects panel — authenticated LEO/admin only
+    path('dashboard/<str:case_slug>/suspects/', get_suspects, name='get_suspects'),
+    path('dashboard/<str:case_slug>/suspects/export/', export_suspects, name='export_suspects'),
 
     # ============================================
     # ADMIN ENDPOINTS
