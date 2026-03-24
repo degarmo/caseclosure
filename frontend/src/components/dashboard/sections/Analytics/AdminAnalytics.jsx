@@ -18,6 +18,7 @@ import { analyticsAPI, adminTrackingAPI } from '@/api/analyticsAPI';
 import IdentityAnomalies from './IdentityAnomalies';
 import SuspectPanel from './SuspectPanel';
 import MLStatusWidget from './MLStatusWidget';
+import WorldVisitorMap from './WorldVisitorMap';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -380,35 +381,11 @@ export default function AdminAnalytics({ user, data: dashboardData }) {
             ) : <Empty msg="No open alerts." />}
           </Card>
 
-          {/* ── Geographic & Device breakdown ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card title="Visitors by country" icon={GlobeAltIcon}>
-              {geo?.countries?.length > 0 ? (
-                <div className="space-y-2">
-                  {geo.countries.slice(0, 8).map((c, i) => {
-                    const max = geo.countries[0]?.visitors || 1;
-                    return (
-                      <div key={i}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="flex items-center gap-1.5 text-gray-700">
-                            {c.code}
-                            {c.risk_level === 'high' && <span className="text-xs text-red-500">⚠ suspicious</span>}
-                          </span>
-                          <span className="text-gray-400">{c.visitors?.toLocaleString()}</span>
-                        </div>
-                        <div className="h-1.5 bg-gray-100 rounded-full">
-                          <div
-                            className={`h-1.5 rounded-full ${c.risk_level === 'high' ? 'bg-red-400' : 'bg-indigo-400'}`}
-                            style={{ width: `${Math.round((c.visitors / max) * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : <Empty msg="No geographic data yet." />}
-            </Card>
+          {/* ── World Visitor Map ── */}
+          <WorldVisitorMap geoData={geo} />
 
+          {/* ── Device breakdown ── */}
+          <div className="grid grid-cols-1 gap-6">
             <Card title="Device breakdown" icon={DevicePhoneMobileIcon}>
               {devicePie.length > 0 ? (
                 <div className="flex items-center gap-4">

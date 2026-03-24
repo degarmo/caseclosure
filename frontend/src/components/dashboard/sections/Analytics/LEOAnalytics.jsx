@@ -17,6 +17,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { analyticsAPI, adminTrackingAPI } from '@/api/analyticsAPI';
 import IdentityAnomalies from './IdentityAnomalies';
 import SuspectPanel from './SuspectPanel';
+import WorldVisitorMap from './WorldVisitorMap';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -367,6 +368,9 @@ export default function LEOAnalytics({ caseSlug, caseName }) {
           </p>
         </Card>
       </div>
+
+      {/* ── World Visitor Map ── */}
+      <WorldVisitorMap geoData={geo} />
 
       {/* ── Flagged geographic locations ── */}
       {flaggedCountries.length > 0 && (
