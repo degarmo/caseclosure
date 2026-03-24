@@ -59,18 +59,23 @@ def dashboard_overview(request, case_slug):
         cache_key = f'dashboard_overview_{case_slug}_{request.user.id}'
         cached_data = cache.get(cache_key)
         
-        if cached_data and not request.GET.get('refresh'):
+        if cached_data and not request.GET.get('refresh') and '_widget_errors' not in cached_data:
             return Response(cached_data)
         
+        widget_errors = {}
+
         def _safe(fn, *args, default=None):
             """Call fn safely — return default dict on any exception."""
+            name = getattr(fn, '__name__', str(fn))
             try:
                 return fn(*args)
             except Exception as exc:
-                import logging
+                import traceback, logging
+                tb = traceback.format_exc()
                 logging.getLogger(__name__).warning(
-                    f"dashboard_overview widget {fn.__name__} failed: {exc}"
+                    f"dashboard_overview widget {name} failed: {exc}\n{tb}"
                 )
+                widget_errors[name] = f"{type(exc).__name__}: {exc}"
                 return default if default is not None else {}
 
         # Initialize analytics
@@ -96,7 +101,9 @@ def dashboard_overview(request, case_slug):
                 'device_breakdown':   _safe(get_device_breakdown_widget, case),
                 'referrer_sources':   _safe(get_referrer_sources_widget, case),
             },
-            'last_updated': timezone.now().isoformat()
+            'last_updated': timezone.now().isoformat(),
+            # Included when any widget threw an exception — use to diagnose blank dashboards
+            '_widget_errors': widget_errors if widget_errors else None,
         }
         
         # Cache for 2 minutes
