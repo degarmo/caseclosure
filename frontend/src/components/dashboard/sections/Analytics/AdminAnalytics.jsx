@@ -127,9 +127,8 @@ export default function AdminAnalytics({ user, data: dashboardData }) {
     setOverviewError(null);
     try {
       const r = await analyticsAPI.getDashboard(slug);
-      console.log('[AdminAnalytics] getDashboard response:', r.data);
       if (!r.data?.widgets) {
-        console.warn('[AdminAnalytics] response missing "widgets" key:', r.data);
+        console.warn('[AdminAnalytics] response missing "widgets" key');
       }
       setOverview(r.data);
     } catch (err) {

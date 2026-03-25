@@ -649,13 +649,21 @@ def alerts_panel_widget(request, case_slug):
 
 def get_alerts_panel_widget(case):
     """Helper function to get alerts panel data"""
-    # Get unresolved alerts
-    alerts = Alert.objects.filter(
-        case=case,
-        resolved=False
-    ).order_by('-priority', '-created_at')[:10]
-    
-    # Serialize alerts
+    # Base queryset — keep unsliced so we can filter/count freely
+    base_qs = Alert.objects.filter(case=case, resolved=False)
+
+    # Count by priority before slicing
+    priority_counts = {
+        'critical': base_qs.filter(priority='critical').count(),
+        'high':     base_qs.filter(priority='high').count(),
+        'medium':   base_qs.filter(priority='medium').count(),
+        'low':      base_qs.filter(priority='low').count(),
+    }
+    total_unresolved = base_qs.count()
+
+    # Now slice for the serialized list
+    alerts = base_qs.order_by('-priority', '-created_at')[:10]
+
     alert_list = []
     for alert in alerts:
         alert_list.append({
@@ -669,18 +677,10 @@ def get_alerts_panel_widget(case):
             'acknowledged': alert.acknowledged,
             'data': alert.data
         })
-    
-    # Count by priority
-    priority_counts = {
-        'critical': alerts.filter(priority='critical').count(),
-        'high': alerts.filter(priority='high').count(),
-        'medium': alerts.filter(priority='medium').count(),
-        'low': alerts.filter(priority='low').count(),
-    }
-    
+
     return {
         'alerts': alert_list,
-        'total_unresolved': alerts.count(),
+        'total_unresolved': total_unresolved,
         'priority_breakdown': priority_counts,
         'requires_immediate_action': priority_counts['critical'] > 0,
     }
