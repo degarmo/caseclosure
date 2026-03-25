@@ -81,6 +81,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'first_name': self.user.first_name,
                 'last_name': self.user.last_name,
                 'is_staff': self.user.is_staff,
+                'is_superuser': self.user.is_superuser,
+                'account_type': self.user.account_type,
             }
 
             logger.info(f"Successful login for user: {self.user.email}")

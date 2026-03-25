@@ -67,8 +67,13 @@ export function useDashboardData(user, permissions, options = {}) {
         promises.push(
           api.get('/cases/my_cases/')
             .then(res => {
-              results.cases = res.data || [];
-              results.userCase = res.data?.[0] || null;
+              const allAccessible = res.data || [];
+              // Family users should only see cases THEY created, not cases
+              // they have CaseAccess to (e.g. from a test invitation to
+              // someone else's case). Filter strictly by owner ID.
+              const ownedCases = allAccessible.filter(c => c.user === user?.id);
+              results.cases = ownedCases;
+              results.userCase = ownedCases[0] || null;
             })
             .catch(err => {
               results.cases = [];
