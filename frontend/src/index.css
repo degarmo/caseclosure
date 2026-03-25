@@ -65,5 +65,13 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Ensure form controls always show dark text on light backgrounds,
+     overriding the text-slate-100 inherited from the dashboard root wrapper */
+  input, select, textarea {
+    color: #111827; /* gray-900 */
+  }
+  .dark input, .dark select, .dark textarea {
+    color: #f9fafb; /* gray-50 */
+  }
 }
 
