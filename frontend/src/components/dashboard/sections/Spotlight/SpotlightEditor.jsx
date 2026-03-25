@@ -38,14 +38,14 @@ const SpotlightEditor = ({
   const [scheduledDate, setScheduledDate] = useState(null);
   const [status, setStatus] = useState('published');
 
-  // Self-fetch cases when none were passed from parent (guards against slow data loads)
+  // Self-fetch cases when none were passed from parent (guards against slow data loads).
+  // Start loading immediately if we need to fetch (avoids flash of empty dropdown).
+  const needsFetch = cases.length === 0 && !caseId;
   const [fetchedCases, setFetchedCases] = useState(cases);
-  const [casesLoading, setCasesLoading] = useState(false);
+  const [casesLoading, setCasesLoading] = useState(needsFetch);
 
   useEffect(() => {
-    // Only fetch if: no cases passed AND not in single-case-user mode (caseId present)
-    if (cases.length === 0 && !caseId) {
-      setCasesLoading(true);
+    if (needsFetch) {
       api.get('/cases/')
         .then(res => {
           const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
@@ -58,7 +58,7 @@ const SpotlightEditor = ({
     }
   }, []); // run once on mount
 
-  // Always use fetchedCases for the dropdown (which starts as the passed prop)
+  // Always use fetchedCases for the dropdown (starts as the passed prop)
   const availableCases = fetchedCases;
 
   const postTypes = [
@@ -389,7 +389,7 @@ const SpotlightEditor = ({
               
               <Button
                 onClick={handleSubmit}
-                disabled={isContentEmpty() || casesLoading || (!caseId && !selectedCase)}
+                disabled={isContentEmpty() || casesLoading}
                 className="bg-slate-800 hover:bg-slate-700 text-white"
               >
                 {scheduledDate ? 'Schedule' : status === 'draft' ? 'Save' : 'Post'}

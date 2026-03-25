@@ -131,15 +131,26 @@ export default function ContentArea({
         payload = clean;
       }
 
+      let savedPost;
       if (editingPost) {
-        await api.patch(`/spotlight/${editingPost.id}/`, payload, axiosConfig);
+        const res = await api.patch(`/spotlight/${editingPost.id}/`, payload, axiosConfig);
+        savedPost = res.data;
       } else {
-        await api.post('/spotlight/', payload, axiosConfig);
+        const res = await api.post('/spotlight/', payload, axiosConfig);
+        savedPost = res.data;
       }
 
       setShowSpotlightEditor(false);
       setEditingPost(null);
       onRefresh(['spotlight']);
+
+      // Tell the user exactly where their post landed
+      if (savedPost) {
+        const destination = savedPost.case_title
+          ? `"${savedPost.case_title}" case page`
+          : 'the main Spotlight page';
+        alert(`✅ Post ${editingPost ? 'updated' : 'published'} successfully!\n\nIt will appear on ${destination}.`);
+      }
 
     } catch (error) {
       // Surface the actual validation error so the user knows what went wrong
