@@ -91,6 +91,10 @@ def track_event(request):
             ip_country=enriched_data.get('country', ''),
             ip_region=enriched_data.get('region', ''),
             ip_city=enriched_data.get('city', ''),
+            ip_latitude=enriched_data.get('lat'),
+            ip_longitude=enriched_data.get('lon'),
+            ip_postal=enriched_data.get('postal', ''),
+            isp=enriched_data.get('isp', ''),
             is_vpn=data.get('is_vpn', False),  # From request data
             is_proxy=data.get('is_proxy', False),  # From request data
             is_tor=data.get('is_tor', False),  # From request data
@@ -261,6 +265,10 @@ def track_batch(request):
                     ip_country=enriched.get('country', ''),
                     ip_region=enriched.get('region', ''),
                     ip_city=enriched.get('city', ''),
+                    ip_latitude=enriched.get('lat'),
+                    ip_longitude=enriched.get('lon'),
+                    ip_postal=enriched.get('postal', ''),
+                    isp=enriched.get('isp', ''),
                     is_vpn=event_data.get('is_vpn', False),
                     is_proxy=event_data.get('is_proxy', False),
                     is_tor=event_data.get('is_tor', False),
@@ -1256,22 +1264,22 @@ def _is_private_ip(ip_str):
 
 def lookup_geo(ip_str):
     """
-    Return geo dict with keys: country, region, city.
+    Return geo dict with keys: country, region, city, lat, lon, postal, isp.
     Strategy:
       1. Check cache (keyed by IP, TTL 24h)
       2. Try local MaxMind GeoLite2-City database (if GEOIP_PATH is set)
       3. Fall back to ip-api.com free JSON endpoint
-      4. Return empty strings on any failure
+      4. Return empty strings / None on any failure
     """
     if not ip_str or _is_private_ip(ip_str):
-        return {'country': '', 'region': '', 'city': ''}
+        return {'country': '', 'region': '', 'city': '', 'lat': None, 'lon': None, 'postal': '', 'isp': ''}
 
     cache_key = f'geo:{ip_str}'
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
-    result = {'country': '', 'region': '', 'city': ''}
+    result = {'country': '', 'region': '', 'city': '', 'lat': None, 'lon': None, 'postal': '', 'isp': ''}
 
     # ── Strategy 1: local MaxMind GeoLite2 ──────────────────────────────────
     from django.conf import settings as _settings
@@ -1288,6 +1296,10 @@ def lookup_geo(ip_str):
                         'country': r.country.iso_code or '',
                         'region':  r.subdivisions.most_specific.name or '',
                         'city':    r.city.name or '',
+                        'lat':     r.location.latitude,
+                        'lon':     r.location.longitude,
+                        'postal':  r.postal.code or '',
+                        'isp':     '',  # GeoLite2-City doesn't include ISP (needs ASN DB)
                     }
                 cache.set(cache_key, result, 86400)
                 return result
@@ -1297,7 +1309,7 @@ def lookup_geo(ip_str):
     # ── Strategy 2: ip-api.com free endpoint ────────────────────────────────
     try:
         import urllib.request
-        url = f'http://ip-api.com/json/{ip_str}?fields=status,country,regionName,city,countryCode'
+        url = f'http://ip-api.com/json/{ip_str}?fields=status,countryCode,regionName,city,lat,lon,zip,isp'
         req = urllib.request.Request(url, headers={'User-Agent': 'CaseClosure/1.0'})
         with urllib.request.urlopen(req, timeout=2) as resp:
             import json as _json
@@ -1307,6 +1319,10 @@ def lookup_geo(ip_str):
                     'country': geo.get('countryCode', ''),
                     'region':  geo.get('regionName', ''),
                     'city':    geo.get('city', ''),
+                    'lat':     geo.get('lat'),
+                    'lon':     geo.get('lon'),
+                    'postal':  geo.get('zip', ''),
+                    'isp':     geo.get('isp', ''),
                 }
     except Exception as e:
         logger.debug(f'ip-api.com lookup failed for {ip_str}: {e}')

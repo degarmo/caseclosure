@@ -150,8 +150,28 @@ function SuspectDetail({ suspect }) {
             <dd>{suspect.latest_country || '—'}</dd>
           </div>
           <div className="flex justify-between">
+            <dt className="text-gray-400">State / Region</dt>
+            <dd>{suspect.latest_region || '—'}</dd>
+          </div>
+          <div className="flex justify-between">
             <dt className="text-gray-400">City</dt>
             <dd>{suspect.latest_city || '—'}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-gray-400">Postal Code</dt>
+            <dd>{suspect.latest_postal || '—'}</dd>
+          </div>
+          {(suspect.latest_lat != null && suspect.latest_lon != null) && (
+            <div className="flex justify-between">
+              <dt className="text-gray-400">Coordinates</dt>
+              <dd className="font-mono">
+                {Number(suspect.latest_lat).toFixed(4)}, {Number(suspect.latest_lon).toFixed(4)}
+              </dd>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <dt className="text-gray-400">ISP</dt>
+            <dd className="truncate max-w-[140px]" title={suspect.latest_isp}>{suspect.latest_isp || '—'}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-gray-400">Unique IPs used</dt>

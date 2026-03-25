@@ -270,6 +270,7 @@ class TrackingEvent(models.Model):
     ip_city = models.CharField(max_length=100, blank=True)
     ip_latitude = models.FloatField(null=True, blank=True)
     ip_longitude = models.FloatField(null=True, blank=True)
+    ip_postal = models.CharField(max_length=20, blank=True)
     is_vpn = models.BooleanField(default=False)
     is_proxy = models.BooleanField(default=False)
     is_tor = models.BooleanField(default=False)
