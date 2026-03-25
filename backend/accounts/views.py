@@ -920,10 +920,8 @@ class AccountRequestAdminView(APIView):
                         'error': 'Can only resend invite for approved requests'
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                # Get the existing invite code linked to this request
-                invite = InviteCode.objects.filter(
-                    account_request=account_request
-                ).order_by('-created_at').first()
+                # Get the existing invite code directly from the request
+                invite = account_request.invite_code
 
                 if not invite:
                     return Response({
