@@ -108,6 +108,41 @@ export default function AccountRequests({ requests = [], onRefresh }) {
     setProcessingId(null);
   };
 
+  const handleResend = async (requestId) => {
+    if (!window.confirm('Resend the invite email to this user?')) return;
+
+    setProcessingId(requestId);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await api.post('/auth/admin/account-requests/', {
+        request_id: requestId,
+        action: 'resend'
+      });
+
+      const inviteCode = response.data.invite_code;
+      const emailSent = response.data.email_sent;
+
+      setMessage(
+        emailSent
+          ? `Invite email resent! Code: ${inviteCode}`
+          : `Email could not be sent — code is: ${inviteCode} (copied to clipboard)`
+      );
+
+      if (!emailSent && inviteCode) {
+        navigator.clipboard.writeText(inviteCode);
+        setCopiedCode(inviteCode);
+        setTimeout(() => setCopiedCode(''), 3000);
+      }
+
+      setTimeout(() => setMessage(''), 5000);
+    } catch (err) {
+      setError('Failed to resend invite email');
+    }
+    setProcessingId(null);
+  };
+
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     setCopiedCode(text);
@@ -272,6 +307,7 @@ export default function AccountRequests({ requests = [], onRefresh }) {
                 )}
                 onApprove={() => handleApprove(request.id)}
                 onReject={() => handleReject(request.id)}
+                onResend={() => handleResend(request.id)}
                 isProcessing={processingId === request.id}
                 onCopyCode={copyToClipboard}
               />
@@ -283,14 +319,15 @@ export default function AccountRequests({ requests = [], onRefresh }) {
   );
 }
 
-function RequestCard({ 
-  request, 
-  isExpanded, 
-  onToggle, 
-  onApprove, 
-  onReject, 
+function RequestCard({
+  request,
+  isExpanded,
+  onToggle,
+  onApprove,
+  onReject,
+  onResend,
   isProcessing,
-  onCopyCode 
+  onCopyCode
 }) {
   const getRelationIcon = (relation) => {
     switch (relation) {
@@ -511,6 +548,23 @@ function RequestCard({
           )}
 
           {/* Action Buttons */}
+          {request.status === 'approved' && (
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={onResend}
+                disabled={isProcessing}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {isProcessing ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4" />
+                )}
+                Resend Invite Email
+              </button>
+            </div>
+          )}
+
           {request.status === 'pending' && (
             <div className="mt-6 flex gap-3">
               <button

@@ -834,7 +834,7 @@ class AccountRequestAdminView(APIView):
         
         logger.info(f"Admin action received: {action} for request_id: {request_id}")
         
-        if not request_id or action not in ['approve', 'reject']:
+        if not request_id or action not in ['approve', 'reject', 'resend']:
             print(f"DEBUG: Invalid request - action={action}, request_id={request_id}")
             return Response({
                 'error': 'Invalid request - missing request_id or invalid action'
@@ -911,7 +911,48 @@ class AccountRequestAdminView(APIView):
                     'message': 'Request rejected',
                     'email_sent': email_sent
                 })
-                
+
+            elif action == 'resend':
+                print("DEBUG: Processing RESEND action")
+
+                if account_request.status != 'approved':
+                    return Response({
+                        'error': 'Can only resend invite for approved requests'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                # Get the existing invite code linked to this request
+                invite = InviteCode.objects.filter(
+                    account_request=account_request
+                ).order_by('-created_at').first()
+
+                if not invite:
+                    return Response({
+                        'error': 'No invite code found for this request'
+                    }, status=status.HTTP_404_NOT_FOUND)
+
+                email_sent = False
+                try:
+                    if EMAIL_UTILS_AVAILABLE:
+                        email_sent = send_invite_email(
+                            account_request.email,
+                            invite.code,
+                            account_request.first_name
+                        )
+                        print(f"DEBUG: Resend email result: {email_sent}")
+                except Exception as e:
+                    logger.error(f"Failed to resend invite email: {e}")
+
+                logger.info(
+                    f"Invite resent for {account_request.email} "
+                    f"by {request.user.email} — email_sent={email_sent}"
+                )
+
+                return Response({
+                    'message': f'Invite resent to {account_request.email}',
+                    'invite_code': invite.code,
+                    'email_sent': email_sent
+                })
+
         except AccountRequest.DoesNotExist:
             print(f"DEBUG: Account request {request_id} not found")
             logger.error(f"Account request {request_id} not found")
