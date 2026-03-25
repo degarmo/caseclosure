@@ -15,7 +15,9 @@ export default function Spotlight() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiMethods.spotlight.list({ status: 'published' });
+      // case_id=main → only fetch posts with no case (main-site posts).
+      // Case-specific posts belong on their individual case pages, not here.
+      const response = await apiMethods.spotlight.list({ status: 'published', case_id: 'main' });
       setPosts(response.data);
     } catch (error) {
       setError(error.response?.data?.detail || error.message);
