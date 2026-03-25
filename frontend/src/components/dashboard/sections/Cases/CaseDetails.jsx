@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '@/api/config';
-import { 
-  ArrowLeft, Save, Eye, Globe, Edit, Trash2, Upload, 
-  User, Calendar, MapPin, Phone, Mail, DollarSign, 
-  FileText, AlertCircle, CheckCircle, Clock, Loader
+import {
+  ArrowLeft, Save, Eye, Globe, Edit, Trash2, Upload,
+  User, Calendar, MapPin, Phone, Mail, DollarSign,
+  FileText, AlertCircle, CheckCircle, Clock, Loader,
+  UserPlus, Shield, Send
 } from 'lucide-react';
+import CaseAccessManager from './CaseAccessManager';
 
 export default function CaseDetails() {
   const { caseId } = useParams();
@@ -92,6 +94,7 @@ export default function CaseDetails() {
     { id: 'investigation', label: 'Investigation', icon: FileText },
     { id: 'reward', label: 'Reward', icon: DollarSign },
     { id: 'deployment', label: 'Deployment', icon: Globe },
+    ...(!isLEO ? [{ id: 'access', label: 'Access', icon: Shield }] : []),
   ];
 
   if (loading) {
@@ -238,6 +241,7 @@ export default function CaseDetails() {
               {activeTab === 'investigation' && <InvestigationTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
               {activeTab === 'reward' && <RewardTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
               {activeTab === 'deployment' && <DeploymentTab caseData={caseData} caseId={caseId} onRefresh={loadCaseData} />}
+              {activeTab === 'access' && <AccessTab caseId={caseId} caseName={caseData?.case_title || `${caseData?.first_name} ${caseData?.last_name}`} />}
             </div>
           </div>
         </div>
@@ -797,4 +801,163 @@ function FormField({
       )}
     </div>
   );
+}
+
+// ─── Access Tab ───────────────────────────────────────────────────────────────
+function AccessTab({ caseId, caseName }) {
+  const ROLE_OPTIONS = [
+    { value: 'police',       label: 'Law Enforcement / Detective' },
+    { value: 'investigator', label: 'Private Investigator' },
+    { value: 'advocate',     label: 'Victim Advocate' },
+    { value: 'family',       label: 'Family Member / Collaborator' },
+    { value: 'other',        label: 'Other' },
+  ];
+
+  const [form, setForm] = useState({
+    invitee_email: '',
+    invitee_name:  '',
+    user_type:     'police',
+    subject_line:  `You've been invited to access a case on CaseClosure`,
+    message_body:  '',
+  });
+  const [sending,  setSending]  = useState(false);
+  const [success,  setSuccess]  = useState('');
+  const [error,    setError]    = useState('');
+  const [accessKey, setAccessKey] = useState(0); // forces CaseAccessManager to re-fetch
+
+  const handleChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!form.invitee_email || !form.invitee_name) {
+      setError('Name and email are required.');
+      return;
+    }
+    setSending(true);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await api.post('/case-invitations/', {
+        case_id:      caseId,
+        invitee_email: form.invitee_email,
+        invitee_name:  form.invitee_name,
+        user_type:     form.user_type,
+        subject_line:  form.subject_line,
+        message_body:  form.message_body,
+      });
+      setSuccess(response.data.message || 'Invitation sent successfully.');
+      setForm(prev => ({ ...prev, invitee_email: '', invitee_name: '', message_body: '' }));
+      setAccessKey(k => k + 1); // refresh access list
+    } catch (err) {
+      setError(err.response?.data?.error || err.response?.data?.detail || 'Failed to send invitation.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+
+      {/* Invite Form */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <UserPlus className="w-5 h-5 text-indigo-600" />
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Invite Someone to This Case</h3>
+        </div>
+
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+            <p className="text-green-800 dark:text-green-200 text-sm">{success}</p>
+          </div>
+        )}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSend} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
+              <input
+                type="text"
+                value={form.invitee_name}
+                onChange={e => handleChange('invitee_name', e.target.value)}
+                placeholder="Detective Jane Smith"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address *</label>
+              <input
+                type="email"
+                value={form.invitee_email}
+                onChange={e => handleChange('invitee_email', e.target.value)}
+                placeholder="detective@police.gov"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role</label>
+            <select
+              value={form.user_type}
+              onChange={e => handleChange('user_type', e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              {ROLE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Subject</label>
+            <input
+              type="text"
+              value={form.subject_line}
+              onChange={e => handleChange('subject_line', e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Personal Message <span className="text-slate-400 font-normal">(optional)</span></label>
+            <textarea
+              value={form.message_body}
+              onChange={e => handleChange('message_body', e.target.value)}
+              rows={4}
+              placeholder="Add a personal note explaining why you're sharing access..."
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={sending}
+              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium text-sm"
+            >
+              {sending ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {sending ? 'Sending...' : 'Send Invitation'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Current Access List */}
+      <CaseAccessManager
+        key={accessKey}
+        caseId={caseId}
+        caseName={caseName}
+      />
+    </div>
+  );
+}
 }
