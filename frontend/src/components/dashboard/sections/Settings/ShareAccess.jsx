@@ -6,9 +6,88 @@ import {
   CheckIcon,
   EnvelopeIcon,
   UserPlusIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ShieldCheckIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 import axios from '@/api/config';
+
+// Access type descriptions and permission breakdowns
+const ACCESS_TYPE_INFO = {
+  police: {
+    label: 'Law Enforcement',
+    description: 'Full access to all case data including sensitive tracking information.',
+    color: 'blue',
+    permissions: [
+      { label: 'View tips & leads', granted: true },
+      { label: 'View tracking & visitor data', granted: true },
+      { label: 'View personal information', granted: true },
+      { label: 'View evidence', granted: true },
+      { label: 'Export data', granted: true },
+      { label: 'Contact family', granted: true },
+    ],
+  },
+  investigator: {
+    label: 'Private Investigator',
+    description: 'Access to tracking data and evidence, but not personal info or exports.',
+    color: 'purple',
+    permissions: [
+      { label: 'View tips & leads', granted: true },
+      { label: 'View tracking & visitor data', granted: true },
+      { label: 'View personal information', granted: false },
+      { label: 'View evidence', granted: true },
+      { label: 'Export data', granted: false },
+      { label: 'Contact family', granted: false },
+    ],
+  },
+  advocate: {
+    label: 'Victim Advocate',
+    description: 'Same access as the case owner — case details and tips, no sensitive tracking.',
+    color: 'green',
+    permissions: [
+      { label: 'View tips & leads', granted: true },
+      { label: 'View tracking & visitor data', granted: false },
+      { label: 'View personal information', granted: false },
+      { label: 'View evidence', granted: true },
+      { label: 'Export data', granted: false },
+      { label: 'Contact family', granted: true },
+    ],
+  },
+  family: {
+    label: 'Family Member',
+    description: 'Same access as the case owner — case details and tips, no sensitive tracking.',
+    color: 'green',
+    permissions: [
+      { label: 'View tips & leads', granted: true },
+      { label: 'View tracking & visitor data', granted: false },
+      { label: 'View personal information', granted: false },
+      { label: 'View evidence', granted: true },
+      { label: 'Export data', granted: false },
+      { label: 'Contact family', granted: true },
+    ],
+  },
+  other: {
+    label: 'Other',
+    description: 'Basic access — case details and tips only, no sensitive data.',
+    color: 'gray',
+    permissions: [
+      { label: 'View tips & leads', granted: true },
+      { label: 'View tracking & visitor data', granted: false },
+      { label: 'View personal information', granted: false },
+      { label: 'View evidence', granted: true },
+      { label: 'Export data', granted: false },
+      { label: 'Contact family', granted: true },
+    ],
+  },
+};
+
+const colorClasses = {
+  blue:   { bg: 'bg-blue-50 dark:bg-blue-900/20',   border: 'border-blue-200 dark:border-blue-800',   text: 'text-blue-800 dark:text-blue-200',   badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+  purple: { bg: 'bg-purple-50 dark:bg-purple-900/20', border: 'border-purple-200 dark:border-purple-800', text: 'text-purple-800 dark:text-purple-200', badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+  green:  { bg: 'bg-green-50 dark:bg-green-900/20',  border: 'border-green-200 dark:border-green-800',  text: 'text-green-800 dark:text-green-200',  badge: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+  gray:   { bg: 'bg-gray-50 dark:bg-gray-700',       border: 'border-gray-200 dark:border-gray-600',    text: 'text-gray-700 dark:text-gray-300',    badge: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
+};
 
 export default function ShareAccess({ user, permissions, onSuccess }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -246,9 +325,9 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
                 value={formData.fullName}
                 onChange={handleInputChange}
                 placeholder="e.g., Detective John Smith"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                          focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                         dark:bg-gray-700 dark:text-white dark:placeholder-gray-400
+                         text-gray-900 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400
                          transition"
                 disabled={submitting}
               />
@@ -266,9 +345,9 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="john.smith@police.gov"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                          focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                         dark:bg-gray-700 dark:text-white dark:placeholder-gray-400
+                         text-gray-900 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400
                          transition"
                 disabled={submitting}
               />
@@ -293,9 +372,9 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
                   name="victimCase"
                   value={formData.victimCase}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                            focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                           dark:bg-gray-700 dark:text-white
+                           text-gray-900 dark:bg-gray-700 dark:text-white
                            transition"
                   disabled={submitting}
                 >
@@ -319,9 +398,9 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
                 name="userType"
                 value={formData.userType}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                          focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                         dark:bg-gray-700 dark:text-white
+                         text-gray-900 dark:bg-gray-700 dark:text-white
                          transition"
                 disabled={submitting}
               >
@@ -331,6 +410,38 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
                 <option value="family">Family Member</option>
                 <option value="other">Other</option>
               </select>
+
+              {/* Access level description */}
+              {(() => {
+                const info = ACCESS_TYPE_INFO[formData.userType];
+                if (!info) return null;
+                const colors = colorClasses[info.color];
+                return (
+                  <div className={`mt-3 rounded-lg border p-4 ${colors.bg} ${colors.border}`}>
+                    <div className="flex items-start gap-2 mb-3">
+                      <ShieldCheckIcon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${colors.text}`} />
+                      <div>
+                        <p className={`text-sm font-semibold ${colors.text}`}>{info.label} Access</p>
+                        <p className={`text-xs mt-0.5 ${colors.text} opacity-80`}>{info.description}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {info.permissions.map((perm) => (
+                        <div key={perm.label} className="flex items-center gap-1.5">
+                          {perm.granted ? (
+                            <CheckIcon className="w-3.5 h-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                          ) : (
+                            <EyeSlashIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                          )}
+                          <span className={`text-xs ${perm.granted ? colors.text : 'text-gray-400 dark:text-gray-500'}`}>
+                            {perm.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Subject Line */}
@@ -344,9 +455,9 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
                 name="subjectLine"
                 value={formData.subjectLine}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                          focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                         dark:bg-gray-700 dark:text-white
+                         text-gray-900 dark:bg-gray-700 dark:text-white
                          transition"
                 disabled={submitting}
               />
@@ -363,9 +474,9 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
                 value={formData.body}
                 onChange={handleInputChange}
                 rows="6"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                          focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                         dark:bg-gray-700 dark:text-white
+                         text-gray-900 dark:bg-gray-700 dark:text-white
                          transition"
                 disabled={submitting}
               />

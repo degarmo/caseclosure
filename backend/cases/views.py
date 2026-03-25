@@ -1314,6 +1314,40 @@ class CaseInvitationViewSet(viewsets.ModelViewSet):
             'other': 'viewer',
         }
         access_level = access_level_mapping.get(data['user_type'], 'viewer')
+
+        # Define role-specific permission flags
+        # LEO: full sensitive access
+        # Private Investigator: tracking yes, personal info no, no export
+        # Advocate/Family/Other: same as case owner — no sensitive tracking data
+        user_type = data['user_type']
+        if user_type == 'police':
+            access_permissions = {
+                'can_view_tips': True,
+                'can_view_tracking': True,
+                'can_view_personal_info': True,
+                'can_view_evidence': True,
+                'can_export_data': True,
+                'can_contact_family': True,
+            }
+        elif user_type == 'investigator':
+            access_permissions = {
+                'can_view_tips': True,
+                'can_view_tracking': True,
+                'can_view_personal_info': False,
+                'can_view_evidence': True,
+                'can_export_data': False,
+                'can_contact_family': False,
+            }
+        else:
+            # advocate, family, other — same as case owner (basic, no sensitive tracking)
+            access_permissions = {
+                'can_view_tips': True,
+                'can_view_tracking': False,
+                'can_view_personal_info': False,
+                'can_view_evidence': True,
+                'can_export_data': False,
+                'can_contact_family': True,
+            }
         
         # Check if user exists
         try:
@@ -1330,10 +1364,7 @@ class CaseInvitationViewSet(viewsets.ModelViewSet):
                     'invited_by': request.user,
                     'accepted': True,
                     'accepted_at': timezone.now(),
-                    'can_view_tips': True,
-                    'can_view_tracking': False,
-                    'can_view_personal_info': False,
-                    'can_export_data': False,
+                    **access_permissions,
                 }
             )
             

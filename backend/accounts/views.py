@@ -432,6 +432,40 @@ class RegisterView(generics.CreateAPIView):
                 )
                 print(f"DEBUG: UserProfile created: {created}, verified: {profile_verified}")
                 
+                # Role-specific CaseAccess permissions
+                # LEO: full sensitive access
+                # PI: tracking yes, personal info/export no
+                # Advocate/Family/Other: no sensitive tracking (same as case owner)
+                inv_type = invitation.invitation_type
+                if inv_type == 'police':
+                    perm_flags = {
+                        'can_view_tips': True,
+                        'can_view_tracking': True,
+                        'can_view_personal_info': True,
+                        'can_view_evidence': True,
+                        'can_export_data': True,
+                        'can_contact_family': True,
+                    }
+                elif inv_type == 'investigator':
+                    perm_flags = {
+                        'can_view_tips': True,
+                        'can_view_tracking': True,
+                        'can_view_personal_info': False,
+                        'can_view_evidence': True,
+                        'can_export_data': False,
+                        'can_contact_family': False,
+                    }
+                else:
+                    # advocate, family, other — no sensitive tracking
+                    perm_flags = {
+                        'can_view_tips': True,
+                        'can_view_tracking': False,
+                        'can_view_personal_info': False,
+                        'can_view_evidence': True,
+                        'can_export_data': False,
+                        'can_contact_family': True,
+                    }
+
                 # Create the CaseAccess record with only existing fields
                 print(f"DEBUG: Creating CaseAccess for case: {invitation.case.id}")
                 case_access = CaseAccess.objects.create(
@@ -441,13 +475,7 @@ class RegisterView(generics.CreateAPIView):
                     invited_by=invitation.invited_by,
                     accepted=True,
                     accepted_at=timezone.now(),
-                    # Only include fields that exist on CaseAccess model
-                    can_view_tips=True,
-                    can_view_tracking=True,
-                    can_view_personal_info=True,
-                    can_view_evidence=True,
-                    can_export_data=True,
-                    can_contact_family=True,
+                    **perm_flags,
                 )
                 print(f"DEBUG: CaseAccess created - ID: {case_access.id}")
                 
