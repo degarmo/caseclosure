@@ -143,11 +143,11 @@ export default function Spotlight() {
                   </div>
                 )}
                 
-                {/* Media */}
-                {post.media && post.media.length > 0 && (
+                {/* Media — prefer SpotlightMedia attachments, fall back to featured_image */}
+                {(post.media?.length > 0 || post.featured_image) && (
                   <div className="relative bg-black">
-                    <img 
-                      src={post.media[0].file} 
+                    <img
+                      src={post.media?.length > 0 ? post.media[0].file : post.featured_image}
                       alt="Post content"
                       className="w-full object-contain"
                       style={{ maxHeight: '500px', margin: '0 auto' }}
@@ -156,7 +156,7 @@ export default function Spotlight() {
                         e.target.parentElement.style.display = 'none';
                       }}
                     />
-                    {post.media.length > 1 && (
+                    {post.media?.length > 1 && (
                       <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-sm">
                         +{post.media.length - 1} more
                       </div>

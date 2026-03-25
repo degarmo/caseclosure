@@ -163,14 +163,14 @@ const SpotlightEditor = ({
                   <SelectValue placeholder="Choose which case this post is for" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="main-website">
-                    ðŸŒ Main Website (Site-wide Post)
-                  </SelectItem>
                   {cases.map(c => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       {c.case_title || `${c.first_name} ${c.last_name}`}
                     </SelectItem>
                   ))}
+                  <SelectItem value="main-website">
+                    🌐 Main Website (no case — site-wide post)
+                  </SelectItem>
                 </SelectContent>
               </Select>
               {caseId && (

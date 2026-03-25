@@ -52,7 +52,18 @@ export default function SpotlightPostsList({
         <div className="divide-y divide-slate-200 dark:divide-slate-700">
           {posts.map((post) => (
             <div key={post.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-4">
+                {/* Featured image thumbnail */}
+                {(post.featured_image || post.media?.length > 0) && (
+                  <div className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-slate-100">
+                    <img
+                      src={post.featured_image || post.media[0]?.file}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.target.parentElement.style.display = 'none'; }}
+                    />
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-semibold text-slate-900 dark:text-white">
@@ -98,9 +109,9 @@ export default function SpotlightPostsList({
                       </span>
                     )}
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-2 ml-4">
+                </div>{/* end flex-1 */}
+
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <Button 
                     variant="ghost" 
                     size="sm"
