@@ -147,15 +147,16 @@ class SpotlightPostViewSet(viewsets.ModelViewSet):
         
         user = self.request.user
         
-        # Check hourly limit
-        hour_ago = timezone.now() - timedelta(hours=1)
-        recent_posts = SpotlightPost.objects.filter(
-            author=user,
-            created_at__gte=hour_ago
-        ).count()
-        
-        if recent_posts >= settings.max_posts_per_hour:
-            raise serializers.ValidationError("Posting limit exceeded. Please try again later.")
+        # Check hourly limit (staff/admin are exempt)
+        if not user.is_staff:
+            hour_ago = timezone.now() - timedelta(hours=1)
+            recent_posts = SpotlightPost.objects.filter(
+                author=user,
+                created_at__gte=hour_ago
+            ).count()
+
+            if recent_posts >= settings.max_posts_per_hour:
+                raise serializers.ValidationError("Posting limit exceeded. Please try again later.")
         
         # Check for active bans/suspensions
         try:

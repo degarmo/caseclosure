@@ -150,9 +150,12 @@ export function useDashboardData(user, permissions, options = {}) {
       promises.push(
         api.get('/spotlight/', { params: spotlightParams })
           .then(res => {
-            results.spotlightPosts = res.data || [];
+            const d = res.data;
+            results.spotlightPosts = Array.isArray(d) ? d : (d?.results || []);
+            console.log('[spotlight] dashboard fetched', results.spotlightPosts.length, 'posts', results.spotlightPosts);
           })
           .catch(err => {
+            console.error('[spotlight] dashboard fetch error', err.response?.status, err.response?.data || err.message);
             results.spotlightPosts = [];
           })
       );

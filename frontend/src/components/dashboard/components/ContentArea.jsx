@@ -131,6 +131,14 @@ export default function ContentArea({
         payload = clean;
       }
 
+      // Debug: log what we're sending
+      console.log('[spotlight] submitting', editingPost ? 'PATCH' : 'POST', {
+        payload: payload instanceof FormData
+          ? Object.fromEntries([...payload.entries()])
+          : payload,
+        axiosConfig,
+      });
+
       let savedPost;
       if (editingPost) {
         const res = await api.patch(`/spotlight/${editingPost.id}/`, payload, axiosConfig);
@@ -139,6 +147,7 @@ export default function ContentArea({
         const res = await api.post('/spotlight/', payload, axiosConfig);
         savedPost = res.data;
       }
+      console.log('[spotlight] saved post response:', savedPost);
 
       setShowSpotlightEditor(false);
       setEditingPost(null);
