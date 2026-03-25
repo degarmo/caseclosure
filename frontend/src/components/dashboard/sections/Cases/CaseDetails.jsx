@@ -960,4 +960,3 @@ function AccessTab({ caseId, caseName }) {
     </div>
   );
 }
-}
