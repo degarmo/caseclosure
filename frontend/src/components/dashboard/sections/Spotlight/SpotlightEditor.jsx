@@ -1,6 +1,7 @@
 // src/components/spotlight/SpotlightEditor.jsx
-import React, { useState, useCallback } from 'react';
-import { X, Calendar, ImageIcon, MapPin, AlertTriangle } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { X, Calendar, ImageIcon, MapPin, AlertTriangle, Loader2 } from 'lucide-react';
+import api from '@/api/config';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -11,16 +12,21 @@ import { Switch } from '@/components/ui/switch';
 import RichTextEditor from '@/common/RichTextEditor';
 import SpotlightScheduler from './SpotlightScheduler';
 
-const SpotlightEditor = ({ 
-  onSubmit, 
-  onCancel, 
-  initialData = null, 
+const SpotlightEditor = ({
+  onSubmit,
+  onCancel,
+  initialData = null,
   caseId = null,      // For users - auto-set their case
   caseName = null,
   cases = []          // For admin - list of all cases to choose from
 }) => {
-  // Initialize selectedCase - if caseId provided, use it, otherwise empty
-  const [selectedCase, setSelectedCase] = useState(caseId || initialData?.case || '');
+  // Initialize selectedCase - if caseId provided, use it; if editing, pre-select the post's case
+  const initCase = caseId
+    ? String(caseId)
+    : initialData?.case
+      ? String(initialData.case)
+      : '';
+  const [selectedCase, setSelectedCase] = useState(initCase);
   const [title, setTitle] = useState(initialData?.title || '');
   const [content, setContent] = useState(initialData?.content || '');
   const [postType, setPostType] = useState(initialData?.post_type || 'update');
@@ -31,6 +37,29 @@ const SpotlightEditor = ({
   const [showScheduler, setShowScheduler] = useState(false);
   const [scheduledDate, setScheduledDate] = useState(null);
   const [status, setStatus] = useState('published');
+
+  // Self-fetch cases when none were passed from parent (guards against slow data loads)
+  const [fetchedCases, setFetchedCases] = useState(cases);
+  const [casesLoading, setCasesLoading] = useState(false);
+
+  useEffect(() => {
+    // Only fetch if: no cases passed AND not in single-case-user mode (caseId present)
+    if (cases.length === 0 && !caseId) {
+      setCasesLoading(true);
+      api.get('/cases/')
+        .then(res => {
+          const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+          setFetchedCases(list);
+        })
+        .catch(() => setFetchedCases([]))
+        .finally(() => setCasesLoading(false));
+    } else {
+      setFetchedCases(cases);
+    }
+  }, []); // run once on mount
+
+  // Always use fetchedCases for the dropdown (which starts as the passed prop)
+  const availableCases = fetchedCases;
 
   const postTypes = [
     { value: 'update', label: 'Case Update' },
@@ -70,8 +99,8 @@ const SpotlightEditor = ({
     // Determine which case to use
     const finalCaseId = selectedCase || caseId;
     
-    // Validate case selection (only required if cases array exists and not main-website)
-    if (cases.length > 0 && !finalCaseId) {
+    // Validate case selection (only required if cases list loaded and not main-website)
+    if (availableCases.length > 0 && !finalCaseId) {
       alert('Please select a case to post to');
       return;
     }
@@ -150,33 +179,34 @@ const SpotlightEditor = ({
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Case Selector - Show if admin has multiple cases OR no caseId provided */}
-          {cases.length > 0 && (
+          {/* Case Selector - always show for admin (loading spinner until cases arrive) */}
+          {!caseId && (
             <div>
               <Label>Select Case *</Label>
-              <Select 
-                value={selectedCase} 
-                onValueChange={setSelectedCase}
-                disabled={!!caseId}  // Disable if caseId is provided (user mode)
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose which case this post is for" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cases.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.case_title || `${c.first_name} ${c.last_name}`}
+              {casesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading cases…
+                </div>
+              ) : (
+                <Select
+                  value={selectedCase}
+                  onValueChange={setSelectedCase}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose which case this post is for" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCases.map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.case_title || `${c.first_name} ${c.last_name}`}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="main-website">
+                      🌐 Main Website (no case — site-wide post)
                     </SelectItem>
-                  ))}
-                  <SelectItem value="main-website">
-                    🌐 Main Website (no case — site-wide post)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {caseId && (
-                <p className="text-xs text-slate-500 mt-1">
-                  Posting to: {caseName}
-                </p>
+                  </SelectContent>
+                </Select>
               )}
               {selectedCase === 'main-website' && (
                 <p className="text-xs text-blue-600 mt-1">
@@ -186,8 +216,17 @@ const SpotlightEditor = ({
             </div>
           )}
 
-          {/* If no cases array and no caseId, show info message */}
-          {!cases.length && !caseId && (
+          {/* User mode: caseId provided, show which case */}
+          {caseId && caseName && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                📌 Posting to: <strong>{caseName}</strong>
+              </p>
+            </div>
+          )}
+
+          {/* Fallback info (should be rare) */}
+          {!caseId && !casesLoading && availableCases.length === 0 && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800">
                 ðŸ'¡ This will be a site-wide spotlight post (not tied to a specific case)
@@ -350,7 +389,7 @@ const SpotlightEditor = ({
               
               <Button
                 onClick={handleSubmit}
-                disabled={isContentEmpty() || (cases.length > 0 && !selectedCase && !caseId)}
+                disabled={isContentEmpty() || casesLoading || (!caseId && !selectedCase)}
                 className="bg-slate-800 hover:bg-slate-700 text-white"
               >
                 {scheduledDate ? 'Schedule' : status === 'draft' ? 'Save' : 'Post'}

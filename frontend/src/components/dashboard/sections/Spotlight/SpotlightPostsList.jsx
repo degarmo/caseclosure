@@ -65,7 +65,7 @@ export default function SpotlightPostsList({
                   </div>
                 )}
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3 mb-1 flex-wrap">
                     <h3 className="font-semibold text-slate-900 dark:text-white">
                       {post.title || 'Untitled Post'}
                     </h3>
@@ -76,7 +76,15 @@ export default function SpotlightPostsList({
                       </Badge>
                     )}
                   </div>
-                  
+
+                  {/* Case label */}
+                  <p className="text-xs font-medium mb-2">
+                    {post.case_title
+                      ? <span className="text-blue-600">📌 {post.case_title}</span>
+                      : <span className="text-slate-400">🌐 Main site</span>
+                    }
+                  </p>
+
                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">
                     {stripHtml(post.content_text || post.content)}
                   </p>
@@ -112,22 +120,25 @@ export default function SpotlightPostsList({
                 </div>{/* end flex-1 */}
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => onEdit && onEdit(post)}
                     disabled={loading}
+                    className="text-slate-700 hover:bg-slate-100 gap-1"
                   >
-                    <Edit className="w-4 h-4" />
+                    <Edit className="w-3.5 h-3.5" />
+                    Edit
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-red-600 hover:text-red-700"
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50 gap-1"
                     onClick={() => onDelete(post.id)}
                     disabled={loading}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
                   </Button>
                 </div>
               </div>
