@@ -74,12 +74,19 @@ class SpotlightPostCreateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-    
+    case_title = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = SpotlightPost
-        fields = ['case', 'title', 'content', 'content_text', 'status',  # ✅ UPDATED: Added case
+        fields = ['id', 'case', 'case_title', 'title', 'content', 'content_text', 'status',
                   'scheduled_for', 'media_files', 'tags', 'case_name',
-                  'post_type', 'priority', 'is_sensitive', 'featured_image']  # ✅ UPDATED: Added post_type, priority, is_sensitive, featured_image
+                  'post_type', 'priority', 'is_sensitive', 'featured_image']
+        read_only_fields = ['id', 'case_title']
+
+    def get_case_title(self, obj):
+        if obj.case:
+            return obj.case.case_title or f"{obj.case.first_name} {obj.case.last_name}"
+        return None
     
     def validate(self, data):
         """Validate case permissions"""

@@ -123,7 +123,7 @@ export default function TemplateRenderer() {
 
   const fetchSpotlightPosts = async () => {
     try {
-      const url = `/case-spotlight/?case_id=${caseData.id}&status=published`;
+      const url = `/spotlight/?case_id=${caseData.id}&status=published`;
       const response = await api.get(url);
       setSpotlightPosts(Array.isArray(response.data) ? response.data : response.data.results || []);
     } catch (e) {

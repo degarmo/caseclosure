@@ -117,17 +117,17 @@ export default function Spotlight({ caseData, customizations, isPreview, isEditi
                       {stripHtml(update.content || update.content_text || '')}
                     </p>
                     
-                    {update.image_url && (
-                      <img 
-                        src={update.image_url} 
+                    {(update.featured_image || update.image_url) && (
+                      <img
+                        src={update.featured_image || update.image_url}
                         alt={update.title}
                         className="mb-5 w-full rounded-xl"
                       />
                     )}
-                    
+
                     <div className="flex items-center gap-4 text-[15px] text-slate-500">
                       <span>{update.likes_count || 0} likes</span>
-                      {update.view_count && <span>{update.view_count} views</span>}
+                      {(update.views_count || update.view_count) > 0 && <span>{update.views_count || update.view_count} views</span>}
                     </div>
                   </CardContent>
                 </Card>
