@@ -1714,3 +1714,46 @@ def featured_case(request):
     except Exception as e:
         logger.error(f"Error in featured_case: {str(e)}")
         return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+@perm_classes([AllowAny])
+def recent_cases(request):
+    """Return the 3 most recently created public cases for the landing page."""
+    try:
+        cases = (
+            Case.objects
+            .filter(archived=False, is_public=True, deployment_status='deployed')
+            .order_by('-created_at')[:3]
+        )
+
+        results = []
+        for case in cases:
+            # Photo
+            photo_url = None
+            primary = case.photos.filter(is_primary=True).first() or case.photos.first()
+            if primary and primary.image:
+                photo_url = request.build_absolute_uri(primary.image.url)
+
+            tips = case.tips.all()
+            results.append({
+                'id': case.id,
+                'first_name': case.first_name,
+                'last_name': case.last_name,
+                'case_title': case.case_title,
+                'case_type': case.case_type,
+                'case_status': case.case_status,
+                'photo_url': photo_url,
+                'deployment_url': case.deployment_url,
+                'city': getattr(case, 'city', ''),
+                'state': getattr(case, 'state', ''),
+                'reward_amount': str(case.reward_amount) if getattr(case, 'reward_amount', None) else None,
+                'tip_count': tips.count(),
+                'created_at': case.created_at.isoformat() if case.created_at else None,
+            })
+
+        return Response(results)
+
+    except Exception as e:
+        logger.error(f"Error in recent_cases: {str(e)}")
+        return Response([])
