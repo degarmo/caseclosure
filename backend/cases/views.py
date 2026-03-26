@@ -1639,11 +1639,21 @@ def public_stats(request):
     """Return aggregate platform stats for the public landing page."""
     try:
         all_cases = Case.objects.filter(archived=False)
+        total = all_cases.count()
         User = get_user_model()
+
+        # case_status field may not exist if migration hasn't run yet
+        try:
+            solved = all_cases.filter(case_status='solved').count()
+            active = all_cases.filter(case_status='active').count()
+        except Exception:
+            solved = 0
+            active = total  # assume all are active if field missing
+
         return Response({
-            'total_cases': all_cases.count(),
-            'solved_cases': all_cases.filter(case_status='solved').count(),
-            'active_cases': all_cases.filter(case_status='active').count(),
+            'total_cases': total,
+            'solved_cases': solved,
+            'active_cases': active,
             'total_users': User.objects.filter(is_active=True).count(),
         })
     except Exception as e:
@@ -1662,22 +1672,38 @@ def featured_case(request):
     """Return one case from the 5 least-visited active public cases.
 
     Rotates randomly on each page load to spread exposure.
+    Falls back to progressively looser filters if strict match returns nothing.
     """
     import random
     try:
-        eligible = (
-            Case.objects
-            .filter(
-                archived=False,
-                case_status='active',
-                is_public=True,
-                deployment_status='deployed',
-            )
-            .annotate(visitor_count=Count('tracker_sessions'))
-            .order_by('visitor_count')[:5]
-        )
+        # Try strict filters first, then progressively loosen
+        filter_tiers = [
+            # Tier 1: active, public, deployed
+            dict(archived=False, case_status='active', is_public=True, deployment_status='deployed'),
+            # Tier 2: public + deployed (any status)
+            dict(archived=False, is_public=True, deployment_status='deployed'),
+            # Tier 3: just deployed
+            dict(archived=False, deployment_status='deployed'),
+            # Tier 4: any non-archived case
+            dict(archived=False),
+        ]
 
-        cases_list = list(eligible)
+        cases_list = []
+        for filters in filter_tiers:
+            try:
+                eligible = (
+                    Case.objects
+                    .filter(**filters)
+                    .annotate(visitor_count=Count('tracker_sessions'))
+                    .order_by('visitor_count')[:5]
+                )
+                cases_list = list(eligible)
+            except Exception:
+                # case_status field might not exist yet — skip tiers that use it
+                continue
+            if cases_list:
+                break
+
         if not cases_list:
             return Response(None, status=status.HTTP_204_NO_CONTENT)
 
@@ -1719,13 +1745,27 @@ def featured_case(request):
 @api_view(['GET'])
 @perm_classes([AllowAny])
 def recent_cases(request):
-    """Return the 3 most recently created public cases for the landing page."""
+    """Return the 3 most recently created public cases for the landing page.
+
+    Falls back to looser filters if strict match returns nothing.
+    """
     try:
-        cases = (
-            Case.objects
-            .filter(archived=False, is_public=True, deployment_status='deployed')
-            .order_by('-created_at')[:3]
-        )
+        # Try strict filters first, then progressively loosen
+        filter_tiers = [
+            dict(archived=False, is_public=True, deployment_status='deployed'),
+            dict(archived=False, deployment_status='deployed'),
+            dict(archived=False),
+        ]
+
+        cases = []
+        for filters in filter_tiers:
+            cases = list(
+                Case.objects
+                .filter(**filters)
+                .order_by('-created_at')[:3]
+            )
+            if cases:
+                break
 
         results = []
         for case in cases:
@@ -1742,7 +1782,7 @@ def recent_cases(request):
                 'last_name': case.last_name,
                 'case_title': case.case_title,
                 'case_type': case.case_type,
-                'case_status': case.case_status,
+                'case_status': getattr(case, 'case_status', 'active'),
                 'photo_url': photo_url,
                 'deployment_url': case.deployment_url,
                 'city': getattr(case, 'city', ''),
