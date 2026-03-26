@@ -9,7 +9,7 @@
  * - US States:    us-atlas@3 states-10m.json (jsDelivr CDN, Albers USA projection)
  */
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ISO numeric → ISO alpha-2 lookup
@@ -328,6 +328,73 @@ export default function WorldVisitorMap({ geoData }) {
   const [selectedState, setSelectedState] = useState(null);       // state FIPS
   const [tooltip,       setTooltip]       = useState(null);
   const [sortBy,        setSortBy]        = useState('visitors');
+  const [usViewBox,     setUsViewBox]     = useState('0 0 975 610');
+  const animFrameRef = useRef(null);
+
+  // ── Pre-compute projected path strings (expensive, do once per load) ────────
+  const statePaths = useMemo(() => {
+    if (!topoStates) return {};
+    return Object.fromEntries(
+      topoStates.map(s => [s.id, polygonsToPathAlbers(s.polygons)])
+    );
+  }, [topoStates]);
+
+  // ── Pre-compute projected bounding box per state for zoom ────────────────────
+  const stateBboxes = useMemo(() => {
+    if (!topoStates) return {};
+    const bboxes = {};
+    topoStates.forEach(state => {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      state.polygons.forEach(poly =>
+        poly.forEach(ring =>
+          ring.forEach(pt => {
+            const [x, y] = albersUSA(pt[0], pt[1]);
+            // Only include points within the contiguous viewport (excludes AK/HI insets)
+            if (x > 10 && x < 960 && y > 10 && y < 600) {
+              if (x < minX) minX = x; if (x > maxX) maxX = x;
+              if (y < minY) minY = y; if (y > maxY) maxY = y;
+            }
+          })
+        )
+      );
+      if (minX < Infinity) bboxes[state.id] = { minX, minY, maxX, maxY };
+    });
+    return bboxes;
+  }, [topoStates]);
+
+  // ── Smooth viewBox animation ─────────────────────────────────────────────────
+  const animateViewBox = useCallback((fromStr, toStr, duration = 450) => {
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    const [fx, fy, fw, fh] = fromStr.split(' ').map(Number);
+    const [tx, ty, tw, th] = toStr.split(' ').map(Number);
+    const start = performance.now();
+    const step = now => {
+      const raw = Math.min(1, (now - start) / duration);
+      // ease-in-out cubic
+      const t = raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2;
+      const vb = [
+        (fx + (tx - fx) * t).toFixed(1),
+        (fy + (ty - fy) * t).toFixed(1),
+        (fw + (tw - fw) * t).toFixed(1),
+        (fh + (th - fh) * t).toFixed(1),
+      ].join(' ');
+      setUsViewBox(vb);
+      if (raw < 1) animFrameRef.current = requestAnimationFrame(step);
+    };
+    animFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
+  const zoomToState = useCallback((fips, currentVB) => {
+    const bbox = stateBboxes[fips];
+    if (!bbox) return;
+    const pad = Math.max(15, ((bbox.maxX - bbox.minX) + (bbox.maxY - bbox.minY)) * 0.08);
+    const targetVB = `${(bbox.minX - pad).toFixed(1)} ${(bbox.minY - pad).toFixed(1)} ${(bbox.maxX - bbox.minX + pad * 2).toFixed(1)} ${(bbox.maxY - bbox.minY + pad * 2).toFixed(1)}`;
+    animateViewBox(currentVB, targetVB);
+  }, [stateBboxes, animateViewBox]);
+
+  const zoomOut = useCallback((currentVB) => {
+    animateViewBox(currentVB, '0 0 975 610');
+  }, [animateViewBox]);
 
   useEffect(() => {
     // World + Europe map data
@@ -431,7 +498,7 @@ export default function WorldVisitorMap({ geoData }) {
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => { setRegion(tab.id); setSelectedState(null); setTooltip(null); }}
+              onClick={() => { setRegion(tab.id); setSelectedState(null); setTooltip(null); setUsViewBox('0 0 975 610'); }}
               className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
                 region === tab.id
                   ? 'border-blue-500 text-blue-400'
@@ -454,23 +521,23 @@ export default function WorldVisitorMap({ geoData }) {
           ) : (
             <>
               <svg
-                viewBox="0 0 975 610"
+                viewBox={usViewBox}
                 className="w-full"
                 style={{ display: 'block', maxHeight: 380 }}
                 onMouseLeave={() => { setHoveredState(null); setTooltip(null); }}
               >
-                {/* Ocean / background */}
-                <rect width={975} height={610} fill="#0f172a" />
+                {/* Ocean / background — must cover the full 975×610 regardless of viewBox */}
+                <rect x={-9999} y={-9999} width={19998} height={19998} fill="#0f172a" />
 
                 {/* State fills */}
                 {topoStates.map(state => {
-                  const d = polygonsToPathAlbers(state.polygons);
+                  const d = statePaths[state.id];
                   if (!d) return null;
                   const isHov = hoveredState === state.id;
                   const isSel = selectedState === state.id;
-                  let fill = '#1e3a5f';                          // default slate-blue
-                  if (isSel) fill = '#2563eb';                   // selected: bright blue
-                  else if (isHov) fill = '#f59e0b';              // hover: amber
+                  let fill = '#1e3a5f';
+                  if (isSel) fill = '#2563eb';
+                  else if (isHov) fill = '#f59e0b';
 
                   return (
                     <path
@@ -486,29 +553,34 @@ export default function WorldVisitorMap({ geoData }) {
                         fips: state.id,
                       })}
                       onMouseLeave={() => { setHoveredState(null); setTooltip(null); }}
-                      onClick={() =>
-                        setSelectedState(prev => prev === state.id ? null : state.id)
-                      }
+                      onClick={() => {
+                        if (selectedState === state.id) {
+                          setSelectedState(null);
+                          zoomOut(usViewBox);
+                        } else {
+                          setSelectedState(state.id);
+                          zoomToState(state.id, usViewBox);
+                        }
+                      }}
                     />
                   );
                 })}
 
-                {/* Pulsing city dots (contiguous US only, Albers USA projected) */}
+                {/* Pulsing city dots (contiguous US, Albers projected) */}
                 {usCities.map((city, i) => {
                   const [cx, cy] = albersUSA(city.lng, city.lat);
-                  // Clamp to viewport
                   if (cx < 0 || cx > 975 || cy < 0 || cy > 610) return null;
-                  const coreR = Math.max(2.5, Math.min(7, 1.5 + city.visitors * 0.4));
-                  const ringR = Math.max(5,   Math.min(14, coreR * 2.2));
+                  const coreR = Math.max(4,  Math.min(12, 2.5 + (city.visitors || 1) * 0.5));
+                  const ringR = Math.max(8,  Math.min(22, coreR * 2.4));
                   const color = city.suspicious > 0 ? '#ef4444' : '#facc15';
                   const delay = `${(i * 0.37) % 2}s`;
                   return (
                     <g key={i} style={{ pointerEvents: 'none' }}>
                       <circle cx={cx} cy={cy} r={ringR} fill={color} opacity={0}>
-                        <animate attributeName="r"       values={`${coreR};${ringR * 1.6};${ringR * 1.6}`} dur="2s" begin={delay} repeatCount="indefinite" />
-                        <animate attributeName="opacity" values="0.55;0;0"                                  dur="2s" begin={delay} repeatCount="indefinite" />
+                        <animate attributeName="r"       values={`${coreR};${ringR * 1.7};${ringR * 1.7}`} dur="2s" begin={delay} repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.6;0;0"                                   dur="2s" begin={delay} repeatCount="indefinite" />
                       </circle>
-                      <circle cx={cx} cy={cy} r={coreR} fill={color} opacity={0.9} stroke="#0f172a" strokeWidth="0.6" />
+                      <circle cx={cx} cy={cy} r={coreR} fill={color} opacity={0.95} stroke="#0f172a" strokeWidth="1" />
                     </g>
                   );
                 })}
@@ -558,17 +630,17 @@ export default function WorldVisitorMap({ geoData }) {
                     <span className="text-slate-500 text-xs">No visitor data for this state</span>
                   )}
                   <button
-                    onClick={() => setSelectedState(null)}
-                    className="ml-auto text-slate-500 hover:text-slate-300 text-xs transition-colors"
+                    onClick={() => { setSelectedState(null); zoomOut(usViewBox); }}
+                    className="ml-auto text-slate-500 hover:text-slate-300 text-xs transition-colors flex items-center gap-1"
                   >
-                    ✕ clear
+                    ↩ zoom out
                   </button>
                 </div>
               )}
 
               {/* Legend */}
               <div className={`px-4 py-2 flex items-center gap-3 text-[10px] text-slate-400 flex-wrap ${selectedState ? '' : 'border-t border-slate-700/50'}`}>
-                <span className="text-slate-500">Click a state to select · Hover for name</span>
+                <span className="text-slate-500">Click state to zoom in · Click again to zoom out</span>
                 <span className="ml-auto flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <span className="relative inline-flex w-2.5 h-2.5">
