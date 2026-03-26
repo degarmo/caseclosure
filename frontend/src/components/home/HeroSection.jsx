@@ -175,10 +175,10 @@ export default function HeroSection() {
                     <img
                       src={featuredPhotoUrl}
                       alt={featured.first_name}
-                      className="w-full h-48 object-cover rounded-2xl group-hover:scale-[1.02] transition-transform duration-300"
+                      className="w-full h-64 object-cover object-top rounded-2xl group-hover:scale-[1.02] transition-transform duration-300"
                     />
                   ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center">
+                    <div className="w-full h-64 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center">
                       <Search className="w-10 h-10 text-slate-300" />
                     </div>
                   )}
