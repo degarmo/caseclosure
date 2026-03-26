@@ -5,11 +5,13 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from .models import (
-    Case, 
-    SpotlightPost, 
-    TemplateRegistry, 
-    CasePhoto, 
-    DeploymentLog
+    Case,
+    SpotlightPost,
+    TemplateRegistry,
+    CasePhoto,
+    DeploymentLog,
+    CaseInvitation,
+    CaseAccess,
 )
 
 
@@ -389,6 +391,54 @@ class DeploymentLogAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         """Deployment logs should not be manually created"""
         return False
+
+
+@admin.register(CaseInvitation)
+class CaseInvitationAdmin(admin.ModelAdmin):
+    list_display = (
+        'invitee_name',
+        'invitee_email',
+        'case',
+        'invitation_type',
+        'status',
+        'invited_by',
+        'created_at',
+        'expires_at',
+    )
+    list_filter = ('status', 'invitation_type', 'created_at')
+    search_fields = ('invitee_name', 'invitee_email', 'case__case_title')
+    readonly_fields = ('id', 'invitation_code', 'created_at', 'accepted_at')
+    actions = ['delete_all_invitations']
+
+    def delete_all_invitations(self, request, queryset):
+        total = CaseInvitation.objects.count()
+        CaseInvitation.objects.all().delete()
+        self.message_user(request, f'Deleted all {total} case invitations.')
+    delete_all_invitations.short_description = 'Delete ALL invitations (not just selected)'
+
+
+@admin.register(CaseAccess)
+class CaseAccessAdmin(admin.ModelAdmin):
+    list_display = (
+        'user',
+        'case',
+        'access_level',
+        'can_view_tracking',
+        'can_view_personal_info',
+        'can_export_data',
+        'accepted',
+        'invited_at',
+    )
+    list_filter = ('access_level', 'accepted', 'can_view_tracking', 'can_view_personal_info')
+    search_fields = ('user__email', 'user__first_name', 'user__last_name', 'case__case_title')
+    readonly_fields = ('invited_at', 'accepted_at')
+    actions = ['delete_all_access']
+
+    def delete_all_access(self, request, queryset):
+        total = CaseAccess.objects.count()
+        CaseAccess.objects.all().delete()
+        self.message_user(request, f'Deleted all {total} case access records.')
+    delete_all_access.short_description = 'Delete ALL access records (not just selected)'
 
 
 # Customize admin site header and title
