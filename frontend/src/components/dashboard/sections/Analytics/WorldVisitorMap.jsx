@@ -275,13 +275,18 @@ function polygonsToD(polygons) {
     .join(' ');
 }
 
-// For us-atlas: coordinates are already in pixel space
-function polygonsToPathDirect(polygons) {
+// For us-atlas: decoded coordinates are geographic [lng, lat].
+// Project each point through Albers USA to get SVG pixel coords.
+function polygonsToPathAlbers(polygons) {
   return polygons
     .map(poly =>
-      poly.map(ring =>
-        ring.map((pt, i) => `${i === 0 ? 'M' : 'L'}${pt[0].toFixed(1)},${pt[1].toFixed(1)}`).join(' ') + 'Z'
-      ).join(' ')
+      poly.map(ring => {
+        const pts = ring.map((pt, i) => {
+          const [x, y] = albersUSA(pt[0], pt[1]);
+          return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+        });
+        return pts.join(' ') + 'Z';
+      }).join(' ')
     ).join(' ');
 }
 
@@ -459,7 +464,7 @@ export default function WorldVisitorMap({ geoData }) {
 
                 {/* State fills */}
                 {topoStates.map(state => {
-                  const d = polygonsToPathDirect(state.polygons);
+                  const d = polygonsToPathAlbers(state.polygons);
                   if (!d) return null;
                   const isHov = hoveredState === state.id;
                   const isSel = selectedState === state.id;
