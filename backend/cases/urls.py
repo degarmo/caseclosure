@@ -10,7 +10,8 @@ from .views import (
     CasePhotoViewSet,
     DeploymentLogViewSet,
     ImageUploadView,
-    CaseInvitationViewSet
+    CaseInvitationViewSet,
+    public_stats,
 )
 
 # Create router and register all viewsets
@@ -27,6 +28,7 @@ router.register(r'case-invitations', CaseInvitationViewSet, basename='case-invit
 # Combine router URLs with custom paths
 urlpatterns = [
     path('images/upload/', ImageUploadView.as_view(), name='image-upload'),
+    path('public-stats/', public_stats, name='public-stats'),
     path('', include(router.urls)),
 ]
 

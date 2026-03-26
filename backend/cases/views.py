@@ -2,7 +2,7 @@
 
 from rest_framework import viewsets, status
 from rest_framework.views import APIView  
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes as perm_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -1629,3 +1629,28 @@ class CaseInvitationViewSet(viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
             raise
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public stats endpoint (no authentication required) — for landing page
+# ─────────────────────────────────────────────────────────────────────────────
+@api_view(['GET'])
+@perm_classes([AllowAny])
+def public_stats(request):
+    """Return aggregate platform stats for the public landing page."""
+    try:
+        all_cases = Case.objects.filter(archived=False)
+        User = get_user_model()
+        return Response({
+            'total_cases': all_cases.count(),
+            'solved_cases': all_cases.filter(case_status='solved').count(),
+            'active_cases': all_cases.filter(case_status='active').count(),
+            'total_users': User.objects.filter(is_active=True).count(),
+        })
+    except Exception as e:
+        logger.error(f"Error in public_stats: {str(e)}")
+        return Response({
+            'total_cases': 0,
+            'solved_cases': 0,
+            'active_cases': 0,
+            'total_users': 0,
+        })

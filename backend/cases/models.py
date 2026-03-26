@@ -290,6 +290,20 @@ class Case(models.Model):
         help_text="Temporarily disable the website"
     )
     
+    # Case investigation status
+    CASE_STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('solved', 'Solved'),
+        ('cold_case', 'Cold Case'),
+        ('closed', 'Closed'),
+    ]
+    case_status = models.CharField(
+        max_length=20,
+        choices=CASE_STATUS_CHOICES,
+        default='active',
+        help_text="Investigation status of the case"
+    )
+
     # Archive status (soft delete)
     archived = models.BooleanField(
         default=False,
