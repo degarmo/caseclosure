@@ -110,7 +110,12 @@ const CaseCard = ({ caseData }) => {
       if (caseData.template_data.customizations) {
         // Check common locations where the image might be stored
         const customizations = caseData.template_data.customizations;
-        
+
+        // Check top-level hero_image (beacon template uses this key)
+        if (customizations.hero_image) {
+          return customizations.hero_image;
+        }
+
         // Check hero section
         if (customizations.hero?.victimImage) {
           return customizations.hero.victimImage;

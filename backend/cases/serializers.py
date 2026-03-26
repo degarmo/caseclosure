@@ -312,12 +312,27 @@ class CaseSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.primary_photo.url)
             return obj.primary_photo.url
 
+        # Fallback to template_data customizations (Cloudinary URL from template editor)
+        if getattr(obj, 'template_data', None) and isinstance(obj.template_data, dict):
+            custs = obj.template_data.get('customizations', {})
+            if isinstance(custs, dict):
+                url = (
+                    custs.get('hero_image')
+                    or custs.get('victimImage')
+                    or (custs.get('hero', {}) or {}).get('victimImage')
+                    or (custs.get('hero', {}) or {}).get('backgroundImage')
+                    or (custs.get('victim', {}) or {}).get('image')
+                    or (custs.get('images', {}) or {}).get('primary')
+                )
+                if url:
+                    return url
+
         return None
 
     def get_victim_photo_url(self, obj):
         """Alias for primary_photo_url for backward compatibility"""
         return self.get_primary_photo_url(obj)
-    
+
     def get_spotlight_posts_count(self, obj):
         return obj.spotlight_posts.filter(status='published').count()
     
@@ -463,6 +478,21 @@ class CaseListSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.primary_photo.url)
             return obj.primary_photo.url
+
+        # Fallback to template_data customizations (Cloudinary URL)
+        if getattr(obj, 'template_data', None) and isinstance(obj.template_data, dict):
+            custs = obj.template_data.get('customizations', {})
+            if isinstance(custs, dict):
+                url = (
+                    custs.get('hero_image')
+                    or custs.get('victimImage')
+                    or (custs.get('hero', {}) or {}).get('victimImage')
+                    or (custs.get('hero', {}) or {}).get('backgroundImage')
+                    or (custs.get('victim', {}) or {}).get('image')
+                    or (custs.get('images', {}) or {}).get('primary')
+                )
+                if url:
+                    return url
 
         return None
 

@@ -1709,16 +1709,30 @@ def featured_case(request):
 
         case = random.choice(cases_list)
 
-        # Get photo URL — check gallery first, then primary_photo field
+        # Get photo URL — check multiple sources
         photo_url = None
+        # 1. Gallery photos
         try:
             primary = case.photos.filter(is_primary=True).first() or case.photos.first()
             if primary and primary.image:
                 photo_url = request.build_absolute_uri(primary.image.url)
         except Exception:
             pass
+        # 2. primary_photo field on Case model
         if not photo_url and getattr(case, 'primary_photo', None) and case.primary_photo:
             photo_url = request.build_absolute_uri(case.primary_photo.url)
+        # 3. template_data customizations (Cloudinary URL from template editor)
+        if not photo_url and getattr(case, 'template_data', None) and isinstance(case.template_data, dict):
+            custs = case.template_data.get('customizations', {})
+            if isinstance(custs, dict):
+                photo_url = (
+                    custs.get('hero_image')
+                    or custs.get('victimImage')
+                    or (custs.get('hero', {}) or {}).get('victimImage')
+                    or (custs.get('hero', {}) or {}).get('backgroundImage')
+                    or (custs.get('victim', {}) or {}).get('image')
+                    or (custs.get('images', {}) or {}).get('primary')
+                )
 
         # Get latest tip time & count
         tips = case.tips.all()
@@ -1774,16 +1788,30 @@ def recent_cases(request):
 
         results = []
         for case in cases:
-            # Photo — check gallery first, then primary_photo field
+            # Photo — check multiple sources
             photo_url = None
+            # 1. Gallery photos
             try:
                 primary = case.photos.filter(is_primary=True).first() or case.photos.first()
                 if primary and primary.image:
                     photo_url = request.build_absolute_uri(primary.image.url)
             except Exception:
                 pass
+            # 2. primary_photo field on Case model
             if not photo_url and getattr(case, 'primary_photo', None) and case.primary_photo:
                 photo_url = request.build_absolute_uri(case.primary_photo.url)
+            # 3. template_data customizations (Cloudinary URL from template editor)
+            if not photo_url and getattr(case, 'template_data', None) and isinstance(case.template_data, dict):
+                custs = case.template_data.get('customizations', {})
+                if isinstance(custs, dict):
+                    photo_url = (
+                        custs.get('hero_image')
+                        or custs.get('victimImage')
+                        or (custs.get('hero', {}) or {}).get('victimImage')
+                        or (custs.get('hero', {}) or {}).get('backgroundImage')
+                        or (custs.get('victim', {}) or {}).get('image')
+                        or (custs.get('images', {}) or {}).get('primary')
+                    )
 
             tips = case.tips.all()
             results.append({
