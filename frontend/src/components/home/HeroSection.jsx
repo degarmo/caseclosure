@@ -75,12 +75,8 @@ export default function HeroSection() {
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold gradient-text">
-                  {stats ? stats.total_users.toLocaleString() : '—'}
-                </div>
-                <div className="text-sm text-slate-500">
-                  {stats?.total_users === 1 ? 'Community Member' : 'Community Members'}
-                </div>
+                <div className="text-2xl font-bold gradient-text">24/7</div>
+                <div className="text-sm text-slate-500">Community Support</div>
               </div>
             </div>
           </div>
