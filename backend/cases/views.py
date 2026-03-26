@@ -1593,7 +1593,7 @@ class CaseInvitationViewSet(viewsets.ModelViewSet):
             'user_name': user.get_full_name() or user.email,
             'case_title': case.case_title,
             'inviter_name': inviter.get_full_name() or inviter.email,
-            'access_type': dict(CaseInvitation.ACCESS_TYPES).get(access_type, access_type),
+            'access_type': dict(CaseInvitation.INVITATION_TYPES).get(access_type, access_type),
             'message_body': message_body,
             'dashboard_url': f"{getattr(settings, 'FRONTEND_URL', 'https://caseclosure')}/dashboard",
             'case_id': str(case.id),
