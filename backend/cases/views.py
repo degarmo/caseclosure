@@ -1709,11 +1709,16 @@ def featured_case(request):
 
         case = random.choice(cases_list)
 
-        # Get photo URL
+        # Get photo URL — check gallery first, then primary_photo field
         photo_url = None
-        primary = case.photos.filter(is_primary=True).first() or case.photos.first()
-        if primary and primary.image:
-            photo_url = request.build_absolute_uri(primary.image.url)
+        try:
+            primary = case.photos.filter(is_primary=True).first() or case.photos.first()
+            if primary and primary.image:
+                photo_url = request.build_absolute_uri(primary.image.url)
+        except Exception:
+            pass
+        if not photo_url and getattr(case, 'primary_photo', None) and case.primary_photo:
+            photo_url = request.build_absolute_uri(case.primary_photo.url)
 
         # Get latest tip time & count
         tips = case.tips.all()
@@ -1769,11 +1774,16 @@ def recent_cases(request):
 
         results = []
         for case in cases:
-            # Photo
+            # Photo — check gallery first, then primary_photo field
             photo_url = None
-            primary = case.photos.filter(is_primary=True).first() or case.photos.first()
-            if primary and primary.image:
-                photo_url = request.build_absolute_uri(primary.image.url)
+            try:
+                primary = case.photos.filter(is_primary=True).first() or case.photos.first()
+                if primary and primary.image:
+                    photo_url = request.build_absolute_uri(primary.image.url)
+            except Exception:
+                pass
+            if not photo_url and getattr(case, 'primary_photo', None) and case.primary_photo:
+                photo_url = request.build_absolute_uri(case.primary_photo.url)
 
             tips = case.tips.all()
             results.append({
