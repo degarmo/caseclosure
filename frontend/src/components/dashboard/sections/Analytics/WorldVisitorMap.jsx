@@ -2,10 +2,11 @@
  * WorldVisitorMap.jsx
  *
  * Interactive visitor map with separate regional views.
- * Tabs: United States | Europe | World | List
+ * Tabs: United States (state-level, clickable) | Europe | World | List
  *
- * No API key required. Uses world-atlas topojson from jsDelivr CDN.
- * Regional views zoom into the same SVG via viewBox cropping.
+ * No API key required.
+ * - World/Europe: world-atlas@2 countries-110m.json (jsDelivr CDN)
+ * - US States:    us-atlas@3 states-10m.json (jsDelivr CDN, Albers USA projection)
  */
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
@@ -61,37 +62,101 @@ const COUNTRY_NAMES = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Regional view definitions
-// viewBox: "x y width height" — crops the 960×480 world SVG
+// US State FIPS → Name
+// ─────────────────────────────────────────────────────────────────────────────
+const STATE_FIPS = {
+  '01':'Alabama','02':'Alaska','04':'Arizona','05':'Arkansas',
+  '06':'California','08':'Colorado','09':'Connecticut','10':'Delaware',
+  '11':'D.C.','12':'Florida','13':'Georgia','15':'Hawaii',
+  '16':'Idaho','17':'Illinois','18':'Indiana','19':'Iowa',
+  '20':'Kansas','21':'Kentucky','22':'Louisiana','23':'Maine',
+  '24':'Maryland','25':'Massachusetts','26':'Michigan','27':'Minnesota',
+  '28':'Mississippi','29':'Missouri','30':'Montana','31':'Nebraska',
+  '32':'Nevada','33':'New Hampshire','34':'New Jersey','35':'New Mexico',
+  '36':'New York','37':'North Carolina','38':'North Dakota','39':'Ohio',
+  '40':'Oklahoma','41':'Oregon','42':'Pennsylvania','44':'Rhode Island',
+  '45':'South Carolina','46':'South Dakota','47':'Tennessee','48':'Texas',
+  '49':'Utah','50':'Vermont','51':'Virginia','53':'Washington',
+  '54':'West Virginia','55':'Wisconsin','56':'Wyoming',
+  '72':'Puerto Rico',
+};
+
+// Rough lat/lng bounding boxes per state FIPS (for city-to-state assignment)
+const STATE_BOUNDS = {
+  '01':{latMin:30.2,latMax:35.0,lngMin:-88.5,lngMax:-84.9},
+  '02':{latMin:51.2,latMax:71.4,lngMin:-179.1,lngMax:-129.9},
+  '04':{latMin:31.3,latMax:37.0,lngMin:-114.8,lngMax:-109.0},
+  '05':{latMin:33.0,latMax:36.5,lngMin:-94.6,lngMax:-89.6},
+  '06':{latMin:32.5,latMax:42.0,lngMin:-124.4,lngMax:-114.1},
+  '08':{latMin:36.9,latMax:41.0,lngMin:-109.1,lngMax:-102.0},
+  '09':{latMin:40.9,latMax:42.1,lngMin:-73.7,lngMax:-71.8},
+  '10':{latMin:38.4,latMax:39.8,lngMin:-75.8,lngMax:-74.9},
+  '11':{latMin:38.8,latMax:39.0,lngMin:-77.1,lngMax:-76.9},
+  '12':{latMin:24.4,latMax:31.0,lngMin:-87.6,lngMax:-79.9},
+  '13':{latMin:30.4,latMax:35.0,lngMin:-85.6,lngMax:-80.8},
+  '15':{latMin:18.9,latMax:22.2,lngMin:-160.2,lngMax:-154.8},
+  '16':{latMin:41.9,latMax:49.0,lngMin:-117.2,lngMax:-111.0},
+  '17':{latMin:36.9,latMax:42.5,lngMin:-91.5,lngMax:-87.0},
+  '18':{latMin:37.8,latMax:41.8,lngMin:-88.1,lngMax:-84.8},
+  '19':{latMin:40.4,latMax:43.5,lngMin:-96.6,lngMax:-90.1},
+  '20':{latMin:36.9,latMax:40.0,lngMin:-102.1,lngMax:-94.6},
+  '21':{latMin:36.5,latMax:39.1,lngMin:-89.6,lngMax:-81.9},
+  '22':{latMin:28.9,latMax:33.0,lngMin:-94.0,lngMax:-88.8},
+  '23':{latMin:43.1,latMax:47.5,lngMin:-71.1,lngMax:-66.9},
+  '24':{latMin:37.9,latMax:39.7,lngMin:-79.5,lngMax:-74.9},
+  '25':{latMin:41.2,latMax:42.9,lngMin:-73.5,lngMax:-69.9},
+  '26':{latMin:41.7,latMax:48.3,lngMin:-90.4,lngMax:-82.4},
+  '27':{latMin:43.5,latMax:49.4,lngMin:-97.2,lngMax:-89.5},
+  '28':{latMin:30.2,latMax:35.0,lngMin:-91.7,lngMax:-88.1},
+  '29':{latMin:35.9,latMax:40.6,lngMin:-95.8,lngMax:-89.1},
+  '30':{latMin:44.4,latMax:49.0,lngMin:-116.1,lngMax:-104.0},
+  '31':{latMin:39.9,latMax:43.0,lngMin:-104.1,lngMax:-95.3},
+  '32':{latMin:35.0,latMax:42.0,lngMin:-120.0,lngMax:-114.0},
+  '33':{latMin:42.7,latMax:45.3,lngMin:-72.6,lngMax:-70.6},
+  '34':{latMin:38.9,latMax:41.4,lngMin:-75.6,lngMax:-73.9},
+  '35':{latMin:31.3,latMax:37.0,lngMin:-109.1,lngMax:-103.0},
+  '36':{latMin:40.5,latMax:45.0,lngMin:-79.8,lngMax:-71.8},
+  '37':{latMin:33.8,latMax:36.6,lngMin:-84.3,lngMax:-75.5},
+  '38':{latMin:45.9,latMax:49.0,lngMin:-104.1,lngMax:-96.5},
+  '39':{latMin:38.4,latMax:41.9,lngMin:-84.8,lngMax:-80.5},
+  '40':{latMin:33.6,latMax:37.0,lngMin:-103.0,lngMax:-94.4},
+  '41':{latMin:41.9,latMax:46.3,lngMin:-124.7,lngMax:-116.5},
+  '42':{latMin:39.7,latMax:42.3,lngMin:-80.5,lngMax:-74.7},
+  '44':{latMin:41.1,latMax:42.0,lngMin:-71.9,lngMax:-71.1},
+  '45':{latMin:32.0,latMax:35.2,lngMin:-83.4,lngMax:-78.5},
+  '46':{latMin:42.5,latMax:45.9,lngMin:-104.1,lngMax:-96.4},
+  '47':{latMin:34.9,latMax:36.7,lngMin:-90.3,lngMax:-81.6},
+  '48':{latMin:25.8,latMax:36.5,lngMin:-106.6,lngMax:-93.5},
+  '49':{latMin:36.9,latMax:42.0,lngMin:-114.1,lngMax:-109.0},
+  '50':{latMin:42.7,latMax:45.0,lngMin:-73.5,lngMax:-71.5},
+  '51':{latMin:36.5,latMax:39.5,lngMin:-83.7,lngMax:-75.2},
+  '53':{latMin:45.5,latMax:49.0,lngMin:-124.7,lngMax:-116.9},
+  '54':{latMin:37.2,latMax:40.6,lngMin:-82.7,lngMax:-77.7},
+  '55':{latMin:42.5,latMax:47.1,lngMin:-92.9,lngMax:-86.2},
+  '56':{latMin:40.9,latMax:45.0,lngMin:-111.1,lngMax:-104.1},
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regional view definitions (for Europe & World tabs using world-atlas)
 // ─────────────────────────────────────────────────────────────────────────────
 const MAP_W = 960;
 const MAP_H = 480;
 
-const REGIONS = {
-  us: {
-    label: 'United States',
-    flag: '🇺🇸',
-    // lng -130..−60, lat 20..55  →  zoomed North America
-    viewBox: '120 90 205 115',
-    lngMin: -135, lngMax: -55, latMin: 17, latMax: 57,
-  },
+const WORLD_REGIONS = {
   europe: {
-    label: 'Europe',
-    flag: '🇪🇺',
-    // lng -25..50, lat 33..72  →  zoomed Europe
+    label: 'Europe', flag: '🇪🇺',
     viewBox: '407 45 200 115',
     lngMin: -28, lngMax: 52, latMin: 30, latMax: 74,
   },
   world: {
-    label: 'World',
-    flag: '🌍',
+    label: 'World', flag: '🌍',
     viewBox: `0 0 ${MAP_W} ${MAP_H}`,
     lngMin: -180, lngMax: 180, latMin: -90, latMax: 90,
   },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Minimal topojson decoder
+// World-atlas TopoJSON decoder (outputs geographic [lng, lat] coordinates)
 // ─────────────────────────────────────────────────────────────────────────────
 function decodeTopo(topo) {
   const { scale, translate } = topo.transform;
@@ -125,8 +190,43 @@ function decodeTopo(topo) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Equirectangular projection
+// US-Atlas TopoJSON decoder (outputs Albers USA pixel coordinates directly)
 // ─────────────────────────────────────────────────────────────────────────────
+function decodeUSStates(topo) {
+  const { scale, translate } = topo.transform;
+  const arcs = topo.arcs.map(arc => {
+    let x = 0, y = 0;
+    return arc.map(([dx, dy]) => {
+      x += dx; y += dy;
+      return [x * scale[0] + translate[0], y * scale[1] + translate[1]];
+    });
+  });
+
+  function arcCoords(i) {
+    const ring = arcs[i < 0 ? ~i : i];
+    return i < 0 ? [...ring].reverse() : ring;
+  }
+
+  function geomToPaths(geom) {
+    if (!geom) return [];
+    if (geom.type === 'Polygon')
+      return [geom.arcs.map(ring => ring.flatMap(arcCoords))];
+    if (geom.type === 'MultiPolygon')
+      return geom.arcs.map(poly => poly.map(ring => ring.flatMap(arcCoords)));
+    return [];
+  }
+
+  return topo.objects.states.geometries.map(g => ({
+    id: String(g.id).padStart(2, '0'),  // FIPS code with leading zero
+    polygons: geomToPaths(g),
+  }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Projections
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Equirectangular projection for world/europe world-atlas tabs
 function project([lng, lat]) {
   return [
     ((lng + 180) / 360) * MAP_W,
@@ -134,6 +234,34 @@ function project([lng, lat]) {
   ];
 }
 
+// Albers USA conic equal-area projection for city dots on US state map.
+// Matches the lower-48 sub-projection used by us-atlas@3 states-10m.json.
+// Standard parallels: 29.5°N and 45.5°N, centered at 96°W, 37.5°N.
+// Scale 1300, translate [487.5, 305] → fits 975×610 viewport.
+function albersUSA(lng, lat) {
+  const toRad = d => d * Math.PI / 180;
+  const phi1 = toRad(29.5), phi2 = toRad(45.5);
+  const phi0 = toRad(37.5), lam0 = toRad(-96);
+  const n    = 0.5 * (Math.sin(phi1) + Math.sin(phi2));
+  const C    = Math.cos(phi1) ** 2 + 2 * n * Math.sin(phi1);
+  const rho0 = Math.sqrt(C - 2 * n * Math.sin(phi0)) / n;
+
+  const phi   = toRad(lat);
+  const lam   = toRad(lng);
+  const rho   = Math.sqrt(Math.max(0, C - 2 * n * Math.sin(phi))) / n;
+  const theta = n * (lam - lam0);
+
+  const x = rho * Math.sin(theta);
+  const y = rho0 - rho * Math.cos(theta);
+
+  return [487.5 + 1300 * x, 305 - 1300 * y];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Path helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// For world-atlas: applies equirectangular projection to [lng, lat] rings
 function ringToPath(ring) {
   return ring.map((pt, i) => {
     const [x, y] = project(pt);
@@ -145,6 +273,16 @@ function polygonsToD(polygons) {
   return polygons
     .map(poly => poly.map(ring => ringToPath(ring)).join(' '))
     .join(' ');
+}
+
+// For us-atlas: coordinates are already in pixel space
+function polygonsToPathDirect(polygons) {
+  return polygons
+    .map(poly =>
+      poly.map(ring =>
+        ring.map((pt, i) => `${i === 0 ? 'M' : 'L'}${pt[0].toFixed(1)},${pt[1].toFixed(1)}`).join(' ') + 'Z'
+      ).join(' ')
+    ).join(' ');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,20 +315,30 @@ function flagEmoji(code) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WorldVisitorMap({ geoData }) {
   const [topoCountries, setTopoCountries] = useState(null);
-  const [loadError, setLoadError]         = useState(null);
-  const [region, setRegion]               = useState('us');   // 'us' | 'europe' | 'world' | 'list'
-  const [hovered, setHovered]             = useState(null);
-  const [tooltip, setTooltip]             = useState(null);
-  const [sortBy, setSortBy]               = useState('visitors');
-  const svgRef = useRef(null);
+  const [topoStates,    setTopoStates]    = useState(null);
+  const [loadError,     setLoadError]     = useState(null);
+  const [region,        setRegion]        = useState('us');
+  const [hovered,       setHovered]       = useState(null);       // country a2
+  const [hoveredState,  setHoveredState]  = useState(null);       // state FIPS
+  const [selectedState, setSelectedState] = useState(null);       // state FIPS
+  const [tooltip,       setTooltip]       = useState(null);
+  const [sortBy,        setSortBy]        = useState('visitors');
 
   useEffect(() => {
+    // World + Europe map data
     fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(topo => setTopoCountries(decodeTopo(topo)))
       .catch(() => setLoadError('Could not load map data.'));
+
+    // US states map data
+    fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(topo => setTopoStates(decodeUSStates(topo)))
+      .catch(() => {}); // fail silently; US tab will show spinner
   }, []);
 
+  // ── Derived data ────────────────────────────────────────────────────────────
   const visitorMap = {};
   (geoData?.countries || []).forEach(c => { visitorMap[c.code] = c; });
 
@@ -210,17 +358,15 @@ export default function WorldVisitorMap({ geoData }) {
 
   const maxVisitors = listRows[0]?.visitors || 1;
 
-  const handleMouseMove = useCallback((e, country) => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTooltip({ x: e.clientX - rect.left + 12, y: e.clientY - rect.top - 10, data: country });
-  }, []);
+  // Cities that fall within the contiguous US (Alaska/Hawaii need separate sub-projections)
+  const usCities = (geoData?.cities || []).filter(c =>
+    c.lat && c.lng &&
+    c.lat >= 24 && c.lat <= 50 &&
+    c.lng >= -125 && c.lng <= -66
+  );
 
-  const currentRegion = REGIONS[region];
-  const isMapView = region !== 'list';
-
-  // Filter cities to those within the current region's bounds
-  const visibleCities = (geoData?.cities || []).filter(c => {
+  // Cities within a specific region for world/europe tabs
+  const regionCities = (currentRegion) => (geoData?.cities || []).filter(c => {
     if (!c.lat || !c.lng || !currentRegion) return false;
     return (
       c.lng >= currentRegion.lngMin && c.lng <= currentRegion.lngMax &&
@@ -228,12 +374,38 @@ export default function WorldVisitorMap({ geoData }) {
     );
   });
 
+  // Cities in selected state (using rough bounding box)
+  const selectedStateBounds = selectedState ? STATE_BOUNDS[selectedState] : null;
+  const selectedStateCities = selectedStateBounds
+    ? (geoData?.cities || []).filter(c =>
+        c.lat && c.lng &&
+        c.lat >= selectedStateBounds.latMin && c.lat <= selectedStateBounds.latMax &&
+        c.lng >= selectedStateBounds.lngMin && c.lng <= selectedStateBounds.lngMax
+      )
+    : [];
+
+  // ── Mouse handlers ──────────────────────────────────────────────────────────
+  const handleCountryMove = useCallback((e, country) => {
+    const rect = e.currentTarget.closest('svg').getBoundingClientRect();
+    setTooltip({ x: e.clientX - rect.left + 12, y: e.clientY - rect.top - 10, data: country });
+  }, []);
+
+  const handleStateMove = useCallback((e, state) => {
+    const rect = e.currentTarget.closest('svg').getBoundingClientRect();
+    setTooltip({ x: e.clientX - rect.left + 12, y: e.clientY - rect.top - 10, data: state });
+  }, []);
+
+  // ── Tabs ────────────────────────────────────────────────────────────────────
   const tabs = [
     { id: 'us',     label: '🇺🇸 United States' },
-    { id: 'europe', label: '🇪🇺 Europe' },
-    { id: 'world',  label: '🌍 World' },
-    { id: 'list',   label: '☰ List' },
+    { id: 'europe', label: '🇪🇺 Europe'         },
+    { id: 'world',  label: '🌍 World'           },
+    { id: 'list',   label: '☰ List'            },
   ];
+
+  const isUSTab       = region === 'us';
+  const isWorldEurope = region === 'europe' || region === 'world';
+  const currentWorldRegion = WORLD_REGIONS[region];
 
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
@@ -254,7 +426,7 @@ export default function WorldVisitorMap({ geoData }) {
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setRegion(tab.id)}
+              onClick={() => { setRegion(tab.id); setSelectedState(null); setTooltip(null); }}
               className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
                 region === tab.id
                   ? 'border-blue-500 text-blue-400'
@@ -267,8 +439,155 @@ export default function WorldVisitorMap({ geoData }) {
         </div>
       </div>
 
-      {/* ── MAP VIEW ─────────────────────────────────────────────────────────── */}
-      {isMapView && (
+      {/* ── US STATE MAP ──────────────────────────────────────────────────────── */}
+      {isUSTab && (
+        <div className="relative" style={{ background: '#0f172a' }}>
+          {!topoStates ? (
+            <div className="flex items-center justify-center h-64 text-slate-500 text-sm animate-pulse">
+              Loading US map…
+            </div>
+          ) : (
+            <>
+              <svg
+                viewBox="0 0 975 610"
+                className="w-full"
+                style={{ display: 'block', maxHeight: 380 }}
+                onMouseLeave={() => { setHoveredState(null); setTooltip(null); }}
+              >
+                {/* Ocean / background */}
+                <rect width={975} height={610} fill="#0f172a" />
+
+                {/* State fills */}
+                {topoStates.map(state => {
+                  const d = polygonsToPathDirect(state.polygons);
+                  if (!d) return null;
+                  const isHov = hoveredState === state.id;
+                  const isSel = selectedState === state.id;
+                  let fill = '#1e3a5f';                          // default slate-blue
+                  if (isSel) fill = '#2563eb';                   // selected: bright blue
+                  else if (isHov) fill = '#f59e0b';              // hover: amber
+
+                  return (
+                    <path
+                      key={state.id}
+                      d={d}
+                      fill={fill}
+                      stroke="#334155"
+                      strokeWidth="0.5"
+                      style={{ cursor: 'pointer', transition: 'fill 0.12s' }}
+                      onMouseEnter={() => setHoveredState(state.id)}
+                      onMouseMove={e => handleStateMove(e, {
+                        name: STATE_FIPS[state.id] || `State ${state.id}`,
+                        fips: state.id,
+                      })}
+                      onMouseLeave={() => { setHoveredState(null); setTooltip(null); }}
+                      onClick={() =>
+                        setSelectedState(prev => prev === state.id ? null : state.id)
+                      }
+                    />
+                  );
+                })}
+
+                {/* Pulsing city dots (contiguous US only, Albers USA projected) */}
+                {usCities.map((city, i) => {
+                  const [cx, cy] = albersUSA(city.lng, city.lat);
+                  // Clamp to viewport
+                  if (cx < 0 || cx > 975 || cy < 0 || cy > 610) return null;
+                  const coreR = Math.max(2.5, Math.min(7, 1.5 + city.visitors * 0.4));
+                  const ringR = Math.max(5,   Math.min(14, coreR * 2.2));
+                  const color = city.suspicious > 0 ? '#ef4444' : '#facc15';
+                  const delay = `${(i * 0.37) % 2}s`;
+                  return (
+                    <g key={i} style={{ pointerEvents: 'none' }}>
+                      <circle cx={cx} cy={cy} r={ringR} fill={color} opacity={0}>
+                        <animate attributeName="r"       values={`${coreR};${ringR * 1.6};${ringR * 1.6}`} dur="2s" begin={delay} repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.55;0;0"                                  dur="2s" begin={delay} repeatCount="indefinite" />
+                      </circle>
+                      <circle cx={cx} cy={cy} r={coreR} fill={color} opacity={0.9} stroke="#0f172a" strokeWidth="0.6" />
+                    </g>
+                  );
+                })}
+              </svg>
+
+              {/* State tooltip */}
+              {tooltip?.data?.name && !tooltip.data.visitors && (
+                <div
+                  className="pointer-events-none absolute z-10 bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs shadow-xl"
+                  style={{ left: tooltip.x, top: tooltip.y }}
+                >
+                  <span className="font-semibold text-white">{tooltip.data.name}</span>
+                  {selectedState === tooltip.data.fips && (
+                    <span className="text-blue-400 ml-2">● selected</span>
+                  )}
+                </div>
+              )}
+
+              {/* Selected state panel */}
+              {selectedState && (
+                <div className="px-4 py-2.5 border-t border-slate-700 bg-slate-800/80 flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-sm bg-blue-500 inline-block" />
+                    <span className="text-white text-xs font-semibold">
+                      {STATE_FIPS[selectedState] || selectedState}
+                    </span>
+                  </div>
+                  {selectedStateCities.length > 0 ? (
+                    <>
+                      <span className="text-slate-400 text-xs">
+                        {selectedStateCities.length} {selectedStateCities.length === 1 ? 'city' : 'cities'} with visitors
+                      </span>
+                      <span className="text-slate-400 text-xs">·</span>
+                      <span className="text-slate-300 text-xs font-mono">
+                        {selectedStateCities.reduce((s, c) => s + (c.visitors || 0), 0).toLocaleString()} visitors
+                      </span>
+                      {selectedStateCities.some(c => c.suspicious > 0) && (
+                        <>
+                          <span className="text-slate-400 text-xs">·</span>
+                          <span className="text-red-400 text-xs">
+                            ⚠ {selectedStateCities.filter(c => c.suspicious > 0).length} suspicious
+                          </span>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-slate-500 text-xs">No visitor data for this state</span>
+                  )}
+                  <button
+                    onClick={() => setSelectedState(null)}
+                    className="ml-auto text-slate-500 hover:text-slate-300 text-xs transition-colors"
+                  >
+                    ✕ clear
+                  </button>
+                </div>
+              )}
+
+              {/* Legend */}
+              <div className={`px-4 py-2 flex items-center gap-3 text-[10px] text-slate-400 flex-wrap ${selectedState ? '' : 'border-t border-slate-700/50'}`}>
+                <span className="text-slate-500">Click a state to select · Hover for name</span>
+                <span className="ml-auto flex items-center gap-3">
+                  <span className="flex items-center gap-1">
+                    <span className="relative inline-flex w-2.5 h-2.5">
+                      <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-yellow-400 opacity-60" />
+                      <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                    </span>
+                    Visitors
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="relative inline-flex w-2.5 h-2.5">
+                      <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-red-500 opacity-60" />
+                      <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-red-500" />
+                    </span>
+                    Suspicious
+                  </span>
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── WORLD / EUROPE MAP ────────────────────────────────────────────────── */}
+      {isWorldEurope && (
         <div className="relative" style={{ background: '#0f172a' }}>
           {loadError ? (
             <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
@@ -281,8 +600,7 @@ export default function WorldVisitorMap({ geoData }) {
           ) : (
             <>
               <svg
-                ref={svgRef}
-                viewBox={currentRegion.viewBox}
+                viewBox={currentWorldRegion.viewBox}
                 className="w-full"
                 style={{ display: 'block', maxHeight: region === 'world' ? 400 : 380 }}
                 onMouseLeave={() => { setHovered(null); setTooltip(null); }}
@@ -306,7 +624,7 @@ export default function WorldVisitorMap({ geoData }) {
                       strokeWidth={region === 'world' ? '0.4' : '0.6'}
                       style={{ cursor: vis ? 'pointer' : 'default', transition: 'fill 0.15s' }}
                       onMouseEnter={() => setHovered(a2)}
-                      onMouseMove={e => handleMouseMove(e, {
+                      onMouseMove={e => handleCountryMove(e, {
                         code: a2,
                         name: vis?.name || COUNTRY_NAMES[a2] || a2 || 'Unknown',
                         visitors: vis?.visitors || 0,
@@ -319,35 +637,26 @@ export default function WorldVisitorMap({ geoData }) {
                 })}
 
                 {/* Pulsing city dots */}
-                {visibleCities.map((city, i) => {
+                {regionCities(currentWorldRegion).map((city, i) => {
                   const [cx, cy] = project([city.lng, city.lat]);
                   const isWorld = region === 'world';
                   const coreR  = Math.max(isWorld ? 1.5 : 2,   Math.min(isWorld ? 4   : 6,   1 + city.visitors * 0.4));
                   const ringR  = Math.max(isWorld ? 3   : 4.5, Math.min(isWorld ? 7   : 12,  coreR * 2.2));
                   const color  = city.suspicious > 0 ? '#ef4444' : '#facc15';
-                  // Stagger pulse so every dot doesn't pulse in unison
                   const delay  = `${(i * 0.37) % 2}s`;
                   return (
                     <g key={i} style={{ pointerEvents: 'none' }}>
-                      {/* Outer pulse ring */}
                       <circle cx={cx} cy={cy} r={ringR} fill={color} opacity={0}>
-                        <animate attributeName="r"      values={`${coreR};${ringR * 1.6};${ringR * 1.6}`} dur="2s" begin={delay} repeatCount="indefinite" />
+                        <animate attributeName="r"       values={`${coreR};${ringR * 1.6};${ringR * 1.6}`} dur="2s" begin={delay} repeatCount="indefinite" />
                         <animate attributeName="opacity" values="0.55;0;0"                                  dur="2s" begin={delay} repeatCount="indefinite" />
                       </circle>
-                      {/* Solid core dot */}
-                      <circle
-                        cx={cx} cy={cy} r={coreR}
-                        fill={color}
-                        opacity={0.9}
-                        stroke="#0f172a"
-                        strokeWidth={isWorld ? '0.4' : '0.6'}
-                      />
+                      <circle cx={cx} cy={cy} r={coreR} fill={color} opacity={0.9} stroke="#0f172a" strokeWidth={isWorld ? '0.4' : '0.6'} />
                     </g>
                   );
                 })}
               </svg>
 
-              {/* Tooltip */}
+              {/* Country tooltip */}
               {tooltip?.data?.visitors > 0 && (
                 <div
                   className="pointer-events-none absolute z-10 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs shadow-xl"
