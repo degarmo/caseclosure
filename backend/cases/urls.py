@@ -12,6 +12,7 @@ from .views import (
     ImageUploadView,
     CaseInvitationViewSet,
     public_stats,
+    featured_case,
 )
 
 # Create router and register all viewsets
@@ -29,6 +30,7 @@ router.register(r'case-invitations', CaseInvitationViewSet, basename='case-invit
 urlpatterns = [
     path('images/upload/', ImageUploadView.as_view(), name='image-upload'),
     path('public-stats/', public_stats, name='public-stats'),
+    path('featured-case/', featured_case, name='featured-case'),
     path('', include(router.urls)),
 ]
 

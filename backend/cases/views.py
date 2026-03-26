@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.throttling import UserRateThrottle
-from django.db.models import Q, F
+from django.db.models import Q, F, Count
 from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
@@ -1654,3 +1654,63 @@ def public_stats(request):
             'active_cases': 0,
             'total_users': 0,
         })
+
+
+@api_view(['GET'])
+@perm_classes([AllowAny])
+def featured_case(request):
+    """Return one case from the 5 least-visited active public cases.
+
+    Rotates randomly on each page load to spread exposure.
+    """
+    import random
+    try:
+        eligible = (
+            Case.objects
+            .filter(
+                archived=False,
+                case_status='active',
+                is_public=True,
+                deployment_status='deployed',
+            )
+            .annotate(visitor_count=Count('tracker_sessions'))
+            .order_by('visitor_count')[:5]
+        )
+
+        cases_list = list(eligible)
+        if not cases_list:
+            return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+        case = random.choice(cases_list)
+
+        # Get photo URL
+        photo_url = None
+        primary = case.photos.filter(is_primary=True).first() or case.photos.first()
+        if primary and primary.image:
+            photo_url = request.build_absolute_uri(primary.image.url)
+
+        # Get latest tip time & count
+        tips = case.tips.all()
+        tip_count = tips.count()
+        latest_tip = tips.order_by('-created_at').values_list('created_at', flat=True).first()
+
+        return Response({
+            'id': case.id,
+            'first_name': case.first_name,
+            'last_name': case.last_name,
+            'case_title': case.case_title,
+            'case_type': case.case_type,
+            'case_type_display': case.get_case_type_display(),
+            'photo_url': photo_url,
+            'deployment_url': case.deployment_url,
+            'visitor_count': case.visitor_count,
+            'tip_count': tip_count,
+            'latest_tip_at': latest_tip,
+            'date_missing': case.date_missing,
+            'city': getattr(case, 'city', ''),
+            'state': getattr(case, 'state', ''),
+        })
+
+    except Exception as e:
+        logger.error(f"Error in featured_case: {str(e)}")
+        return Response(None, status=status.HTTP_204_NO_CONTENT)

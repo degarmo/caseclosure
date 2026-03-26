@@ -1,15 +1,43 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Heart, Search } from "lucide-react";
+import { ArrowRight, Heart, Search, MapPin, Clock, Eye, MessageCircle } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+function timeAgo(dateStr) {
+  if (!dateStr) return null;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+const CASE_TYPE_LABELS = {
+  missing: 'Missing Person',
+  homicide: 'Homicide',
+  unidentified: 'Unidentified',
+  cold_case: 'Cold Case',
+  other: 'Other',
+};
+
 export default function HeroSection() {
   const [stats, setStats] = useState(null);
+  const [featured, setFeatured] = useState(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/public-stats/`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setStats(data); })
+      .catch(() => {});
+
+    fetch(`${API_BASE}/api/featured-case/`)
+      .then(r => r.ok && r.status !== 204 ? r.json() : null)
+      .then(data => { if (data) setFeatured(data); })
       .catch(() => {});
   }, []);
 
@@ -20,6 +48,25 @@ export default function HeroSection() {
   const handleAboutClick = () => {
     window.location.href = "/about";
   };
+
+  // Build display name
+  const displayName = featured
+    ? `${featured.first_name}${featured.last_name ? ' ' + featured.last_name.charAt(0) + '.' : ''}`
+    : null;
+
+  // Build subtitle (e.g. "Missing since Jan 2023" or "Homicide · Dallas, TX")
+  const subtitle = featured ? (() => {
+    const parts = [];
+    if (featured.case_type === 'missing' && featured.date_missing) {
+      const d = new Date(featured.date_missing);
+      parts.push(`Missing since ${d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`);
+    } else {
+      parts.push(featured.case_type_display || CASE_TYPE_LABELS[featured.case_type] || 'Active Case');
+    }
+    const loc = [featured.city, featured.state].filter(Boolean).join(', ');
+    if (loc) parts.push(loc);
+    return parts.join(' · ');
+  })() : null;
 
   return (
     <section className="relative overflow-hidden">
@@ -81,38 +128,106 @@ export default function HeroSection() {
             </div>
           </div>
 
+          {/* ── Featured Case Card ────────────────────────────────────── */}
           <div className="relative">
             <div className="floating-card bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-white/20">
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                    <Heart className="w-6 h-6 text-orange-600" />
+              {featured ? (
+                <a
+                  href={featured.deployment_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block space-y-5 group"
+                >
+                  {/* Header: name + badge */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
+                      <Heart className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-800 truncate">
+                        {featured.case_title || `${displayName}'s Story`}
+                      </div>
+                      <div className="text-sm text-slate-500 truncate">{subtitle}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-semibold text-slate-800">Sarah's Story</div>
-                    <div className="text-sm text-slate-500">Missing since March 2023</div>
-                  </div>
-                </div>
 
-                <img
-                  src="https://images.unsplash.com/photo-1494790108755-2616c64e8e03?w=400&h=300&fit=crop&crop=face"
-                  alt="Case example"
-                  className="w-full h-48 object-cover rounded-2xl"
-                />
+                  {/* Photo */}
+                  {featured.photo_url ? (
+                    <img
+                      src={featured.photo_url}
+                      alt={featured.first_name}
+                      className="w-full h-48 object-cover rounded-2xl group-hover:scale-[1.02] transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-48 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center">
+                      <Search className="w-10 h-10 text-slate-300" />
+                    </div>
+                  )}
 
-                <div className="space-y-3">
-                  <div className="text-sm text-slate-600">
-                    "Thanks to CaseClosure, we received 127 new tips and finally found the breakthrough we needed."
+                  {/* Stats row */}
+                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Eye className="w-3.5 h-3.5" />
+                      {(featured.visitor_count || 0).toLocaleString()} visitor{featured.visitor_count !== 1 ? 's' : ''}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      {(featured.tip_count || 0).toLocaleString()} tip{featured.tip_count !== 1 ? 's' : ''}
+                    </span>
+                    {(featured.city || featured.state) && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {[featured.city, featured.state].filter(Boolean).join(', ')}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">Last tip: 2 hours ago</span>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-1">
+                    {featured.latest_tip_at ? (
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
+                        <Clock className="w-3.5 h-3.5" />
+                        Last tip: {timeAgo(featured.latest_tip_at)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">No tips yet — be the first</span>
+                    )}
                     <div className="flex items-center gap-1">
-                      <Search className="w-4 h-4 text-slate-400" />
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                      </span>
                       <span className="text-xs text-slate-400">Active investigation</span>
                     </div>
                   </div>
+
+                  {/* Needs exposure label */}
+                  <div className="text-center">
+                    <span className="text-[10px] uppercase tracking-wider text-orange-500 font-semibold">
+                      This case needs more exposure
+                    </span>
+                  </div>
+                </a>
+              ) : (
+                /* Fallback while loading or if no featured case */
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                      <Heart className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-800">Featured Case</div>
+                      <div className="text-sm text-slate-500">Helping families find answers</div>
+                    </div>
+                  </div>
+                  <div className="w-full h-48 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center">
+                    <div className="text-center text-slate-400">
+                      <Search className="w-8 h-8 mx-auto mb-2" />
+                      <p className="text-sm">Cases will appear here once published</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="absolute -top-4 -right-4 w-24 h-24 accent-gradient rounded-full opacity-20 blur-xl" />
