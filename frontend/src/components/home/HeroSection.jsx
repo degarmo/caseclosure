@@ -77,7 +77,8 @@ export default function HeroSection() {
   const subtitle = featured ? (() => {
     const parts = [];
     if (featured.case_type === 'missing' && featured.date_missing) {
-      const d = new Date(featured.date_missing);
+      const [y, m, day] = featured.date_missing.split('T')[0].split('-').map(Number);
+      const d = new Date(y, m - 1, day);
       parts.push(`Missing since ${d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`);
     } else {
       parts.push(featured.case_type_display || CASE_TYPE_LABELS[featured.case_type] || 'Active Case');

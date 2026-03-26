@@ -42,7 +42,9 @@ const CaseCard = ({ caseData }) => {
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date';
     try {
-      const date = new Date(dateString);
+      // Parse as local date parts to avoid UTC timezone shift (off-by-one bug)
+      const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+      const date = new Date(year, month - 1, day);
       return date.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
