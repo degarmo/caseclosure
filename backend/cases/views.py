@@ -1754,6 +1754,7 @@ def featured_case(request):
             'date_missing': case.date_missing,
             'city': getattr(case, 'city', ''),
             'state': getattr(case, 'state', ''),
+            'template_data': getattr(case, 'template_data', None),
         })
 
     except Exception as e:

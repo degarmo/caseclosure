@@ -51,6 +51,23 @@ export default function HeroSection() {
     window.location.href = "/about";
   };
 
+  // Resolve photo URL — server may return it directly, or we check template_data client-side
+  const featuredPhotoUrl = featured ? (() => {
+    if (featured.photo_url) return featured.photo_url;
+    // Fallback: check template_data customizations (Cloudinary URL)
+    const custs = featured.template_data?.customizations;
+    if (custs) {
+      return custs.hero_image
+        || custs.victimImage
+        || custs.hero?.victimImage
+        || custs.hero?.backgroundImage
+        || custs.victim?.image
+        || custs.images?.primary
+        || null;
+    }
+    return null;
+  })() : null;
+
   // Build display name
   const displayName = featured
     ? `${featured.first_name}${featured.last_name ? ' ' + featured.last_name.charAt(0) + '.' : ''}`
@@ -154,9 +171,9 @@ export default function HeroSection() {
                   </div>
 
                   {/* Photo */}
-                  {featured.photo_url ? (
+                  {featuredPhotoUrl ? (
                     <img
-                      src={featured.photo_url}
+                      src={featuredPhotoUrl}
                       alt={featured.first_name}
                       className="w-full h-48 object-cover rounded-2xl group-hover:scale-[1.02] transition-transform duration-300"
                     />
