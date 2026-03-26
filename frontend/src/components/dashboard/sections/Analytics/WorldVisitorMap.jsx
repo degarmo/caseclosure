@@ -318,19 +318,31 @@ export default function WorldVisitorMap({ geoData }) {
                   );
                 })}
 
-                {/* City dots */}
+                {/* Pulsing city dots */}
                 {visibleCities.map((city, i) => {
                   const [cx, cy] = project([city.lng, city.lat]);
+                  const isWorld = region === 'world';
+                  const coreR  = Math.max(isWorld ? 1.5 : 2,   Math.min(isWorld ? 4   : 6,   1 + city.visitors * 0.4));
+                  const ringR  = Math.max(isWorld ? 3   : 4.5, Math.min(isWorld ? 7   : 12,  coreR * 2.2));
+                  const color  = city.suspicious > 0 ? '#ef4444' : '#facc15';
+                  // Stagger pulse so every dot doesn't pulse in unison
+                  const delay  = `${(i * 0.37) % 2}s`;
                   return (
-                    <circle
-                      key={i}
-                      cx={cx} cy={cy}
-                      r={Math.max(region === 'world' ? 1.5 : 2.5, Math.min(region === 'world' ? 5 : 8, 1 + city.visitors * 0.5))}
-                      fill={city.suspicious > 0 ? '#ef4444' : '#facc15'}
-                      opacity={0.85}
-                      stroke="#0f172a"
-                      strokeWidth="0.5"
-                    />
+                    <g key={i} style={{ pointerEvents: 'none' }}>
+                      {/* Outer pulse ring */}
+                      <circle cx={cx} cy={cy} r={ringR} fill={color} opacity={0}>
+                        <animate attributeName="r"      values={`${coreR};${ringR * 1.6};${ringR * 1.6}`} dur="2s" begin={delay} repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.55;0;0"                                  dur="2s" begin={delay} repeatCount="indefinite" />
+                      </circle>
+                      {/* Solid core dot */}
+                      <circle
+                        cx={cx} cy={cy} r={coreR}
+                        fill={color}
+                        opacity={0.9}
+                        stroke="#0f172a"
+                        strokeWidth={isWorld ? '0.4' : '0.6'}
+                      />
+                    </g>
                   );
                 })}
               </svg>
@@ -367,8 +379,18 @@ export default function WorldVisitorMap({ geoData }) {
                   </span>
                 ))}
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" />
-                  City
+                  <span className="relative inline-flex w-2.5 h-2.5">
+                    <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-yellow-400 opacity-60" />
+                    <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                  </span>
+                  City (live)
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="relative inline-flex w-2.5 h-2.5">
+                    <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-red-500 opacity-60" />
+                    <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-red-500" />
+                  </span>
+                  Suspicious
                 </span>
               </div>
             </>
