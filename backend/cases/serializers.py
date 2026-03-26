@@ -507,9 +507,19 @@ class CreateCaseInvitationSerializer(serializers.Serializer):
         return value
     
     def validate(self, data):
-        """Verify the inviter owns the case"""
+        """Verify the inviter owns the case or is an admin/staff member"""
         case = Case.objects.get(id=data['case_id'])
-        if case.user_id != data['invited_by']:
+        request = self.context.get('request')
+        inviter = request.user if request else None
+
+        # Admins and staff can share any case
+        is_admin = inviter and (
+            inviter.is_staff or
+            inviter.is_superuser or
+            getattr(inviter, 'account_type', '') == 'admin'
+        )
+
+        if not is_admin and case.user_id != data['invited_by']:
             raise serializers.ValidationError(
                 "You can only invite people to cases you own"
             )

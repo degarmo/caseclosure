@@ -136,8 +136,9 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
       // Handle both array and paginated responses
       const casesData = Array.isArray(response.data) ? response.data : (response.data.results || []);
       
-      // Filter to only show cases owned by current user
-      const userCases = casesData.filter(c => c.user === user?.id);
+      // Admins can share any case; regular users only see their own
+      const isAdmin = permissions?.isAdmin?.() || user?.is_staff || user?.is_superuser;
+      const userCases = isAdmin ? casesData : casesData.filter(c => c.user === user?.id);
       
       setCases(userCases);
       setError(null);
@@ -231,12 +232,20 @@ export default function ShareAccess({ user, permissions, onSuccess }) {
         errorMessage: err.message
       });
 
-      setError(
-        err.response?.data?.detail || 
-        err.response?.data?.error ||
+      // DRF validation errors can be in several shapes — extract a readable message
+      const errData = err.response?.data;
+      const apiError =
+        errData?.detail ||
+        errData?.error ||
+        errData?.non_field_errors?.[0] ||
+        (errData && typeof errData === 'object'
+          ? Object.entries(errData)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v[0] : v}`)
+              .join('; ')
+          : null) ||
         err.message ||
-        'Failed to send invitation'
-      );
+        'Failed to send invitation';
+      setError(apiError);
     } finally {
       setSubmitting(false);
     }
