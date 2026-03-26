@@ -292,18 +292,28 @@ class CaseSerializer(serializers.ModelSerializer):
     
     def get_primary_photo_url(self, obj):
         """Get just the URL of the primary photo"""
-        primary = obj.photos.filter(is_primary=True).first()
-        if not primary:
-            # If no primary photo marked, use the first photo
-            primary = obj.photos.first()
-        
-        if primary and primary.image:
-            request = self.context.get('request')
+        request = self.context.get('request')
+
+        # Check gallery photos first
+        try:
+            primary = obj.photos.filter(is_primary=True).first()
+            if not primary:
+                primary = obj.photos.first()
+            if primary and primary.image:
+                if request:
+                    return request.build_absolute_uri(primary.image.url)
+                return primary.image.url
+        except Exception:
+            pass
+
+        # Fallback to primary_photo field on the Case model
+        if getattr(obj, 'primary_photo', None) and obj.primary_photo:
             if request:
-                return request.build_absolute_uri(primary.image.url)
-            return primary.image.url
+                return request.build_absolute_uri(obj.primary_photo.url)
+            return obj.primary_photo.url
+
         return None
-    
+
     def get_victim_photo_url(self, obj):
         """Alias for primary_photo_url for backward compatibility"""
         return self.get_primary_photo_url(obj)
@@ -434,15 +444,26 @@ class CaseListSerializer(serializers.ModelSerializer):
     
     def get_primary_photo_url(self, obj):
         """Get the primary photo URL for list view"""
-        primary = obj.photos.filter(is_primary=True).first()
-        if not primary:
-            primary = obj.photos.first()
-        
-        if primary and primary.image:
-            request = self.context.get('request')
+        request = self.context.get('request')
+
+        # Check gallery photos first
+        try:
+            primary = obj.photos.filter(is_primary=True).first()
+            if not primary:
+                primary = obj.photos.first()
+            if primary and primary.image:
+                if request:
+                    return request.build_absolute_uri(primary.image.url)
+                return primary.image.url
+        except Exception:
+            pass
+
+        # Fallback to primary_photo field on the Case model
+        if getattr(obj, 'primary_photo', None) and obj.primary_photo:
             if request:
-                return request.build_absolute_uri(primary.image.url)
-            return primary.image.url
+                return request.build_absolute_uri(obj.primary_photo.url)
+            return obj.primary_photo.url
+
         return None
 
 
