@@ -1371,6 +1371,8 @@ class CaseInvitationViewSet(viewsets.ModelViewSet):
             logger.info(f"[INVITATION] CaseAccess created: {created}, ID: {access.id}")
             
             # Send notification email to existing user
+            email_sent = False
+            email_error_msg = None
             try:
                 logger.info(f"[INVITATION] Calling _send_existing_user_notification()")
                 self._send_existing_user_notification(
@@ -1381,16 +1383,20 @@ class CaseInvitationViewSet(viewsets.ModelViewSet):
                     subject_line=data['subject_line'],
                     message_body=data['message_body']
                 )
-                logger.info(f"[INVITATION] ✓ Notification email method completed")
+                email_sent = True
+                logger.info(f"[INVITATION] ✓ Notification email sent")
             except Exception as email_error:
-                logger.error(f"[INVITATION] ✗ Notification email error: {str(email_error)}", exc_info=True)
-            
+                email_error_msg = str(email_error)
+                logger.error(f"[INVITATION] ✗ Notification email error: {email_error_msg}", exc_info=True)
+
             return Response(
                 {
                     'status': 'success',
                     'message': f'Access granted to {user.get_full_name() or user.email}. Notification sent.',
                     'type': 'existing_user',
-                    'case_access_id': str(access.id)
+                    'case_access_id': str(access.id),
+                    'email_sent': email_sent,
+                    'email_error': email_error_msg,
                 },
                 status=status.HTTP_201_CREATED
             )
@@ -1420,35 +1426,43 @@ class CaseInvitationViewSet(viewsets.ModelViewSet):
             
             logger.info(f"[INVITATION] Invitation created: {created}, ID: {invitation.id}")
             
+            # Whether new or existing invitation, always send/resend the email
+            email_sent = False
+            email_error_msg = None
+            try:
+                logger.info(f"[INVITATION] Calling _send_invitation_email() (created={created})")
+                self._send_invitation_email(
+                    invitation=invitation,
+                    inviter=request.user
+                )
+                email_sent = True
+                logger.info(f"[INVITATION] ✓ Invitation email sent")
+            except Exception as email_error:
+                email_error_msg = str(email_error)
+                logger.error(f"[INVITATION] ✗ Invitation email error: {email_error_msg}", exc_info=True)
+
             if created:
-                # Send invitation email to new user
-                try:
-                    logger.info(f"[INVITATION] Calling _send_invitation_email()")
-                    self._send_invitation_email(
-                        invitation=invitation,
-                        inviter=request.user
-                    )
-                    logger.info(f"[INVITATION] ✓ Invitation email method completed")
-                except Exception as email_error:
-                    logger.error(f"[INVITATION] ✗ Invitation email error: {str(email_error)}", exc_info=True)
-                
                 return Response(
                     {
                         'status': 'success',
                         'message': f'Invitation sent to {invitee_email}',
                         'type': 'new_user',
                         'invitation_id': str(invitation.id),
-                        'expires_in_days': 30
+                        'expires_in_days': 30,
+                        'email_sent': email_sent,
+                        'email_error': email_error_msg,
                     },
                     status=status.HTTP_201_CREATED
                 )
             else:
                 return Response(
                     {
-                        'status': 'already_invited',
-                        'message': f'{invitee_email} has already been invited to this case',
-                        'type': 'duplicate',
-                        'invitation_id': str(invitation.id)
+                        'status': 'success',
+                        'message': f'Invitation resent to {invitee_email}',
+                        'type': 'resent',
+                        'invitation_id': str(invitation.id),
+                        'email_sent': email_sent,
+                        'email_error': email_error_msg,
                     },
                     status=status.HTTP_200_OK
                 )
