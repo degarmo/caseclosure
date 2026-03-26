@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { ArrowRight, Heart, Search, MapPin, Clock, Eye, MessageCircle } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { getAPIBaseURL } from "../../api/config";
+
+const API_BASE = getAPIBaseURL().replace(/\/+$/, '');  // strip trailing slash
 
 function timeAgo(dateStr) {
   if (!dateStr) return null;
@@ -30,12 +32,12 @@ export default function HeroSection() {
   const [featured, setFeatured] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/public-stats/`)
+    fetch(`${API_BASE}/public-stats/`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setStats(data); })
       .catch(() => {});
 
-    fetch(`${API_BASE}/api/featured-case/`)
+    fetch(`${API_BASE}/featured-case/`)
       .then(r => r.ok && r.status !== 204 ? r.json() : null)
       .then(data => { if (data) setFeatured(data); })
       .catch(() => {});

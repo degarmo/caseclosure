@@ -3,7 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Clock, Users, Search } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { getAPIBaseURL } from "../../api/config";
+
+const API_BASE = getAPIBaseURL().replace(/\/+$/, '');  // strip trailing slash
 
 const CASE_STATUS_STYLES = {
   active:    'accent-gradient text-slate-800 font-semibold',
@@ -70,7 +72,7 @@ export default function FeaturedCases() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/recent-cases/`)
+    fetch(`${API_BASE}/recent-cases/`)
       .then(r => r.ok ? r.json() : [])
       .then(data => { setCases(Array.isArray(data) ? data : []); })
       .catch(() => {})
