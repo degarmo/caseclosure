@@ -388,12 +388,14 @@ class RegisterView(generics.CreateAPIView):
                 access_level = access_level_map.get(invitation.invitation_type, 'viewer')
                 
                 # Map invitation type to User.account_type
+                # Must match CustomUser.account_type choices:
+                # unverified, verified, helper, detective, advocate, admin
                 account_type_map = {
-                    'police': 'leo',           # Police get LEO account type
-                    'investigator': 'leo',     # Private investigators also get LEO
-                    'advocate': 'advocate',    # Advocates get advocate type
-                    'family': 'verified',      # Family members get verified
-                    'other': 'basic'          # Others get basic
+                    'police': 'detective',     # Law enforcement → detective
+                    'investigator': 'helper',  # Private investigators → helper
+                    'advocate': 'advocate',    # Advocates → advocate
+                    'family': 'verified',      # Family members → verified
+                    'other': 'unverified'      # Others → unverified
                 }
                 account_type = account_type_map.get(invitation.invitation_type, 'basic')
                 

@@ -2,7 +2,7 @@ export function usePermissions(user) {
   const permissions = {
     // Role checks
     isAdmin: () => user?.is_superuser || user?.is_staff || user?.is_admin,
-    isPolice: () => user?.role === 'police' || user?.account_type === 'law_enforcement',
+    isPolice: () => user?.role === 'police' || user?.account_type === 'detective' || user?.account_type === 'leo' || user?.account_type === 'law_enforcement',
     isUser: () => !permissions.isAdmin() && !permissions.isPolice(),
     isReadOnly: () => permissions.isPolice(),
 
