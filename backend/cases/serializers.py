@@ -3,12 +3,13 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
-    Case, 
-    SpotlightPost, 
-    TemplateRegistry, 
-    DeploymentLog, 
+    Case,
+    SpotlightPost,
+    TemplateRegistry,
+    DeploymentLog,
     CasePhoto,
-    CaseInvitation
+    CaseInvitation,
+    TimelineEvent
 )
 
 User = get_user_model()
@@ -138,6 +139,28 @@ class DeploymentLogSerializer(serializers.ModelSerializer):
         return None
 
 
+class TimelineEventSerializer(serializers.ModelSerializer):
+    """Serializer for case timeline events."""
+    class Meta:
+        model = TimelineEvent
+        fields = [
+            'id',
+            'case',
+            'title',
+            'description',
+            'event_type',
+            'date',
+            'time',
+            'location',
+            'source_url',
+            'is_major',
+            'order',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
 class CaseSerializer(serializers.ModelSerializer):
     """
     Main serializer for Case model - Updated with City and State fields
@@ -150,6 +173,7 @@ class CaseSerializer(serializers.ModelSerializer):
     
     # Related serializers
     photos = CasePhotoSerializer(many=True, read_only=True)
+    timeline_events = TimelineEventSerializer(many=True, read_only=True)
     
     # Computed photo fields
     primary_photo = serializers.SerializerMethodField()
@@ -251,10 +275,13 @@ class CaseSerializer(serializers.ModelSerializer):
             # Publishing
             'is_public',
             'is_disabled',
-            
+
             # Related counts
             'spotlight_posts_count',
             'photos_count',
+
+            # Timeline
+            'timeline_events',
         ]
         read_only_fields = [
             'id', 
@@ -276,7 +303,8 @@ class CaseSerializer(serializers.ModelSerializer):
             'spotlight_posts_count',
             'photos_count',
             'latest_deployment',
-            'template_info'
+            'template_info',
+            'timeline_events'
         ]
     
     def get_primary_photo(self, obj):

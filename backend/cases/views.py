@@ -28,15 +28,16 @@ import re
 import time
 import uuid
 
-from .models import (Case, SpotlightPost, TemplateRegistry, DeploymentLog, CasePhoto, CaseAccess, CaseInvitation)
+from .models import (Case, SpotlightPost, TemplateRegistry, DeploymentLog, CasePhoto, CaseAccess, CaseInvitation, TimelineEvent)
 from .serializers import (
-    CaseSerializer, 
-    SpotlightPostSerializer, 
+    CaseSerializer,
+    SpotlightPostSerializer,
     TemplateRegistrySerializer,
     DeploymentLogSerializer,
     CasePhotoSerializer,
     CaseInvitationSerializer,
-    CreateCaseInvitationSerializer
+    CreateCaseInvitationSerializer,
+    TimelineEventSerializer
 )
 from .services.deployment import get_deployment_service
 
@@ -1936,3 +1937,47 @@ def recent_cases(request):
     except Exception as e:
         logger.error(f"Error in recent_cases: {str(e)}")
         return Response([])
+
+
+class TimelineEventViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for case timeline events.
+    Only the case owner, staff, or admin can manage events.
+    """
+    serializer_class = TimelineEventSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = TimelineEvent.objects.all()
+
+        # Filter by case_id query param
+        case_id = self.request.query_params.get('case_id')
+        if case_id:
+            qs = qs.filter(case_id=case_id)
+
+        # Non-staff users can only see events for their own cases
+        if not (user.is_staff or user.is_superuser):
+            qs = qs.filter(case__user=user)
+
+        return qs
+
+    def perform_create(self, serializer):
+        case = serializer.validated_data.get('case')
+        user = self.request.user
+        if not (user.is_staff or user.is_superuser or case.user == user):
+            raise PermissionDenied("You do not own this case.")
+        serializer.save()
+
+    def perform_update(self, serializer):
+        case = serializer.instance.case
+        user = self.request.user
+        if not (user.is_staff or user.is_superuser or case.user == user):
+            raise PermissionDenied("You do not own this case.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if not (user.is_staff or user.is_superuser or instance.case.user == user):
+            raise PermissionDenied("You do not own this case.")
+        instance.delete()

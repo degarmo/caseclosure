@@ -806,6 +806,65 @@ class CaseInvitation(models.Model):
             'other': 'unverified',            # Other
         }
         return mapping.get(invitation_type, 'unverified')
+
+
+class TimelineEvent(models.Model):
+    """
+    Timeline events for a case's public website.
+    Case owners can add key events to display on the Timeline page.
+    """
+
+    EVENT_TYPES = [
+        ('incident', 'Incident'),
+        ('investigation', 'Investigation'),
+        ('arrest', 'Arrest'),
+        ('court', 'Court'),
+        ('memorial', 'Memorial'),
+        ('media', 'Media Coverage'),
+        ('sighting', 'Sighting'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case = models.ForeignKey(
+        Case,
+        on_delete=models.CASCADE,
+        related_name='timeline_events'
+    )
+
+    # Event details
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    event_type = models.CharField(max_length=50, choices=EVENT_TYPES, default='other')
+
+    # Date/time
+    date = models.DateField()
+    time = models.TimeField(null=True, blank=True)
+
+    # Location (optional)
+    location = models.CharField(max_length=255, blank=True)
+
+    # Source link (optional)
+    source_url = models.URLField(blank=True)
+
+    # Highlight flag
+    is_major = models.BooleanField(default=False, help_text="Highlight as a major event on the timeline")
+
+    # Ordering
+    order = models.IntegerField(default=0, help_text="Manual sort order override")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'case_timeline_events'
+        ordering = ['date', 'time', 'order']
+        indexes = [
+            models.Index(fields=['case', 'date']),
+        ]
+
+    def __str__(self):
+        return f"{self.date}: {self.title} ({self.case.case_title})"
     
     def save(self, *args, **kwargs):
         # Auto-set account_type based on invitation_type

@@ -9,7 +9,8 @@ import {
   UserPlus, Shield, Send
 } from 'lucide-react';
 import CaseAccessManager from './CaseAccessManager';
-import { ArrowRightLeft } from 'lucide-react';
+import TimelineTab from './TimelineTab';
+import { ArrowRightLeft, Clock as ClockIcon } from 'lucide-react';
 
 // ── Transfer Ownership Modal ──────────────────────────────────────────────────
 function TransferOwnershipModal({ caseId, caseName, onClose, onTransferred }) {
@@ -198,6 +199,7 @@ export default function CaseDetails() {
     { id: 'investigation', label: 'Investigation', icon: FileText },
     { id: 'reward', label: 'Reward', icon: DollarSign },
     { id: 'deployment', label: 'Deployment', icon: Globe },
+    ...(!isLEO ? [{ id: 'timeline', label: 'Timeline', icon: ClockIcon }] : []),
     ...(!isLEO ? [{ id: 'access', label: 'Access', icon: Shield }] : []),
   ];
 
@@ -353,6 +355,7 @@ export default function CaseDetails() {
               {activeTab === 'investigation' && <InvestigationTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
               {activeTab === 'reward' && <RewardTab caseData={caseData} onChange={handleInputChange} isReadOnly={isLEO} />}
               {activeTab === 'deployment' && <DeploymentTab caseData={caseData} caseId={caseId} onRefresh={loadCaseData} />}
+              {activeTab === 'timeline' && <TimelineTab caseId={caseId} />}
               {activeTab === 'access' && <AccessTab caseId={caseId} caseName={caseData?.case_title || `${caseData?.first_name} ${caseData?.last_name}`} />}
             </div>
           </div>

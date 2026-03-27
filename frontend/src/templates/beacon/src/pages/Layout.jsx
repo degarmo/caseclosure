@@ -29,12 +29,21 @@ export default function Layout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Navigation items - can be customized per template
-  const navigationItems = customizations?.navigation?.items || [
+  const defaultItems = [
     { title: "Home", page: "home", icon: Home },
     { title: "About", page: "about", icon: User },
     { title: "Spotlight", page: "spotlight", icon: Heart },
-    { title: "Contact", page: "contact", icon: Phone }
   ];
+
+  // Conditionally include Timeline if the case has timeline events
+  const hasTimeline = caseData?.timeline_events && caseData.timeline_events.length > 0;
+  if (hasTimeline) {
+    defaultItems.push({ title: "Timeline", page: "timeline", icon: Clock });
+  }
+
+  defaultItems.push({ title: "Contact", page: "contact", icon: Phone });
+
+  const navigationItems = customizations?.navigation?.items || defaultItems;
 
   // Get display name
   const getDisplayName = () => {

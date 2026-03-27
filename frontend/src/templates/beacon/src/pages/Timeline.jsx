@@ -16,6 +16,13 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+// Parse date string without UTC shift
+const parseLocalDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
 const eventTypeConfig = {
   incident: { color: "bg-red-500", icon: AlertTriangle, label: "Incident" },
   investigation: { color: "bg-blue-500", icon: Shield, label: "Investigation" },
@@ -68,7 +75,7 @@ export default function Timeline({ caseData = {}, customizations = {}, isEditing
                   <div className="md:hidden mb-4">
                     <Badge variant="outline" className="bg-white border-slate-300">
                       <Calendar className="w-3 h-3 mr-1" />
-                      {format(new Date(event.date), "MMM d, yyyy")}
+                      {format(parseLocalDate(event.date), "MMM d, yyyy")}
                     </Badge>
                   </div>
 
@@ -77,10 +84,10 @@ export default function Timeline({ caseData = {}, customizations = {}, isEditing
                     <div className="hidden md:block w-32 text-right">
                       <div className="sticky top-24">
                         <div className="text-sm font-medium text-slate-600">
-                          {format(new Date(event.date), "MMM d")}
+                          {format(parseLocalDate(event.date), "MMM d")}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {format(new Date(event.date), "yyyy")}
+                          {format(parseLocalDate(event.date), "yyyy")}
                         </div>
                       </div>
                     </div>

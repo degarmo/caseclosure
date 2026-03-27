@@ -11,6 +11,7 @@ from .views import (
     DeploymentLogViewSet,
     ImageUploadView,
     CaseInvitationViewSet,
+    TimelineEventViewSet,
     public_stats,
     featured_case,
     recent_cases,
@@ -26,6 +27,7 @@ router.register(r'templates', TemplateRegistryViewSet, basename='template')
 router.register(r'case-photos', CasePhotoViewSet, basename='case-photo')
 router.register(r'deployment-logs', DeploymentLogViewSet, basename='deployment-log')
 router.register(r'case-invitations', CaseInvitationViewSet, basename='case-invitation')
+router.register(r'timeline-events', TimelineEventViewSet, basename='timeline-event')
 
 # Combine router URLs with custom paths
 urlpatterns = [
