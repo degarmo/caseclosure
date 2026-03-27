@@ -500,6 +500,7 @@ try:
         'publish-scheduled-spotlight-posts': {
             'task': 'spotlight.tasks.publish_scheduled_posts',
             'schedule': crontab(minute='*/5'),  # Every 5 minutes
+            'options': {'queue': 'batch'},
         },
         # ── ML / tracking ────────────────────────────────────────────────────
         # Batch-analyze any events that landed in the last hour but weren't
@@ -525,6 +526,7 @@ try:
         'health-check': {
             'task': 'tracker.tasks.health_check',
             'schedule': crontab(minute='*/10'),     # Every 10 minutes
+            'options': {'queue': 'batch'},
         },
     }
 except ImportError:
