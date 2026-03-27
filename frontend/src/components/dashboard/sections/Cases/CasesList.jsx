@@ -66,7 +66,7 @@ export default function CasesList({
   });
 
   const handleRowClick = (caseId) => {
-    navigate(`/dashboard/cases/${caseId}`);
+    navigate(`/cases/${caseId}`);
   };
 
   const handleEditCase = (e, caseId) => {
@@ -81,7 +81,7 @@ export default function CasesList({
 
   const handleViewCase = (e, caseId) => {
     e.stopPropagation();
-    navigate(`/dashboard/cases/${caseId}`);
+    navigate(`/cases/${caseId}`);
   };
 
   const toggleCaseStatus = async (e, caseId, isDisabled) => {
