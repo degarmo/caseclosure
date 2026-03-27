@@ -9,11 +9,114 @@ import {
   UserPlus, Shield, Send
 } from 'lucide-react';
 import CaseAccessManager from './CaseAccessManager';
+import { ArrowRightLeft } from 'lucide-react';
+
+// ── Transfer Ownership Modal ──────────────────────────────────────────────────
+function TransferOwnershipModal({ caseId, caseName, onClose, onTransferred }) {
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [transferring, setTransferring] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get('/cases/platform_users/')
+      .then(res => { setUsers(res.data); setLoading(false); })
+      .catch(() => { setError('Failed to load users'); setLoading(false); });
+  }, []);
+
+  const filtered = users.filter(u => {
+    const q = search.toLowerCase();
+    return !q || u.email.toLowerCase().includes(q) || u.name.toLowerCase().includes(q);
+  });
+
+  const handleTransfer = async () => {
+    if (!selectedUserId) return;
+    const target = users.find(u => String(u.id) === String(selectedUserId));
+    if (!window.confirm(`Transfer "${caseName}" to ${target?.name || target?.email}? This cannot be undone.`)) return;
+
+    setTransferring(true);
+    setError('');
+    try {
+      await api.post(`/cases/${caseId}/transfer_ownership/`, { new_owner_id: selectedUserId });
+      onTransferred();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Transfer failed');
+      setTransferring(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-indigo-100 rounded-lg">
+            <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Transfer Ownership</h3>
+            <p className="text-sm text-slate-500">Move this case to another user</p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+        )}
+
+        <input
+          type="text"
+          placeholder="Search by name or email..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full px-3 py-2 mb-3 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+
+        <div className="max-h-60 overflow-y-auto border border-slate-200 dark:border-slate-600 rounded-lg mb-4">
+          {loading ? (
+            <div className="p-4 text-center text-sm text-slate-500">Loading users...</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-4 text-center text-sm text-slate-500">No users found</div>
+          ) : (
+            filtered.map(u => (
+              <button
+                key={u.id}
+                onClick={() => setSelectedUserId(u.id)}
+                className={`w-full text-left px-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors ${
+                  String(selectedUserId) === String(u.id) ? 'bg-indigo-50 dark:bg-indigo-900/30 ring-1 ring-indigo-300' : ''
+                }`}
+              >
+                <p className="font-medium text-sm text-slate-900 dark:text-white">{u.name}</p>
+                <p className="text-xs text-slate-500">{u.email}</p>
+              </button>
+            ))
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleTransfer}
+            disabled={!selectedUserId || transferring}
+            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {transferring ? 'Transferring...' : 'Transfer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function CaseDetails() {
   const { caseId } = useParams();
   const navigate = useNavigate();
-  
+
   const [caseData, setCaseData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -21,6 +124,7 @@ export default function CaseDetails() {
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('basic');
   const [user, setUser] = useState(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   // Get user from localStorage
   useEffect(() => {
@@ -179,6 +283,14 @@ export default function CaseDetails() {
                   </button>
 
                   <button
+                    onClick={() => setShowTransferModal(true)}
+                    className="px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors flex items-center gap-2 font-medium"
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />
+                    Transfer
+                  </button>
+
+                  <button
                     onClick={handleDelete}
                     className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2 font-medium"
                   >
@@ -246,6 +358,21 @@ export default function CaseDetails() {
           </div>
         </div>
       </div>
+
+      {/* Transfer Ownership Modal */}
+      {showTransferModal && (
+        <TransferOwnershipModal
+          caseId={caseId}
+          caseName={caseData?.case_title || `${caseData?.first_name} ${caseData?.last_name}`}
+          onClose={() => setShowTransferModal(false)}
+          onTransferred={() => {
+            setShowTransferModal(false);
+            setSuccessMessage('Case ownership transferred successfully!');
+            loadCaseData();
+            setTimeout(() => setSuccessMessage(''), 5000);
+          }}
+        />
+      )}
     </div>
   );
 }

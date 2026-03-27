@@ -816,6 +816,106 @@ class CaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+    @action(detail=True, methods=['post'])
+    def transfer_ownership(self, request, id=None):
+        """Transfer case ownership to another user.
+
+        Only the current owner, staff, or admin can transfer a case.
+        POST body: { "new_owner_id": <user_id> }
+        """
+        try:
+            case = self.get_object()
+            user = request.user
+
+            # Permission check: must be owner, staff, or admin
+            is_owner = case.user == user
+            is_admin = user.is_staff or user.is_superuser or (
+                hasattr(user, 'profile') and getattr(user.profile, 'account_type', '') == 'admin'
+            )
+            if not is_owner and not is_admin:
+                return Response(
+                    {'error': 'Only the case owner or an admin can transfer ownership.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            new_owner_id = request.data.get('new_owner_id')
+            if not new_owner_id:
+                return Response(
+                    {'error': 'new_owner_id is required.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            User = get_user_model()
+            try:
+                new_owner = User.objects.get(id=new_owner_id, is_active=True)
+            except User.DoesNotExist:
+                return Response(
+                    {'error': 'User not found or inactive.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            if new_owner == case.user:
+                return Response(
+                    {'error': 'This user already owns this case.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            old_owner_email = case.user.email
+            case.user = new_owner
+            case.save(update_fields=['user'])
+
+            logger.info(
+                f"Case {case.id} transferred from {old_owner_email} "
+                f"to {new_owner.email} by {user.email}"
+            )
+
+            return Response({
+                'message': f'Case transferred to {new_owner.email}',
+                'case_id': str(case.id),
+                'new_owner': {
+                    'id': new_owner.id,
+                    'email': new_owner.email,
+                    'name': f'{new_owner.first_name} {new_owner.last_name}'.strip() or new_owner.email,
+                },
+            })
+
+        except Exception as e:
+            logger.error(f"Error transferring case: {str(e)}")
+            return Response(
+                {'error': 'Failed to transfer case ownership.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'])
+    def platform_users(self, request):
+        """Return list of active platform users for ownership transfer dropdown.
+
+        Only staff/admin can list all users.
+        """
+        user = request.user
+        is_admin = user.is_staff or user.is_superuser or (
+            hasattr(user, 'profile') and getattr(user.profile, 'account_type', '') == 'admin'
+        )
+        if not is_admin:
+            return Response(
+                {'error': 'Only admins can list platform users.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        User = get_user_model()
+        users = User.objects.filter(is_active=True).order_by('email').values(
+            'id', 'email', 'first_name', 'last_name'
+        )
+        results = [
+            {
+                'id': u['id'],
+                'email': u['email'],
+                'name': f"{u['first_name'] or ''} {u['last_name'] or ''}".strip() or u['email'],
+            }
+            for u in users
+        ]
+        return Response(results)
+
     @action(detail=False, methods=['get'], url_path='by-subdomain/(?P<subdomain>[^/.]+)', 
             permission_classes=[AllowAny])
     def by_subdomain(self, request, subdomain=None):
